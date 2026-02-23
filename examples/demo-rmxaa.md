@@ -5,11 +5,11 @@ classoption:
   - twoside
 title: "Signal Decomposition in Stellar Light Curves"
 rmxaa-authors:
-  - name: "J.\\,Smith"
+  - name: "J. Smith"
     affiliations: "1"
-  - name: "A.\\,Jones"
+  - name: "A. Jones"
     affiliations: "2"
-  - name: "C.\\,Rivera"
+  - name: "C. Rivera"
     affiliations: "1,2"
 rmxaa-affiliations:
   - id: "1"
@@ -50,7 +50,7 @@ inkwell:
 
 Stellar light curve analysis often requires decomposing periodic signals into frequency components. The Fourier series provides the mathematical framework for this decomposition [@fourier1822], and modern computational tools allow rapid visualization of convergence properties.
 
-This document demonstrates the RMxAA journal template compiled from markdown through Pandoc [@macfarlane2023] and XeLaTeX. Code blocks execute in place, producing figures that appear in the compiled PDF.
+This document demonstrates the RMxAA journal template compiled from markdown through Pandoc [@macfarlane2023] and LaTeX. Code blocks execute in place, producing figures that appear in the compiled PDF.
 
 # FOURIER ANALYSIS
 
