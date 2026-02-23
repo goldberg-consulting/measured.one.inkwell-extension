@@ -33,6 +33,9 @@ acknowledgments: |
   The authors thank the Inkwell contributors for the template system.
 bibliography: references/refs.bib
 link-citations: true
+figPrefix: "figure"
+tblPrefix: "table"
+eqnPrefix: "equation"
 inkwell:
   code-display: output
   python-env: ./venv
@@ -46,29 +49,31 @@ The literate programming paradigm [@knuth1984] allows code and prose to coexist.
 
 # Computational Example
 
-We demonstrate with a Fourier series visualization [@fourier1822]. The partial sum approximating a square wave is:
+We demonstrate with a Fourier series visualization [@fourier1822]. The partial sum approximating a square wave is given by @eq:fourier.
 
-$$f_n(x) = \sum_{k=1}^{n} \frac{4}{(2k-1)\pi}\sin\bigl((2k-1)x\bigr)$$
+$$f_n(x) = \sum_{k=1}^{n} \frac{4}{(2k-1)\pi}\sin\bigl((2k-1)x\bigr)$$ {#eq:fourier}
 
-```{python file="scripts/sine_plot.py" output="sine_plot" caption="Fourier partial sums converging to a square wave."}
+@Fig:fourier shows the partial sums converging to the square wave as $n$ increases. The overshoot at the discontinuity is the Gibbs phenomenon.
+
+```{python file="scripts/sine_plot.py" output="sine_plot" caption="Fourier partial sums converging to a square wave." label="fourier"}
 ```
 
 # Data Visualization
 
-Inline Python generates a scatter plot with regression:
+@Fig:scatter shows a simulated scatter plot with linear regression, generated inline by Python.
 
-```{python file="scripts/scatter.py" output="scatter" caption="Simulated regression with n = 150 data points."}
+```{python file="scripts/scatter.py" output="scatter" caption="Simulated regression with n = 150 data points." label="scatter"}
 ```
 
 # Results
 
-Table 1 shows the convergence behavior of the Fourier partial sums at the midpoint $x = \pi/2$, where the true value is $f(x) = 1$. The peak overshoot column quantifies the Gibbs phenomenon: regardless of $n$, the maximum value overshoots by approximately 9% of the jump magnitude.
+@Tbl:convergence shows the convergence behavior of the Fourier partial sums at the midpoint $x = \pi/2$, where the true value is $f(x) = 1$. The peak overshoot column quantifies the Gibbs phenomenon: regardless of $n$, the maximum value overshoots by approximately 9% of the jump magnitude.
 
 ```{python file="scripts/convergence_table.py" output="convergence" caption="Convergence of Fourier partial sums at x = pi/2." label="convergence"}
 ```
 
 # Conclusion
 
-The Ludus template compiles correctly from markdown through Inkwell, producing the journal's native two-column layout with themed headers, figure captions, generated tables, and bibliography.
+As shown in @Fig:fourier and @Fig:scatter, Inkwell produces publication-quality figures from Python scripts. @Tbl:convergence demonstrates CSV-to-table rendering, and @Eq:fourier confirms that LaTeX math compiles correctly. The Ludus template handles all of these in a two-column layout with themed headers and bibliography.
 
 ## References

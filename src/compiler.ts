@@ -390,6 +390,7 @@ async function compilePandoc(
 
   const clsExpected = path.join(template.dir, "rmaa-rho-class", "rmaa-rho.cls");
   const clsCached = path.join(cacheDir, "rmaa-rho-class", "rmaa-rho.cls");
+  const cacheBib = path.join(cacheDir, "references", "refs.bib");
   const diagnosticLog = [
     `[inkwell] template: ${template.id} (${template.dir})`,
     `[inkwell] pandoc template: ${templateDst}`,
@@ -398,6 +399,9 @@ async function compilePandoc(
     `[inkwell] cls in template dir: ${fs.existsSync(clsExpected)}`,
     `[inkwell] cls in cache dir: ${fs.existsSync(clsCached)}`,
     `[inkwell] engine: ${engine || preferredEngine}`,
+    `[inkwell] pandoc args: ${args.join(" ")}`,
+    `[inkwell] cache bib exists: ${fs.existsSync(cacheBib)}`,
+    `[inkwell] cache dir contents: ${(() => { try { return fs.readdirSync(cacheDir).join(", "); } catch { return "error"; } })()}`,
   ].join("\n");
 
   try {
