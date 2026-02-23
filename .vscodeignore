@@ -1,0 +1,29 @@
+# Source (compiled JS in out/ is all that's needed)
+src/**
+tsconfig.json
+.eslint*
+
+# Dev and CI
+.cursor/**
+.vscode/**
+.vscode-test/**
+.git/**
+.gitignore
+node_modules/**
+
+# Documentation and examples (available on GitHub)
+examples/**
+demo-project/**
+CHANGELOG.md
+
+# Large media used only in the GitHub README
+media/hero-banner.png
+media/workflow.png
+media/editor-preview.png
+media/run-preview.png
+media/compile-preview.png
+media/examples/**
+
+# Build artifacts
+*.vsix
+**/*.map
