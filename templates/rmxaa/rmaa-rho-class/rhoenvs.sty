@@ -1,0 +1,105 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% --------------------------------------------------------
+% Rhoenvs
+% LaTeX Package
+% Version 1.0.1 (21/05/2024)
+%
+% Authors: 
+% Guillermo Jimenez (memo.notess1@gmail.com)
+% Eduardo Gracidas (eduardo.gracidas29@gmail.com)
+% --------------------------------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% --------------------------------------------------------
+%                        WARNING!
+% --------------------------------------------------------
+% Do not remove this package from 'rmma-rho.class' folder
+% to avoid compilation problems. This package defines 
+% the included environments and colors.
+% --------------------------------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%----------------------------------------------------------
+% PACKAGE CONFIGURATION
+%----------------------------------------------------------
+
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{rmaa-rho-class/rhoenvs}[2024/05/21]
+
+%----------------------------------------------------------
+% COLORS
+%----------------------------------------------------------
+
+\RequirePackage{xcolor}
+\definecolor{rhocolor}{RGB}{0,61,121} % Blue
+\definecolor{rhoyellow}{RGB}{213,159,15} 
+
+%----------------------------------------------------------
+% RHOENV-, INFO-, NOTE- ENVIRONMENTS
+%----------------------------------------------------------
+
+% Rhoenv
+\newmdenv[
+   backgroundcolor=rhocolor!22, 	
+%   backgroundcolor=fff3c8,
+    linecolor=rhocolor!22,									
+    linewidth=0.7pt,
+    frametitle=\vskip0pt\bfseries,
+    frametitlerule=false,
+    frametitlefont=\color{rhocolor}\bfseries\sffamily,
+    frametitlealignment=\raggedright,
+    innertopmargin=3pt,
+    innerbottommargin=6pt,
+    innerleftmargin=6pt,
+    innerrightmargin=6pt,
+    font=\selectfont,
+    fontcolor=rhocolor,									
+    frametitleaboveskip=8pt,
+    skipabove=10pt
+]{rhoenv}
+
+%----------------------------------------------------------
+
+% Info
+\newmdenv[
+    backgroundcolor=rhocolor!22, 						
+    linecolor=rhocolor!22,									
+    linewidth=0.7pt,
+    frametitle=\vskip0pt\bfseries\infolanguage,
+    frametitlerule=false,
+    %frametitlefont=\color{rhocolor}\bfseries\sffamily,
+    frametitlefont=\bfseries\normalfont,
+    frametitlealignment=\raggedright,
+    innertopmargin=3pt,
+    innerbottommargin=6pt,
+    innerleftmargin=6pt,
+    innerrightmargin=6pt,
+    font=\normalfont,
+    fontcolor=rhocolor,									
+    frametitleaboveskip=3pt,
+    skipabove=10pt
+]{info}
+
+%----------------------------------------------------------
+
+% Note
+\newmdenv[
+    backgroundcolor=rhocolor!22, 						
+    linecolor=rhocolor!22,									
+    linewidth=0.7pt,
+    frametitle=\vskip0pt\bfseries\notelanguage,
+    frametitlerule=false,
+    frametitlefont=\color{rhocolor}\bfseries\sffamily,
+    frametitlealignment=\raggedright,
+    innertopmargin=3pt,
+    innerbottommargin=6pt,
+    innerleftmargin=6pt,
+    innerrightmargin=6pt,
+    font=\normalfont,
+    fontcolor=rhocolor,									
+    frametitleaboveskip=3pt,
+    skipabove=10pt
+]{note}
+
+%----------------------------------------------------------
+
+\endinput

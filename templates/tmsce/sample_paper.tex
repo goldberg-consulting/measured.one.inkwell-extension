@@ -1,0 +1,159 @@
+\documentclass{tmsce}
+
+% ---------------- Your packages ----------------
+\usepackage{lipsum}
+\usepackage{amsmath,amsfonts,amsthm}
+\usepackage{algorithmic}
+\usepackage{algorithm}
+\usepackage{array}
+\usepackage[caption=false,font=normalsize,labelfont=sf,textfont=sf]{subfig}
+\usepackage{textcomp}
+\usepackage{stfloats}
+\usepackage{url}
+\usepackage{verbatim}
+\usepackage{graphicx}
+\usepackage{cite}
+\usepackage{mwe} % provides example-image (remove later when you use your real images)
+
+\hyphenation{op-tical net-works semi-conduc-tor IEEE-Xplore}
+
+% ---------------- Journal meta ----------------
+\doi{10.0000/tmsce.2026.001}
+\copyrightline{© Published by \textbf{Transactions on Mathematical Sciences and Computational Engineering}.\\ The Tribhuj Publishers}
+\permissions{For permissions, please contact:\\\url{tmsce.editorial@gmail.com}}
+
+\vol{1}
+\issue{1}
+\yearofpub{2026}
+\pagerange{1--12}
+
+% ---------------- Title/Author ----------------
+\title{Title goes here}
+
+\authors{Author$^{1}$ and Author$^{2}$}
+\affiliation{$^{1}$Department of XYZ, Institute W, Country P\\
+$^{2}$Department of XYZ, ABC Institute, India\\
+\textit{Corresponding author:} abcd@xyz.com}
+
+\received{14 December 2025}
+\revised{18 May 2026}
+\accepted{20 June 2026}
+
+\keywords{certificateless signatures; multivariate cryptography; provable security; computational engineering}
+
+% ---------------- Theorem environments (sample) ----------------
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+\end{abstract}
+
+\printkeywords
+\printdates
+
+% optional separator line (single-column)
+\tmsceendfrontmatter
+
+% =========================================================
+\section{Introduction}
+\lipsum[1]
+
+We will refer to a classic text using a sample citation \cite{knuth84}.
+We also demonstrate inline math, e.g., $e^{i\pi}+1=0$, and a displayed equation:
+\begin{equation}\label{eq:sample}
+\sum_{k=1}^{n} k = \frac{n(n+1)}{2}.
+\end{equation}
+
+\subsection{A sample theorem}
+\begin{theorem}[Toy result]
+For every integer $n\ge 1$, the sum $\sum_{k=1}^{n} k$ is equal to $\frac{n(n+1)}{2}$.
+\end{theorem}
+\begin{proof}
+The proof can be done by induction. The base case $n=1$ holds. Assume true for $n$.
+Then $\sum_{k=1}^{n+1} k = \left(\sum_{k=1}^{n} k\right) + (n+1) = \frac{n(n+1)}{2} + (n+1)=\frac{(n+1)(n+2)}{2}$.
+\end{proof}
+
+% =========================================================
+\section{Sample Figure(s)}
+Figure~\ref{fig:single} shows a sample figure. Figure~\ref{fig:subfig} shows two subfigures.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.75\linewidth]{example-image}
+\caption{A sample figure (replace \texttt{example-image} with your own file).}
+\label{fig:single}
+\end{figure}
+
+\begin{figure}[!t]
+\centering
+\subfloat[First subfigure]{%
+  \includegraphics[width=0.45\linewidth]{example-image-a}
+  \label{fig:subA}
+}\hfill
+\subfloat[Second subfigure]{%
+  \includegraphics[width=0.45\linewidth]{example-image-b}
+  \label{fig:subB}
+}
+\caption{A sample subfigure layout.}
+\label{fig:subfig}
+\end{figure}
+
+% =========================================================
+\section{Sample Table}
+Table~\ref{tab:example} shows a simple table with aligned columns.
+
+\begin{table}[!t]
+\centering
+\caption{A sample table for demonstration.}
+\label{tab:example}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|c|c|c|}
+\hline
+\textbf{Method} & \textbf{Time (ms)} & \textbf{Accuracy (\%)} \\
+\hline
+Baseline & 12.5 & 91.2 \\
+Proposed & 10.1 & 93.8 \\
+Optimized & 8.7 & 94.4 \\
+\hline
+\end{tabular}
+\end{table}
+
+% =========================================================
+\section{Sample Algorithm}
+Algorithm~\ref{alg:sample} shows a basic algorithm environment.
+
+\begin{algorithm}[!t]
+\caption{Sample procedure (toy example).}
+\label{alg:sample}
+\begin{algorithmic}[1]
+\REQUIRE Input array $A[1..n]$
+\ENSURE \texttt{true} if $A$ is non-decreasing, else \texttt{false}
+\FOR{$i \leftarrow 1$ to $n-1$}
+  \IF{$A[i] > A[i+1]$}
+    \RETURN \texttt{false}
+  \ENDIF
+\ENDFOR
+\RETURN \texttt{true}
+\end{algorithmic}
+\end{algorithm}
+
+% =========================================================
+\section{Conclusion}
+We included samples of an equation (Eq.~\ref{eq:sample}), figures (Fig.~\ref{fig:single}--\ref{fig:subfig}),
+a table (Table~\ref{tab:example}), and an algorithm (Algorithm~\ref{alg:sample}) to serve as a template.
+
+\bibliographystyle{plain}
+\begin{thebibliography}{1}
+
+\bibitem{knuth84}
+Donald~E. Knuth.
+\newblock \emph{The \TeX book}.
+\newblock Addison-Wesley, 1984.
+
+\end{thebibliography}
+
+\end{document}

@@ -1,0 +1,6 @@
+{
+  "name": "RMxAA",
+  "description": "Revista Mexicana de Astronomia y Astrofisica (v4.6). Set vol, pages, yearofpub, rmxaa-authors, rmxaa-affiliations, leadauthor, smalltitle, corresponding-author, corresponding-email, resumen, keywords in YAML frontmatter.",
+  "documentclass": "rmaa-rho",
+  "type": "xelatex"
+}

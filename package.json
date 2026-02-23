@@ -1,0 +1,169 @@
+{
+  "name": "inkwell",
+  "displayName": "Inkwell",
+  "description": "Markdown to publication-quality PDF. Live preview, Pandoc + XeLaTeX compilation, runnable code blocks, and LaTeX template management.",
+  "version": "0.1.0",
+  "publisher": "measure-one",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Visualization",
+    "Notebooks",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "markdown",
+    "latex",
+    "pandoc",
+    "pdf",
+    "xelatex",
+    "academic",
+    "preview",
+    "literate programming"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/goldberg-consulting/measured.one.inkwell-extension"
+  },
+  "activationEvents": [
+    "onLanguage:markdown",
+    "onLanguage:latex",
+    "workspaceContains:.inkwell"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "inkwell.preview",
+        "title": "Inkwell: Open Preview",
+        "category": "Inkwell",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "inkwell.compile",
+        "title": "Inkwell: Compile PDF",
+        "category": "Inkwell"
+      },
+      {
+        "command": "inkwell.exportPDF",
+        "title": "Inkwell: Export PDF to File...",
+        "category": "Inkwell"
+      },
+      {
+        "command": "inkwell.selectTemplate",
+        "title": "Inkwell: Select LaTeX Template",
+        "category": "Inkwell"
+      },
+      {
+        "command": "inkwell.setupToolchain",
+        "title": "Inkwell: Check / Install Toolchain (Pandoc, XeLaTeX)",
+        "category": "Inkwell"
+      },
+      {
+        "command": "inkwell.runCodeBlocks",
+        "title": "Inkwell: Run Code Blocks",
+        "category": "Inkwell"
+      },
+      {
+        "command": "inkwell.clearRunCache",
+        "title": "Inkwell: Clear Code Block Cache",
+        "category": "Inkwell"
+      },
+      {
+        "command": "inkwell.cancelRun",
+        "title": "Inkwell: Cancel Running Code Blocks",
+        "category": "Inkwell"
+      },
+      {
+        "command": "inkwell.setupPythonEnv",
+        "title": "Inkwell: Setup Python Environment (venv)",
+        "category": "Inkwell"
+      },
+      {
+        "command": "inkwell.initProject",
+        "title": "Inkwell: New Project",
+        "category": "Inkwell"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "inkwell.preview",
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v",
+        "when": "editorLangId == markdown || editorLangId == latex"
+      },
+      {
+        "command": "inkwell.compile",
+        "key": "ctrl+shift+r",
+        "mac": "cmd+shift+r",
+        "when": "editorLangId == markdown || editorLangId == latex"
+      },
+      {
+        "command": "inkwell.runCodeBlocks",
+        "key": "ctrl+shift+b",
+        "mac": "cmd+shift+b",
+        "when": "editorLangId == markdown"
+      }
+    ],
+    "configuration": {
+      "title": "Inkwell",
+      "properties": {
+        "inkwell.autoCompile": {
+          "type": "string",
+          "enum": ["off", "onSave", "interval"],
+          "default": "off",
+          "enumDescriptions": [
+            "Manual compilation only (use the toolbar button or keybinding)",
+            "Compile automatically each time the file is saved",
+            "Compile on a repeating timer (see autoCompileIntervalSeconds)"
+          ],
+          "description": "When to automatically compile the PDF."
+        },
+        "inkwell.autoCompileIntervalSeconds": {
+          "type": "number",
+          "default": 60,
+          "minimum": 10,
+          "description": "Seconds between auto-compilations when autoCompile is 'interval'."
+        },
+        "inkwell.defaultCodeDisplay": {
+          "type": "string",
+          "enum": ["output", "both", "code", "none"],
+          "default": "output",
+          "enumDescriptions": [
+            "Show only the output of code blocks",
+            "Show both the source code and its output",
+            "Show only the source code",
+            "Hide code blocks entirely"
+          ],
+          "description": "Default visibility for code blocks in compiled output. Can be overridden per-document (inkwell.code-display in frontmatter) or per-block (display attribute)."
+        }
+      }
+    },
+    "menus": {
+      "editor/title": [
+        {
+          "command": "inkwell.preview",
+          "when": "editorLangId == markdown || editorLangId == latex",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "dependencies": {
+    "markdown-it": "^14.1.0"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.1.2",
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}

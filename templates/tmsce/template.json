@@ -1,0 +1,6 @@
+{
+  "name": "TMSCE",
+  "description": "Transactions on Mathematical Sciences and Computational Engineering. Set doi, vol, issue, yearofpub, authors, affiliation, keywords, received, revised, accepted in YAML frontmatter.",
+  "documentclass": "tmsce",
+  "type": "xelatex"
+}

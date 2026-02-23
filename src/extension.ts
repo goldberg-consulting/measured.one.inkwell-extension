@@ -1,0 +1,330 @@
+import * as vscode from "vscode";
+import { InkwellPreviewProvider } from "./preview";
+import { compile, exportPDF, isCompilable } from "./compiler";
+import { InkwellDiagnostics } from "./diagnostics";
+import { selectTemplateCommand } from "./templates";
+import { findInkwellRoot, saveManifestField } from "./config";
+import { checkToolchain, showToolchainStatus } from "./toolchain";
+import { runAllBlocks, parseCodeBlocks, RunCancellation } from "./runner";
+import { clearCache } from "./cache";
+import { initProject } from "./scaffold";
+import * as path from "path";
+import * as fs from "fs";
+
+let diagnostics: InkwellDiagnostics;
+let autoCompileTimer: ReturnType<typeof setInterval> | undefined;
+let isCompiling = false;
+let activeRunCancel: RunCancellation | undefined;
+
+export function activate(context: vscode.ExtensionContext) {
+  diagnostics = new InkwellDiagnostics();
+
+  const previewProvider = new InkwellPreviewProvider(context);
+  previewProvider.setDiagnostics(diagnostics);
+
+  previewProvider.onRun = async () => {
+    const doc = previewProvider.getDocument();
+    if (!doc || !isCompilable(doc)) {
+      vscode.window.showWarningMessage("Open a markdown or LaTeX file first.");
+      return;
+    }
+    await runCodeBlocksWithProgress(doc, previewProvider);
+  };
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("inkwell.preview", () => {
+      previewProvider.show();
+    }),
+
+    vscode.commands.registerCommand("inkwell.compile", async () => {
+      const doc =
+        vscode.window.activeTextEditor?.document ?? previewProvider.getDocument();
+      if (!doc || !isCompilable(doc)) {
+        vscode.window.showWarningMessage("Open a markdown or LaTeX file first.");
+        return;
+      }
+      await runCompile(doc);
+    }),
+
+    vscode.commands.registerCommand("inkwell.exportPDF", async () => {
+      const doc =
+        vscode.window.activeTextEditor?.document ?? previewProvider.getDocument();
+      if (!doc || !isCompilable(doc)) {
+        vscode.window.showWarningMessage("Open a markdown or LaTeX file first.");
+        return;
+      }
+      await exportPDF(doc, diagnostics);
+    }),
+
+    vscode.commands.registerCommand("inkwell.selectTemplate", async () => {
+      const doc =
+        vscode.window.activeTextEditor?.document ?? previewProvider.getDocument();
+      const uri = doc?.uri;
+      const templateId = await selectTemplateCommand(uri);
+      if (!templateId) return;
+
+      const root = uri ? findInkwellRoot(uri) : undefined;
+      if (root) {
+        saveManifestField(root, "template", templateId);
+        vscode.window.showInformationMessage(
+          `Template set to "${templateId}" in .inkwell/manifest.json`
+        );
+      } else {
+        vscode.window.showInformationMessage(
+          `Selected "${templateId}". Add template: ${templateId} to your YAML frontmatter, or create an .inkwell/ project to persist this choice.`
+        );
+      }
+    }),
+
+    vscode.commands.registerCommand("inkwell.setupToolchain", () => {
+      showToolchainStatus();
+    }),
+
+    vscode.commands.registerCommand("inkwell.runCodeBlocks", async () => {
+      const doc =
+        vscode.window.activeTextEditor?.document ?? previewProvider.getDocument();
+      if (!doc || !isCompilable(doc)) {
+        vscode.window.showWarningMessage("Open a markdown or LaTeX file first.");
+        return;
+      }
+      await runCodeBlocksWithProgress(doc, previewProvider);
+    }),
+
+    vscode.commands.registerCommand("inkwell.cancelRun", () => {
+      if (activeRunCancel) {
+        activeRunCancel.cancel();
+      }
+    }),
+
+    vscode.commands.registerCommand("inkwell.clearRunCache", async () => {
+      const doc =
+        vscode.window.activeTextEditor?.document ?? previewProvider.getDocument();
+      if (!doc) return;
+      const sourceDir = path.dirname(doc.uri.fsPath);
+      const cacheDir = path.join(sourceDir, ".inkwell", "outputs");
+      clearCache(cacheDir);
+      vscode.window.showInformationMessage("Inkwell: Code block cache cleared.");
+    }),
+
+    vscode.commands.registerCommand("inkwell.setupPythonEnv", async () => {
+      const doc =
+        vscode.window.activeTextEditor?.document ?? previewProvider.getDocument();
+      if (!doc) return;
+      await setupPythonEnv(doc);
+    }),
+
+    vscode.commands.registerCommand("inkwell.initProject", () => {
+      initProject();
+    }),
+
+    vscode.workspace.onDidSaveTextDocument((document) => {
+      const mode = vscode.workspace
+        .getConfiguration("inkwell")
+        .get<string>("autoCompile");
+      if (mode === "onSave" && isCompilable(document)) {
+        runCompile(document);
+      }
+    }),
+
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration("inkwell.autoCompile") ||
+          e.affectsConfiguration("inkwell.autoCompileIntervalSeconds")) {
+        setupAutoCompileTimer();
+      }
+    }),
+
+    diagnostics
+  );
+
+  setupAutoCompileTimer();
+  activationCheck();
+}
+
+export function deactivate() {
+  if (autoCompileTimer) {
+    clearInterval(autoCompileTimer);
+    autoCompileTimer = undefined;
+  }
+}
+
+function setupAutoCompileTimer(): void {
+  if (autoCompileTimer) {
+    clearInterval(autoCompileTimer);
+    autoCompileTimer = undefined;
+  }
+
+  const config = vscode.workspace.getConfiguration("inkwell");
+  const mode = config.get<string>("autoCompile");
+  if (mode !== "interval") return;
+
+  const seconds = config.get<number>("autoCompileIntervalSeconds") || 60;
+  autoCompileTimer = setInterval(() => {
+    const editor = vscode.window.activeTextEditor;
+    if (editor && isCompilable(editor.document)) {
+      runCompile(editor.document);
+    }
+  }, seconds * 1000);
+}
+
+async function runCompile(document: vscode.TextDocument): Promise<void> {
+  if (isCompiling) return;
+  isCompiling = true;
+
+  try {
+    const result = await compile(document);
+    diagnostics.report(document.uri, result.errors);
+    if (result.success && result.pdfPath) {
+      vscode.window.setStatusBarMessage(
+        `Inkwell: PDF compiled (${result.duration.toFixed(1)}s)`,
+        5000
+      );
+    } else if (result.errors.length > 0) {
+      vscode.window.setStatusBarMessage(
+        `Inkwell: ${result.errors.length} error(s)`,
+        5000
+      );
+    }
+  } finally {
+    isCompiling = false;
+  }
+}
+
+async function runCodeBlocksWithProgress(
+  document: vscode.TextDocument,
+  previewProvider: InkwellPreviewProvider
+): Promise<void> {
+  if (activeRunCancel) {
+    activeRunCancel.cancel();
+    activeRunCancel = undefined;
+  }
+
+  const text = document.getText();
+  const blocks = parseCodeBlocks(text);
+
+  if (!blocks.length) {
+    vscode.window.showInformationMessage("No executable code blocks found.");
+    return;
+  }
+
+  const sourceFile = document.uri.fsPath;
+  const cancel = new RunCancellation();
+  activeRunCancel = cancel;
+
+  previewProvider.sendRunStarted(blocks.length);
+
+  const results = await runAllBlocks(text, sourceFile, cancel, (p) => {
+    previewProvider.sendBlockProgress(p);
+    if (p.warning) {
+      previewProvider.sendLogEntry("error", p.warning);
+    }
+    if (p.interpreter && p.status === "running") {
+      previewProvider.sendLogEntry("info", `Block ${p.index + 1}: using ${p.interpreter}`);
+    }
+  });
+
+  activeRunCancel = undefined;
+
+  const failed = results.filter((r) => r.exitCode !== 0 && r.exitCode !== 130);
+  const cancelled = results.filter((r) => r.exitCode === 130);
+  const cached = results.filter((r) => r.cached);
+  const ran = results.length - cached.length - cancelled.length;
+
+  for (const r of failed) {
+    previewProvider.sendLogEntry(
+      "error",
+      `Block ${r.block.index + 1} (${r.block.lang}) failed`,
+      r.stderr,
+    );
+  }
+
+  if (cancel.cancelled) {
+    previewProvider.sendRunComplete("cancelled", ran, cached.length, cancelled.length);
+  } else if (failed.length) {
+    previewProvider.sendRunComplete("failed", ran, cached.length, 0, failed.length);
+  } else {
+    previewProvider.sendRunComplete("done", ran, cached.length);
+  }
+
+  previewProvider.notifyBlocksRan();
+}
+
+async function setupPythonEnv(document: vscode.TextDocument): Promise<void> {
+  const docDir = path.dirname(document.uri.fsPath);
+
+  const envOptions = [
+    { label: "./venv", detail: "Create venv in document directory" },
+    { label: "./.inkwell/venv", detail: "Create venv in .inkwell project directory" },
+    { label: "Custom path...", detail: "Specify a custom venv location" },
+  ];
+
+  const pick = await vscode.window.showQuickPick(envOptions, {
+    placeHolder: "Where should the Python virtual environment be created?",
+  });
+  if (!pick) return;
+
+  let envPath: string;
+  if (pick.label === "Custom path...") {
+    const input = await vscode.window.showInputBox({
+      prompt: "Path for the virtual environment (relative to document or absolute)",
+      value: "./venv",
+    });
+    if (!input) return;
+    envPath = input;
+  } else {
+    envPath = pick.label;
+  }
+
+  const resolved = path.resolve(docDir, envPath);
+  const reqFile = path.join(docDir, "requirements.txt");
+  const hasReqs = fs.existsSync(reqFile);
+
+  const terminal = vscode.window.createTerminal("Inkwell Python Env");
+  terminal.show();
+
+  const commands: string[] = [];
+
+  if (fs.existsSync(resolved)) {
+    commands.push(`echo "Venv already exists at ${resolved}"`);
+  } else {
+    commands.push(`python3 -m venv "${resolved}"`);
+  }
+
+  commands.push(`source "${resolved}/bin/activate"`);
+
+  if (hasReqs) {
+    commands.push(`pip install -r "${reqFile}"`);
+  } else {
+    const installPick = await vscode.window.showInputBox({
+      prompt: "Packages to install (space-separated, or leave empty)",
+      placeHolder: "numpy matplotlib pandas",
+    });
+    if (installPick?.trim()) {
+      commands.push(`pip install ${installPick.trim()}`);
+    }
+  }
+
+  commands.push(`python3 --version`);
+  commands.push(`echo "Venv ready at ${envPath}"`);
+  commands.push(`echo "Add to your frontmatter:  python-env: ${envPath}"`);
+
+  terminal.sendText(commands.join(" && "));
+}
+
+async function activationCheck() {
+  const status = await checkToolchain();
+  if (status.pandoc.installed && status.xelatex.installed) return;
+
+  const missing: string[] = [];
+  if (!status.pandoc.installed) missing.push("pandoc");
+  if (!status.xelatex.installed) missing.push("xelatex");
+
+  const choice = await vscode.window.showWarningMessage(
+    `Inkwell: ${missing.join(" and ")} not found. PDF compilation requires these tools.`,
+    "Setup now",
+    "Dismiss"
+  );
+
+  if (choice === "Setup now") {
+    showToolchainStatus();
+  }
+}
