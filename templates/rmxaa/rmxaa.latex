@@ -179,7 +179,7 @@ $header-includes$
 $endfor$
 
 \begin{document}
-$if(linenumbers)$$else$\nolinenumbers$endif$
+$if(linenumbers)$\linenumbers$endif$
 
 \maketitle
 \pagestyle{fancy}\thispagestyle{firststyle}

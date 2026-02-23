@@ -31,7 +31,7 @@
 \let\oldtablenotetext\tablenotetext
 
 % --- Continúa con el resto de paquetes ---
-\AtBeginDocument{\linenumbers}
+% \AtBeginDocument{\linenumbers}  % controlled by template via YAML frontmatter
 \AtEndOfClass{\let\CheckCommand\providecommand\RequirePackage{microtype}}
 
 %----------------------------------------------------------

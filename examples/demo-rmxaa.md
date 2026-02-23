@@ -39,7 +39,7 @@ pages: "1--6"
 yearofpub: 2026
 received: "January 15, 2026"
 accepted: "February 20, 2026"
-linenumbers: true
+linenumbers: false
 bibliography: references/refs.bib
 link-citations: true
 inkwell:
