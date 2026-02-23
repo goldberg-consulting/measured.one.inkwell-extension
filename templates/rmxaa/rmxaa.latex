@@ -1,31 +1,31 @@
+% RMxAA journal template wrapper for Pandoc.
+% The rmaa-rho cls loads most standard packages internally
+% (graphicx, hyperref, xcolor, amsmath, booktabs, enumitem,
+% longtable, xurl, etc.), so this wrapper adds only what
+% Pandoc requires for syntax highlighting and bibliography.
+
+\PassOptionsToPackage{dvipsnames}{xcolor}
+\PassOptionsToPackage{numbers}{natbib}
+
 \documentclass[$for(classoption)$$classoption$$sep$,$endfor$$if(classoption)$$else$9pt,twoside$endif$]{rmaa-rho-class/rmaa-rho}
+
+% Pandoc citeproc manages the bibliography; suppress natbib's
+% author-year format check, which rejects citeproc's \bibitem entries.
+% The cls loads natbib[authoryear,numbers] and registers an
+% \AtBeginDocument hook that calls \NAT@force@numbers; we must
+% neutralize it before that hook fires.
+\makeatletter
+\def\NAT@force@numbers{}
+\AtEndPreamble{\def\NAT@force@numbers{}}
+\makeatother
 \RMxAAtemplatetype{\RMxAA}
 
-\usepackage{amsmath,amssymb}
-\usepackage{booktabs}
-\usepackage{longtable}
-\usepackage{enumitem}
-\usepackage{float}
-\usepackage{graphicx}
-\usepackage[dvipsnames]{xcolor}
-\usepackage{hyperref}
-\hypersetup{
-  colorlinks=true,
-  linkcolor=$if(linkcolor)$$linkcolor$$else$RoyalBlue$endif$,
-  citecolor=$if(citecolor)$$citecolor$$else$OliveGreen$endif$,
-  urlcolor=$if(urlcolor)$$urlcolor$$else$RoyalBlue$endif$,
-  pdfborder={0 0 0},
-}
-\usepackage{xurl}
-
-% Journal metadata from YAML frontmatter
-$if(vol)$\vol{$vol$}$endif$
+% Provide defaults for fields the cls uses unconditionally in \maketitle.
+\vol{$if(vol)$$vol$$else$0$endif$}
+\pages{$if(pages)$$pages$$else$0--0$endif$}
+\thisyear{$if(yearofpub)$$yearofpub$$else$\the\year$endif$}
+\doi{$if(doi)$$doi$$else$$endif$}
 $if(startpage)$\setcounter{page}{$startpage$}$endif$
-$if(pages)$\pages{$pages$}$endif$
-$if(yearofpub)$\thisyear{$yearofpub$}$endif$
-$if(doi)$\doi{$doi$}$endif$
-
-\newcommand\rmaatex{RMxAA~\LaTeX}
 
 \title{$if(title)$$title$$else$Untitled$endif$}
 
@@ -66,6 +66,32 @@ $if(resumen)$
 $resumen$
 \end{resumen}
 $endif$
+
+% Pandoc longtable in twocolumn: redirect to table float + tabular,
+% capturing \caption for emission at the float level.
+\usepackage{float}
+\makeatletter
+\newcommand{\rmxaa@savedcaption}{}
+\renewenvironment{longtable}[1][]{%
+  \gdef\rmxaa@savedcaption{}%
+  \let\rmxaa@origcaption\caption
+  \renewcommand{\caption}[1]{\gdef\rmxaa@savedcaption{##1}}%
+  \begin{table}[H]%
+  \centering
+  \tabular%
+}{%
+  \endtabular
+  \ifx\rmxaa@savedcaption\@empty\else
+    \vspace{4pt}%
+    \rmxaa@origcaption{\rmxaa@savedcaption}%
+  \fi
+  \end{table}%
+}
+\def\endfirsthead{}
+\def\endhead{}
+\def\endfoot{}
+\def\endlastfoot{}
+\makeatother
 
 % Pandoc syntax highlighting
 \usepackage{framed}

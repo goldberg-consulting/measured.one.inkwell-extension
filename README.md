@@ -10,7 +10,7 @@ Inkwell lets you stay in markdown, stay in your editor, and still get publicatio
 
 1. **Write** in markdown with YAML frontmatter for metadata and styling
 2. **Run** code blocks (Python, R, Shell, Node) that produce figures, tables, and text
-3. **Compile** through Pandoc and XeLaTeX with your chosen journal template
+3. **Compile** through Pandoc and LaTeX (XeLaTeX or pdfLaTeX, per template) with your chosen journal template
 4. **PDF** output with embedded results, citations, and formatted math
 
 ![Editor with live PDF preview](media/editor-preview.png)
@@ -30,7 +30,7 @@ Then in VS Code / Cursor: `Cmd+Shift+P` > "Developer: Install Extension from Loc
 
 ### Prerequisites
 
-Inkwell needs Pandoc and XeLaTeX installed on your system. On first activation, it checks for both and offers guided installation if either is missing.
+Inkwell needs Pandoc and a LaTeX distribution (providing both XeLaTeX and pdfLaTeX) installed on your system. On first activation, it checks for both and offers guided installation if either is missing.
 
 **macOS (Homebrew):**
 
@@ -95,6 +95,16 @@ Side panel (`Cmd+Shift+V`) with three tabs:
 - **Preview**: HTML rendering with KaTeX math and Mermaid diagrams, updates as you type
 - **PDF**: compiled output rendered in-panel
 - **Log**: compilation output, code block stderr, errors
+
+### Compilation output
+
+Detailed build logs are available in the **Output** panel (`Cmd+Shift+U`). Select **Inkwell LaTeX** from the dropdown in the top-right corner of the panel. This shows:
+
+- Template and PDF engine used for each compilation
+- Pass/fail status with elapsed time
+- LaTeX errors and warnings with line numbers
+- Missing package names (with quick-fix code actions in the editor)
+- Full Pandoc and LaTeX log output for debugging
 
 ### Runnable code blocks
 
@@ -167,14 +177,14 @@ inkwell:
 
 ## Templates
 
-Inkwell ships with four templates. Each journal template includes a Pandoc `.latex` wrapper that compiles with the journal's native document class.
+Inkwell ships with four templates. Each journal template includes a Pandoc `.latex` wrapper that compiles with the journal's native document class. Templates declare their preferred PDF engine (`xelatex` or `pdflatex`) in `template.json`; Inkwell selects the right one automatically.
 
-| Template | Class | Description |
-|----------|-------|-------------|
-| **Inkwell Default** | `article` | Clean article with theorem environments, code highlighting, title page |
-| **TMSCE** | `tmsce` | Transactions on Mathematical Sciences and Computational Engineering |
-| **Ludus Academik** | `ludusofficial` | Ludus Academik Journal (themed, two-column) |
-| **RMxAA** | `rmaa-rho` | Revista Mexicana de Astronomia y Astrofisica (v4.6, two-column) |
+| Template | Class | Engine | Description |
+|----------|-------|--------|-------------|
+| **Inkwell Default** | `article` | xelatex | Clean article with theorem environments, code highlighting, title page |
+| **TMSCE** | `tmsce` | pdflatex | Transactions on Mathematical Sciences and Computational Engineering |
+| **Ludus Academik** | `ludusofficial` | xelatex | Ludus Academik Journal (themed, two-column) |
+| **RMxAA** | `rmaa-rho` | pdflatex | Revista Mexicana de Astronomia y Astrofisica (v4.6, two-column) |
 
 Select a template with `template: tmsce` in your YAML frontmatter, or use `Cmd+Shift+P` > **Inkwell: Select LaTeX Template**.
 
@@ -182,7 +192,93 @@ Journal-specific metadata (DOI, volume, issue, author affiliations, received/acc
 
 ### Custom templates
 
-Add your own by dropping a template directory (with a `template.json` manifest and a `.latex` Pandoc template) into `~/.inkwell/templates/`. Any Overleaf or journal template works. Project-local templates go in `.inkwell/templates/` within your project.
+You can add your own journal or house style by creating a template directory. Templates live in one of three locations, searched in this order:
+
+| Location | Scope | Path |
+|----------|-------|------|
+| Built-in | Ships with Inkwell | `<extension>/templates/<name>/` |
+| Global | All projects on this machine | `~/.inkwell/templates/<name>/` |
+| Project-local | Single project only | `.inkwell/templates/<name>/` |
+
+A global or project-local template with the same name as a built-in will override it, provided the override includes its own `.latex` Pandoc wrapper. Directories that contain only supporting files (`.cls`, `.sty`, images) without a `.latex` wrapper will not shadow a built-in template.
+
+#### Creating a template
+
+A minimal template directory looks like this:
+
+```
+my-journal/
+  template.json          # required: manifest
+  my-journal.latex       # required: Pandoc template wrapper
+  my-journal.cls         # the journal's LaTeX document class
+  my-journal.sty         # style files, if any
+  logos/logo.png         # images referenced by the class
+```
+
+**Step 1: Create the manifest.** `template.json` declares the template name and preferred PDF engine:
+
+```json
+{
+  "name": "My Journal",
+  "description": "Short description shown in the template picker.",
+  "engine": "xelatex"
+}
+```
+
+`engine` must be `"xelatex"` or `"pdflatex"`. Inkwell selects the right one automatically at compile time.
+
+**Step 2: Write the Pandoc template wrapper.** This is a `.latex` file that bridges Pandoc's variable system (`$title$`, `$body$`, `$for(...)$`, etc.) to the journal class. At minimum it must contain `\documentclass`, `\begin{document}`, `$body$`, and `\end{document}`. A basic starting point:
+
+```latex
+\documentclass{my-journal}
+
+\title{$if(title)$$title$$else$Untitled$endif$}
+\author{$for(author)$$author$$sep$ \and $endfor$}
+
+% Pandoc compatibility
+\providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+
+$for(header-includes)$
+$header-includes$
+$endfor$
+
+\begin{document}
+\maketitle
+
+$body$
+
+\end{document}
+```
+
+The built-in templates in `templates/` are complete working examples. `rmxaa/rmxaa.latex` shows how to handle dual-language abstracts, author affiliations with superscripts, longtable-to-float conversion for two-column layouts, and Pandoc syntax highlighting. `tmsce/tmsce.latex` and `ludus/ludus.latex` show simpler patterns.
+
+**Step 3: Include supporting files.** Drop the journal's `.cls`, `.sty`, `.bst`, font, and image files into the template directory. Subdirectories are fine; Inkwell adds the template directory to `TEXINPUTS` so LaTeX can find files in nested paths (e.g., `\documentclass{my-class-dir/my-journal}` works).
+
+Inkwell automatically copies these file types to the build directory:
+
+`.cls` `.sty` `.bst` `.bib` `.def` `.fd` `.cfg` `.clo` `.ldf` `.png` `.jpg` `.jpeg` `.pdf` `.eps` `.svg` `.ttf` `.otf` `.woff` `.woff2`
+
+**Step 4: Reference it in your document.** Set the template name in YAML frontmatter:
+
+```yaml
+---
+template: my-journal
+title: "Paper Title"
+---
+```
+
+Or select it with `Cmd+Shift+P` > **Inkwell: Select LaTeX Template**.
+
+#### Adapting an existing journal class
+
+Most journal submission packages ship a `.cls` file and a sample `.tex` document. To turn one into an Inkwell template:
+
+1. Create a directory under `~/.inkwell/templates/` (or `.inkwell/templates/` in your project)
+2. Copy all `.cls`, `.sty`, `.bst`, font, and image files from the journal package
+3. Create `template.json` with the journal name and the correct engine
+4. Open the sample `.tex` file and translate its preamble into a `.latex` Pandoc wrapper, replacing hardcoded values with Pandoc variables (`$title$`, `$author$`, `$abstract$`, etc.)
+5. Map journal-specific metadata (DOI, volume, affiliations) to custom YAML frontmatter fields and wire them into the wrapper with `$if(field)$...$endif$` blocks
+6. Test with a simple markdown file to verify the output matches the journal's formatting
 
 ## Examples
 
@@ -212,7 +308,7 @@ Then open any `.md` file, hit **Run**, then **Compile**.
 |---------|----------|-------------|
 | New Project | | Scaffold an Inkwell project |
 | Open Preview | `Cmd+Shift+V` | Live HTML, PDF, and log tabs |
-| Compile PDF | `Cmd+Shift+R` | Pandoc + XeLaTeX |
+| Compile PDF | `Cmd+Shift+R` | Pandoc + XeLaTeX/pdfLaTeX (per template) |
 | Run Code Blocks | `Cmd+Shift+B` | Execute blocks, cache results |
 | Cancel Run | | Stop in-progress execution |
 | Clear Cache | | Force all blocks to re-run |

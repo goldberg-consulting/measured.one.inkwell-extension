@@ -1,14 +1,22 @@
+// Template resolution. Templates are Pandoc .latex files accompanied by
+// supporting assets (.cls, .sty, fonts, images). Three sources are
+// searched in ascending priority: built-in, global (~/.inkwell/templates),
+// and project-local (.inkwell/templates). The highest-priority match wins.
+
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
 import { findInkwellRoot } from "./config";
 
+export type PdfEngine = "xelatex" | "pdflatex" | "lualatex";
+
 export interface TemplateManifest {
   name: string;
   description?: string;
   author?: string;
   documentclass?: string;
+  engine?: PdfEngine;
   variables?: Record<string, string>;
 }
 
@@ -147,6 +155,7 @@ export function listTemplates(
   for (const [id, dir] of scanDir(globalTemplatesDir())) {
     const manifest = readManifest(dir, id);
     const pandocTemplate = findPandocTemplate(dir);
+    if (!pandocTemplate && result.has(id)) continue;
     result.set(id, {
       id,
       manifest,
@@ -162,6 +171,7 @@ export function listTemplates(
       for (const [id, dir] of scanDir(projDir)) {
         const manifest = readManifest(dir, id);
         const pandocTemplate = findPandocTemplate(dir);
+        if (!pandocTemplate && result.has(id)) continue;
         result.set(id, {
           id,
           manifest,
@@ -184,6 +194,8 @@ export function resolveTemplate(
   return all.get(templateId);
 }
 
+// Resolution order: frontmatter template field > manifest.json > built-in.
+// This lets per-document overrides coexist with a project-level default.
 export function getTemplateForDocument(
   document: vscode.TextDocument
 ): ResolvedTemplate {

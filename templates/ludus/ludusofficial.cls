@@ -13,60 +13,58 @@
 \RequirePackage{ifxetex}
 
 \ifxetex
-  %% XeLaTeX mode
   \RequirePackage{fontspec}
-  \RequirePackage{xeCJK}  % CJK (Chinese/Japanese/Korean) support
+  \IfFileExists{xeCJK.sty}{\RequirePackage{xeCJK}}{}
 \else
-  %% PDFLaTeX mode
   \RequirePackage[utf8]{inputenc}
   \RequirePackage[T1]{fontenc}
 \fi
 
-%% Font settings - all sans-serif
+% Font cascade: Source Sans 3 > Helvetica Neue > LM Sans by file
+\newcommand{\ludus@setupfonts}{%
+  \IfFontExistsTF{Source Sans 3}{%
+    \setmainfont{Source Sans 3}[Scale=1.0, Ligatures=TeX]%
+    \setsansfont{Source Sans 3}[Scale=1.0, Ligatures=TeX]%
+  }{%
+    \IfFontExistsTF{Helvetica Neue}{%
+      \setmainfont{Helvetica Neue}[Scale=1.0, Ligatures=TeX]%
+      \setsansfont{Helvetica Neue}[Scale=1.0, Ligatures=TeX]%
+    }{%
+      \setmainfont{lmsans10-regular.otf}[
+        BoldFont=lmsans10-bold.otf,
+        ItalicFont=lmsans10-oblique.otf,
+        BoldItalicFont=lmsans10-boldoblique.otf,
+        Ligatures=TeX]%
+      \setsansfont{lmsans10-regular.otf}[
+        BoldFont=lmsans10-bold.otf,
+        ItalicFont=lmsans10-oblique.otf,
+        BoldItalicFont=lmsans10-boldoblique.otf,
+        Ligatures=TeX]%
+    }%
+  }%
+  \IfFontExistsTF{Latin Modern Mono}{%
+    \setmonofont{Latin Modern Mono}[Scale=MatchLowercase]%
+  }{%
+    \setmonofont{lmmono10-regular.otf}[Scale=MatchLowercase]%
+  }%
+  \@ifpackageloaded{xeCJK}{%
+    \IfFontExistsTF{Hiragino Sans}{%
+      \setCJKmainfont{Hiragino Sans}%
+      \setCJKsansfont{Hiragino Sans}%
+      \setCJKmonofont{Hiragino Sans}%
+    }{%
+      \IfFontExistsTF{Microsoft YaHei}{%
+        \setCJKmainfont{Microsoft YaHei}[BoldFont=Microsoft YaHei Bold]%
+        \setCJKsansfont{Microsoft YaHei}%
+        \setCJKmonofont{Microsoft YaHei}%
+      }{}%
+    }%
+  }{}%
+}
+
 \ifxetex
-  % Main font: sans-serif
-  \IfFontExistsTF{Source Sans 3}{
-    \setmainfont{Source Sans 3}[
-      Scale=1.0,
-      Ligatures=TeX
-    ]
-  }{
-    \setmainfont{Latin Modern Sans}[
-      Scale=1.0,
-      Ligatures=TeX
-    ]
-  }
-  
-  % Sans-serif font
-  \IfFontExistsTF{Source Sans 3}{
-    \setsansfont{Source Sans 3}[
-      Scale=1.0,
-      Ligatures=TeX
-    ]
-  }{
-    \setsansfont{Latin Modern Sans}[
-      Scale=1.0,
-      Ligatures=TeX
-    ]
-  }
-  
-  % Monospace font
-  \setmonofont{Latin Modern Mono}[Scale=MatchLowercase]
-  
-  % CJK font settings - using system fonts
-  \IfFontExistsTF{Microsoft YaHei}{
-    \setCJKmainfont{Microsoft YaHei}[BoldFont=Microsoft YaHei Bold]
-    \setCJKsansfont{Microsoft YaHei}
-    \setCJKmonofont{Microsoft YaHei}
-  }{
-    \IfFontExistsTF{SimHei}{
-      \setCJKmainfont{SimHei}
-      \setCJKsansfont{SimHei}
-      \setCJKmonofont{SimHei}
-    }{}
-  }
+  \ludus@setupfonts
 \else
-  % PDFLaTeX: use sans as default font family
   \renewcommand{\familydefault}{\sfdefault}
 \fi
 
