@@ -51,7 +51,7 @@ $endif$
   \fi
   \end{table}%
 }
-\def\endfirsthead{}
+\def\endfirsthead#1\endhead{}
 \def\endhead{}
 \def\endfoot{}
 \def\endlastfoot{}
