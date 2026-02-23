@@ -11,7 +11,7 @@ import { findInkwellRoot, saveManifestField } from "./config";
 import { checkToolchain, showToolchainStatus } from "./toolchain";
 import { runAllBlocks, parseCodeBlocks, RunCancellation } from "./runner";
 import { clearCache } from "./cache";
-import { initProject } from "./scaffold";
+import { initProject, updateProject } from "./scaffold";
 import * as path from "path";
 import * as fs from "fs";
 
@@ -122,6 +122,10 @@ export function activate(context: vscode.ExtensionContext) {
 
     vscode.commands.registerCommand("inkwell.initProject", () => {
       initProject();
+    }),
+
+    vscode.commands.registerCommand("inkwell.updateProject", () => {
+      updateProject();
     }),
 
     vscode.workspace.onDidSaveTextDocument((document) => {
