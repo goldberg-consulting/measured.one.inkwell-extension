@@ -7,6 +7,8 @@ import * as path from "path";
 import * as fs from "fs";
 import { selectTemplateCommand } from "./templates";
 
+const SCAFFOLD_VERSION = 2;
+
 interface ScaffoldOptions {
   name: string;
   dir: string;
@@ -147,6 +149,7 @@ print(f"n = {len(x)}, r = {r:.3f}, slope = {m:.3f}")
 const MANIFEST_TEMPLATE = (template?: string) =>
   JSON.stringify(
     {
+      scaffoldVersion: SCAFFOLD_VERSION,
       template: template || "inkwell",
       settings: {},
     },
@@ -297,5 +300,135 @@ Write your content here. Cite sources with [@knuth1984] and use inline math like
   const refsBib = path.join(opts.dir, "references", "refs.bib");
   if (!fs.existsSync(refsBib)) {
     fs.writeFileSync(refsBib, STARTER_BIB);
+  }
+}
+
+// ── Update Project ─────────────────────────────────────────────────
+
+const GITIGNORE_LINES = GITIGNORE.split("\n").map((l) => l.trim()).filter(Boolean);
+
+const REQUIRED_DIRS = [".inkwell", ".inkwell/outputs", "scripts", "figures", "references"];
+
+const STARTER_FILES: Array<{ rel: string; content: string }> = [
+  { rel: "scripts/sine_plot.py", content: SINE_PLOT_PY },
+  { rel: "scripts/scatter.py", content: SCATTER_PY },
+  { rel: "references/refs.bib", content: STARTER_BIB },
+  { rel: "figures/.gitkeep", content: "" },
+];
+
+function updateGitignore(projectRoot: string): string[] {
+  const gi = path.join(projectRoot, ".gitignore");
+  let existing = "";
+  try {
+    existing = fs.readFileSync(gi, "utf-8");
+  } catch {}
+
+  const existingSet = new Set(
+    existing.split("\n").map((l) => l.trim()).filter(Boolean)
+  );
+  const added: string[] = [];
+  for (const line of GITIGNORE_LINES) {
+    if (!existingSet.has(line)) {
+      added.push(line);
+    }
+  }
+
+  if (added.length) {
+    const suffix = (existing.endsWith("\n") ? "" : "\n") + added.join("\n") + "\n";
+    fs.writeFileSync(gi, existing + suffix, "utf-8");
+  }
+  return added;
+}
+
+function updateManifest(projectRoot: string): string[] {
+  const mp = path.join(projectRoot, ".inkwell", "manifest.json");
+  let manifest: Record<string, unknown> = {};
+  try {
+    manifest = JSON.parse(fs.readFileSync(mp, "utf-8"));
+  } catch {}
+
+  const changes: string[] = [];
+
+  if (!manifest.template) {
+    manifest.template = "inkwell";
+    changes.push("added default template");
+  }
+  if (!manifest.settings) {
+    manifest.settings = {};
+    changes.push("added settings block");
+  }
+
+  const prev = (manifest.scaffoldVersion as number) || 0;
+  if (prev < SCAFFOLD_VERSION) {
+    manifest.scaffoldVersion = SCAFFOLD_VERSION;
+    changes.push(`scaffoldVersion ${prev} -> ${SCAFFOLD_VERSION}`);
+  }
+
+  fs.mkdirSync(path.dirname(mp), { recursive: true });
+  fs.writeFileSync(mp, JSON.stringify(manifest, null, 2) + "\n", "utf-8");
+  return changes;
+}
+
+function ensureDirs(projectRoot: string): string[] {
+  const created: string[] = [];
+  for (const d of REQUIRED_DIRS) {
+    const full = path.join(projectRoot, d);
+    if (!fs.existsSync(full)) {
+      fs.mkdirSync(full, { recursive: true });
+      created.push(d);
+    }
+  }
+  return created;
+}
+
+function ensureStarterFiles(projectRoot: string): string[] {
+  const created: string[] = [];
+  for (const { rel, content } of STARTER_FILES) {
+    const full = path.join(projectRoot, rel);
+    if (!fs.existsSync(full)) {
+      fs.mkdirSync(path.dirname(full), { recursive: true });
+      fs.writeFileSync(full, content, "utf-8");
+      created.push(rel);
+    }
+  }
+  return created;
+}
+
+export async function updateProject(): Promise<void> {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) {
+    vscode.window.showWarningMessage("Open a file inside an Inkwell project first.");
+    return;
+  }
+
+  const { findInkwellRoot } = await import("./config");
+  const projectRoot = findInkwellRoot(editor.document.uri);
+  if (!projectRoot) {
+    vscode.window.showWarningMessage(
+      "No Inkwell project found. Run \"Inkwell: New Project\" first."
+    );
+    return;
+  }
+
+  const report: string[] = [];
+
+  const dirs = ensureDirs(projectRoot);
+  if (dirs.length) report.push(`Created directories: ${dirs.join(", ")}`);
+
+  const gi = updateGitignore(projectRoot);
+  if (gi.length) report.push(`Added .gitignore entries: ${gi.join(", ")}`);
+
+  const mf = updateManifest(projectRoot);
+  if (mf.length) report.push(`Manifest: ${mf.join("; ")}`);
+
+  const files = ensureStarterFiles(projectRoot);
+  if (files.length) report.push(`Created starter files: ${files.join(", ")}`);
+
+  if (report.length) {
+    vscode.window.showInformationMessage(
+      `Project updated (${report.length} change${report.length > 1 ? "s" : ""}). ${report.join(". ")}.`
+    );
+  } else {
+    vscode.window.showInformationMessage("Project is already up to date.");
   }
 }
