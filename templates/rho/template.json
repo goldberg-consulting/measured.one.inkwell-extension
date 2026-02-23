@@ -1,0 +1,6 @@
+{
+  "name": "Rho Academic Article",
+  "description": "Rho class (v2.1.1) two-column academic article. Set journalname, rho-authors, rho-affiliations, dates, corres, email, doi, received, revised, accepted, published, license, leadauthor, footinfo, smalltitle, institution, theday, keywords in YAML frontmatter.",
+  "documentclass": "rho",
+  "engine": "pdflatex"
+}
