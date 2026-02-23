@@ -60,6 +60,8 @@ source venv/bin/activate
 pip install numpy matplotlib
 ```
 
+See the **[Syntax Guide](GUIDE.md)** for the complete reference on YAML frontmatter, code blocks, math, citations, and template-specific fields.
+
 ## Quick start
 
 1. Open VS Code / Cursor
