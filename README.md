@@ -13,7 +13,9 @@ Inkwell lets you stay in markdown, stay in your editor, and still get publicatio
 3. **Compile** through Pandoc and LaTeX (XeLaTeX or pdfLaTeX, per template) with your chosen journal template
 4. **PDF** output with embedded results, citations, and formatted math
 
-![Editor with live PDF preview](media/editor-preview.png)
+![Run code blocks that generate figures and tables](media/run-preview.png)
+
+![Compile to PDF with journal formatting and embedded results](media/compile-preview.png)
 
 ## Installation
 
