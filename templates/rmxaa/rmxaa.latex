@@ -67,24 +67,23 @@ $resumen$
 \end{resumen}
 $endif$
 
-% Pandoc longtable in twocolumn: redirect to table float + tabular,
-% capturing \caption for emission at the float level.
+% Pandoc longtable in twocolumn: redirect to table float + tabular.
+% Defer \tabular start until first \tabularnewline so that \caption and
+% \label run at the float level where the caption package handles them.
 \usepackage{float}
 \makeatletter
-\newcommand{\rmxaa@savedcaption}{}
-\renewenvironment{longtable}[1][]{%
-  \gdef\rmxaa@savedcaption{}%
-  \let\rmxaa@origcaption\caption
-  \renewcommand{\caption}[1]{\gdef\rmxaa@savedcaption{##1}}%
+\newcommand{\rmxaa@colspec}{}
+\renewenvironment{longtable}[2][]{%
   \begin{table}[H]%
   \centering
-  \tabular%
+  \gdef\rmxaa@colspec{#2}%
+  \let\rmxaa@origtabularnewline\tabularnewline
+  \def\tabularnewline{%
+    \let\tabularnewline\rmxaa@origtabularnewline
+    \expandafter\tabular\expandafter{\rmxaa@colspec}%
+  }%
 }{%
   \endtabular
-  \ifx\rmxaa@savedcaption\@empty\else
-    \vspace{4pt}%
-    \rmxaa@origcaption{\rmxaa@savedcaption}%
-  \fi
   \end{table}%
 }
 \def\endfirsthead#1\endhead{}
@@ -143,14 +142,30 @@ $endif$
 \def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
 \makeatother
 \setkeys{Gin}{width=\maxwidth,keepaspectratio}
-\newcommand{\citeproctext}{}
-\newcommand{\citeproc}[2]{\begingroup\def\citeproctext{#2}\cite{#1}\endgroup}
+\NewDocumentCommand\citeproctext{}{}
+\NewDocumentCommand\citeproc{mm}{%
+  \begingroup\def\citeproctext{#2}\cite{#1}\endgroup}
+\makeatletter
+ \let\@cite@ofmt\@firstofone
+ \def\@biblabel#1{}
+ \def\@cite#1#2{{#1\if@tempswa , #2\fi}}
+\makeatother
 \newlength{\cslhangindent}\setlength{\cslhangindent}{1.5em}
 \newlength{\csllabelwidth}\setlength{\csllabelwidth}{3em}
-\newenvironment{CSLReferences}[2]{\begin{list}{}{\setlength{\itemindent}{0pt}\setlength{\leftmargin}{0pt}\setlength{\parsep}{0pt}\ifodd #1\setlength{\leftmargin}{\cslhangindent}\setlength{\itemindent}{-\cslhangindent}\fi}}{\end{list}}
-\newcommand{\CSLBlock}[1]{\hfill\break#1\hfill\break}
+\newenvironment{CSLReferences}[2]%
+ {\begin{list}{}{%
+  \setlength{\itemindent}{0pt}%
+  \setlength{\leftmargin}{0pt}%
+  \setlength{\parsep}{0pt}%
+  \ifodd #1
+   \setlength{\leftmargin}{\cslhangindent}%
+   \setlength{\itemindent}{-1\cslhangindent}%
+  \fi
+  \setlength{\itemsep}{#2\baselineskip}}}
+ {\end{list}}
+\newcommand{\CSLBlock}[1]{\hfill\break\parbox[t]{\linewidth}{\strut\ignorespaces#1\strut}}
 \newcommand{\CSLLeftMargin}[1]{\parbox[t]{\csllabelwidth}{\strut#1\strut}}
-\newcommand{\CSLRightInline}[1]{\parbox[t]{\dimexpr\linewidth-\csllabelwidth}{#1}\break}
+\newcommand{\CSLRightInline}[1]{\parbox[t]{\linewidth - \csllabelwidth}{\strut#1\strut}}
 \newcommand{\CSLIndent}[1]{\hspace{\cslhangindent}#1}
 \makeatletter
 \@ifundefined{c@none}{\newcounter{none}}{}
