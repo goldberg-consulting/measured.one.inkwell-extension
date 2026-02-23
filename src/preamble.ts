@@ -1,3 +1,9 @@
+// Dynamic LaTeX preamble generator. Reads inkwell style options from
+// YAML frontmatter (code-bg, tables, hanging-indent, etc.) and emits
+// the corresponding LaTeX packages and environment redefinitions.
+// The generated preamble is written to the compile cache and passed
+// to Pandoc via -H so it precedes the document body.
+
 import * as fs from "fs";
 import * as path from "path";
 

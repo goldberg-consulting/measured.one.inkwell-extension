@@ -1,3 +1,9 @@
+// Side-panel preview. Renders the markdown as HTML (with KaTeX math
+// and Mermaid diagrams), displays compiled PDFs inline via pdf.js, and
+// exposes a run-progress panel that streams block-by-block status back
+// from the runner. Communication with the webview is message-based;
+// the host pushes content and the webview posts compile/run requests.
+
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
@@ -239,6 +245,8 @@ export class InkwellPreviewProvider {
     );
   }
 
+  // 150ms debounce: fast enough to feel live, slow enough to avoid
+  // re-rendering on every keystroke during rapid editing.
   private scheduleUpdate(document: vscode.TextDocument): void {
     if (this.throttle) clearTimeout(this.throttle);
     this.throttle = setTimeout(() => this.sendContentUpdate(document), 150);

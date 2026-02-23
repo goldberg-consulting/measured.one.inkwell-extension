@@ -1,3 +1,6 @@
+// Maps compilation errors to VS Code diagnostics (squiggly underlines)
+// and provides quick-fix code actions for missing LaTeX packages.
+
 import * as vscode from "vscode";
 
 export interface CompileError {

@@ -1,3 +1,8 @@
+// Content-addressed cache for code block outputs. Each block is hashed
+// by its source (or referenced file), language, and key attributes.
+// A cache hit requires both a matching hash and a prior zero exit code,
+// so failed runs are always re-executed.
+
 import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";

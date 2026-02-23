@@ -1,3 +1,9 @@
+// Code block runner. Parses fenced ```{lang ...} blocks from markdown,
+// resolves the correct interpreter (system or venv), executes each block
+// sequentially, and caches results keyed by content hash. Supports
+// Python, R, Node, and shell; other languages fall through with a clear
+// error rather than silent failure.
+
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
@@ -91,6 +97,7 @@ const LANG_COMMANDS: Record<string, string[]> = {
   javascript: ["node"],
 };
 
+// Quarto/Pandoc-style fenced code blocks: ```{python file="..." output="plot"}
 const BLOCK_PATTERN = /^```\{(\w+)([^}]*)\}\s*\n([\s\S]*?)^```/gm;
 
 export function parseRunConfig(markdown: string): RunConfig {
@@ -180,6 +187,9 @@ export interface ResolvedInterpreter {
   warning?: string;
 }
 
+// Resolves the interpreter binary for a given language and optional
+// virtualenv. Falls back to the system interpreter if the env is missing
+// and reports a warning so the user knows what happened.
 function resolveInterpreter(
   langKey: string,
   envPath: string | undefined,
@@ -322,7 +332,9 @@ export async function runBlock(
 
     if (cancel) cancel.setProcess(proc);
 
-    const result = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+    // We wrap execFile in a manual promise so we can stream stdout/stderr
+  // incrementally and still capture partial output on non-zero exit.
+  const result = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
       let out = "";
       let err = "";
       proc.stdout?.on("data", (d: Buffer) => { out += d.toString(); });

@@ -1,3 +1,7 @@
+// Project scaffold. Creates the .inkwell/ directory structure, a starter
+// markdown document with sensible frontmatter defaults, an optional
+// Python venv, and a .gitignore that excludes build artifacts.
+
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
