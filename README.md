@@ -231,4 +231,4 @@ Then open any `.md` file, hit **Run**, then **Compile**.
 
 ## License
 
-MIT
+[Inkwell Source License v1.0](LICENSE). Use it freely, give credit, and if you build something better, contribute it back or share it under the same terms.

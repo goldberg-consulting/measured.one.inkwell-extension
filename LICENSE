@@ -1,0 +1,33 @@
+Inkwell Source License v1.0
+
+Copyright (c) 2026 Goldberg Consulting LLC
+
+Permission is granted, free of charge, to any person obtaining a copy of
+this software and associated documentation (the "Software"), to use the
+Software for personal, academic, or commercial purposes, subject to the
+following conditions:
+
+1. ATTRIBUTION. Any use, distribution, or public reference to the Software
+   must include clear attribution to the original authors and a link to
+   the source repository:
+   https://github.com/goldberg-consulting/measured.one.inkwell-extension
+
+2. NO MISREPRESENTATION. You may not present the Software, or any
+   substantial portion of it, as your own original work. Forks and
+   derivatives must retain this license and the original copyright notice.
+
+3. SHARE ENHANCEMENTS. If you modify the Software and distribute the
+   modified version, you must either:
+   (a) contribute your changes back to the original repository via pull
+       request, or
+   (b) distribute the modified version under these same license terms
+       with clear documentation of what was changed.
+
+4. NO WARRANTY. The Software is provided "as is", without warranty of any
+   kind, express or implied, including but not limited to the warranties
+   of merchantability, fitness for a particular purpose, and
+   noninfringement. In no event shall the authors be liable for any claim,
+   damages, or other liability arising from the use of the Software.
+
+For collaboration, feature requests, or licensing questions:
+https://github.com/goldberg-consulting/measured.one.inkwell-extension/issues
