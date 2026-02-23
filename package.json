@@ -86,6 +86,11 @@
         "command": "inkwell.initProject",
         "title": "Inkwell: New Project",
         "category": "Inkwell"
+      },
+      {
+        "command": "inkwell.updateProject",
+        "title": "Inkwell: Update Project",
+        "category": "Inkwell"
       }
     ],
     "keybindings": [
