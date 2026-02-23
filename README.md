@@ -282,16 +282,9 @@ Most journal submission packages ship a `.cls` file and a sample `.tex` document
 
 ## Examples
 
-The [`examples/`](examples/) directory contains working demo documents for each template:
+The [`examples/`](examples/) directory contains working demo documents for each template. Each compiles from markdown with YAML frontmatter to a publication-ready PDF.
 
-| File | Template | Features demonstrated |
-|------|----------|----------------------|
-| [`demo-default.md`](examples/demo-default.md) | Inkwell Default | Code blocks, figures, citations, math, TOC |
-| [`demo-tmsce.md`](examples/demo-tmsce.md) | TMSCE | Journal metadata, author affiliations, keywords |
-| [`demo-ludus.md`](examples/demo-ludus.md) | Ludus Academik | Two-column layout, themed headers, acknowledgments |
-| [`demo-rmxaa.md`](examples/demo-rmxaa.md) | RMxAA | Dual-language abstracts, astronomy formatting |
-
-To try them:
+To try them yourself:
 
 ```bash
 cd examples
@@ -301,6 +294,164 @@ pip install -r requirements.txt
 ```
 
 Then open any `.md` file, hit **Run**, then **Compile**.
+
+---
+
+### Inkwell Default
+
+Clean single-column article with table of contents, figures, math, and syntax-highlighted code.
+
+<table><tr>
+<td width="50%">
+
+```yaml
+title: "Inkwell Default Template Demo"
+author: "Inkwell"
+date: "February 2026"
+toc: true
+lof: true
+bibliography: references/refs.bib
+inkwell:
+  code-bg: "#f5f5f5"
+  code-border: true
+  tables: booktabs
+```
+
+Features: TOC, list of figures/tables, numbered equations, runnable Python code blocks with inline output, citations, theorem environments.
+
+[Source](examples/demo-default.md) | [PDF](examples/demo-default.pdf)
+
+</td>
+<td width="50%">
+
+![Inkwell Default output](media/examples/demo-default.png)
+
+</td>
+</tr></table>
+
+---
+
+### RMxAA (Revista Mexicana de Astronomia y Astrofisica)
+
+Two-column astronomy journal with dual-language abstracts, line numbers, and the RMxAA masthead.
+
+<table><tr>
+<td width="50%">
+
+```yaml
+template: rmxaa
+classoption: [9pt, twoside]
+title: "Signal Decomposition in Stellar
+        Light Curves"
+rmxaa-authors:
+  - name: "J. Smith"
+    affiliations: "1"
+  - name: "A. Jones"
+    affiliations: "2"
+rmxaa-affiliations:
+  - id: "1"
+    text: "Universidad Nacional, ..."
+  - id: "2"
+    text: "State University, ..."
+resumen: |
+  Demostramos la plantilla ...
+keywords: "Fourier analysis, ..."
+vol: 100
+received: "January 15, 2026"
+accepted: "February 20, 2026"
+```
+
+Features: superscripted author-affiliation mapping, Spanish resumen, journal header with volume/pages/year, corresponding author block, two-column body with numbered sections.
+
+[Source](examples/demo-rmxaa.md) | [PDF](examples/demo-rmxaa.pdf)
+
+</td>
+<td width="50%">
+
+![RMxAA output](media/examples/demo-rmxaa.png)
+
+</td>
+</tr></table>
+
+---
+
+### TMSCE (Transactions on Mathematical Sciences and Computational Engineering)
+
+Single-column journal with DOI, received/revised/accepted dates, and keyword block.
+
+<table><tr>
+<td width="50%">
+
+```yaml
+template: tmsce
+title: "On the Convergence of Fourier
+        Partial Sums"
+tmsce-authors:
+  - name: "J. Smith"
+    superscript: "1"
+  - name: "A. Jones"
+    superscript: "2"
+tmsce-affiliations:
+  - superscript: "1"
+    text: "Dept. of Mathematics, ..."
+  - superscript: "2"
+    text: "Dept. of Applied Sciences, ..."
+doi: "https://doi.org/10.0000/..."
+keywords: "Fourier series, ..."
+received: "15 January 2026"
+accepted: "20 February 2026"
+```
+
+Features: DOI link, corresponding author email, keywords with date stamps, numbered equations, syntax-highlighted code, bibliography.
+
+[Source](examples/demo-tmsce.md) | [PDF](examples/demo-tmsce.pdf)
+
+</td>
+<td width="50%">
+
+![TMSCE output](media/examples/demo-tmsce.png)
+
+</td>
+</tr></table>
+
+---
+
+### Ludus Academik
+
+Themed two-column layout with color-coded section headers and journal branding.
+
+<table><tr>
+<td width="50%">
+
+```yaml
+template: ludus
+classoption: [red, fullpaper]
+title: "Procedural Content Generation
+        in Digital Narratives"
+shorttitle: "Procedural Content ..."
+ludus-authors:
+  - name: "John Smith"
+    superscript: "1"
+  - name: "Alice Jones"
+    superscript: "2"
+journalname: "LUDUS"
+publicationyear: "2026"
+articledoi: "10.1234/ludus.2026.demo"
+acknowledgments: |
+  The authors thank ...
+```
+
+Features: theme selection (`red`, `blue`, `green`, `orange`), article type (`fullpaper`, `shortpaper`), branded header with journal name and DOI, colored section headings, acknowledgments block.
+
+[Source](examples/demo-ludus.md) | [PDF](examples/demo-ludus.pdf)
+
+</td>
+<td width="50%">
+
+![Ludus Academik output](media/examples/demo-ludus.png)
+
+</td>
+</tr></table>
 
 ## Commands
 
