@@ -179,10 +179,10 @@ $header-includes$
 $endfor$
 
 \begin{document}
+$if(linenumbers)$$else$\nolinenumbers$endif$
 
 \maketitle
 \pagestyle{fancy}\thispagestyle{firststyle}
-$if(linenumbers)$$else$\nolinenumbers$endif$
 
 $if(toc)$\tableofcontents$endif$
 $if(lof)$\listoffigures$endif$

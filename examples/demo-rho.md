@@ -1,7 +1,7 @@
 ---
 template: rho
 title: "Template for preparing an academic article using the Rho LaTeX class with Inkwell"
-journalname: "Example Template"
+journalname: "Rho Journal"
 rho-authors:
   - name: "Author One"
     superscript: "1,*"
@@ -32,6 +32,7 @@ revised: "February 1, 2026"
 accepted: "February 15, 2026"
 published: "February 22, 2026"
 license: "This document is licensed under Creative Commons CC BY 4.0."
+logo: "logo.png"
 abstract: |
   This document demonstrates the Rho LaTeX class rendered through
   Inkwell's Pandoc pipeline. Rho provides a two-column academic
