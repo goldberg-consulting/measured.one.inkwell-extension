@@ -247,21 +247,33 @@ async function compileTeX(
   };
 }
 
-// Copy TeX support files and images from the source directory into the
-// compile cache. Only overwrites when the source is newer, so repeated
-// compilations stay fast for large asset directories.
+const COPY_EXTS = new Set([
+  ".cls", ".sty", ".bst", ".bib", ".def", ".fd", ".cfg", ".clo",
+  ".png", ".jpg", ".jpeg", ".pdf", ".eps", ".svg",
+  ".ttf", ".otf",
+]);
+
+const RESOURCE_SUBDIRS = ["references", "figures", "images", "assets"];
+
 function copySiblingFiles(sourceDir: string, cacheDir: string): void {
-  const copyExts = new Set([
-    ".cls", ".sty", ".bst", ".bib", ".def", ".fd", ".cfg", ".clo",
-    ".png", ".jpg", ".jpeg", ".pdf", ".eps", ".svg",
-    ".ttf", ".otf",
-  ]);
+  copyDirFiles(sourceDir, cacheDir);
+  for (const sub of RESOURCE_SUBDIRS) {
+    const subSrc = path.join(sourceDir, sub);
+    if (fs.existsSync(subSrc) && fs.statSync(subSrc).isDirectory()) {
+      const subDst = path.join(cacheDir, sub);
+      fs.mkdirSync(subDst, { recursive: true });
+      copyDirFiles(subSrc, subDst);
+    }
+  }
+}
+
+function copyDirFiles(srcDir: string, dstDir: string): void {
   try {
-    for (const entry of fs.readdirSync(sourceDir)) {
+    for (const entry of fs.readdirSync(srcDir)) {
       const ext = path.extname(entry).toLowerCase();
-      if (copyExts.has(ext)) {
-        const src = path.join(sourceDir, entry);
-        const dst = path.join(cacheDir, entry);
+      if (COPY_EXTS.has(ext)) {
+        const src = path.join(srcDir, entry);
+        const dst = path.join(dstDir, entry);
         if (!fs.existsSync(dst) || fs.statSync(src).mtimeMs > fs.statSync(dst).mtimeMs) {
           fs.copyFileSync(src, dst);
         }
