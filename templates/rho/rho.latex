@@ -158,6 +158,24 @@ $if(keywords)$\keywords{$keywords$}$endif$
 \@ifundefined{c@none}{\newcounter{none}}{}
 \makeatother
 
+$if(logo)$
+\makeatletter
+\fancypagestyle{firststyle}{%
+    \fancyfoot[R]{%
+        {\ifx\@institution\undefined\else\footerfont\@institution\hspace{10pt}\fi}%
+        {\ifx\@theday\undefined\else\footerfont\bfseries\@theday\hspace{10pt}\fi}%
+        {\ifx\@smalltitle\undefined\else\footerfont\@smalltitle\hspace{10pt}\fi}%
+        {\footerfont\textbf\thepage\textendash\pageref{LastPage}}%
+    }%
+    \fancyfoot[L]{\ifx\@footinfo\undefined\else\footerfont\@footinfo\fi}%
+    \fancyfoot[C]{}%
+    \fancyhead[C]{}%
+    \fancyhead[R]{\raisebox{-0.5\height}{\includegraphics[height=\headheight,keepaspectratio]{$logo$}}}%
+    \fancyhead[L]{}%
+}
+\makeatother
+$endif$
+
 $for(header-includes)$
 $header-includes$
 $endfor$
@@ -166,6 +184,7 @@ $endfor$
 
 \maketitle
 \thispagestyle{firststyle}
+$if(linenumbers)$\linenumbers$endif$
 
 $if(toc)$\tableofcontents$endif$
 $if(lof)$\listoffigures$endif$
