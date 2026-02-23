@@ -1,3 +1,8 @@
+// Toolchain detection and guided installation. Probes for pandoc and
+// xelatex across platform-specific search paths, classifies the TeX
+// distribution (Full/Basic/TinyTeX), and offers one-click install via
+// Homebrew, apt/dnf, or TinyTeX when dependencies are absent.
+
 import * as vscode from "vscode";
 import { execFile } from "child_process";
 import { promisify } from "util";

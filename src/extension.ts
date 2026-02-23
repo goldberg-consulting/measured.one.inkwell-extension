@@ -1,3 +1,7 @@
+// Extension entry point. Registers all commands, wires the preview panel
+// to the compilation and code-execution pipelines, and manages lifecycle
+// (auto-compile timers, toolchain checks on activation).
+
 import * as vscode from "vscode";
 import { InkwellPreviewProvider } from "./preview";
 import { compile, exportPDF, isCompilable } from "./compiler";
@@ -22,6 +26,9 @@ export function activate(context: vscode.ExtensionContext) {
   const previewProvider = new InkwellPreviewProvider(context);
   previewProvider.setDiagnostics(diagnostics);
 
+  // n.b. The webview steals focus from the editor, so activeTextEditor
+  // is undefined when the user clicks Run in the preview panel. We
+  // resolve the target document from the preview provider instead.
   previewProvider.onRun = async () => {
     const doc = previewProvider.getDocument();
     if (!doc || !isCompilable(doc)) {

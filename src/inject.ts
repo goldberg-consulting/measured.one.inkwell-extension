@@ -1,3 +1,8 @@
+// Injection layer. Replaces executable ```{lang} blocks in the original
+// markdown with their cached outputs (stdout, images, tables) prior to
+// compilation or preview rendering. The display mode per block controls
+// whether the reader sees code, output, both, or nothing.
+
 import * as path from "path";
 import * as fs from "fs";
 import { BlockResult, CodeBlock, DisplayMode, parseCodeBlocks, parseRunConfig } from "./runner";
@@ -28,6 +33,9 @@ export function injectResults(
   }
 
   const blocks = parseCodeBlocks(markdown);
+  // Walk blocks in document order, tracking a character offset so that
+  // earlier replacements (which may change string length) do not shift
+  // the positions of later blocks.
   let output = markdown;
   let offset = 0;
 
@@ -178,6 +186,8 @@ function formatArtifact(
   }
 }
 
+// Heuristic: if stdout starts with a markdown-ish character, pass it
+// through raw so tables/headings/images render correctly in the preview.
 function looksLikeMarkdown(text: string): boolean {
   return /^[#|>*\-\d]/.test(text) || text.includes("![");
 }
