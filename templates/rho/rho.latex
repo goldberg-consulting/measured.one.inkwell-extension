@@ -1,0 +1,174 @@
+% Rho class (v2.1.1) Pandoc bridge template.
+% The cls loads most standard packages internally (graphicx, hyperref,
+% xcolor, amsmath, booktabs, enumitem, caption, listings, xurl, etc.).
+% We add only what Pandoc requires for syntax highlighting and tables.
+
+\documentclass[$for(classoption)$$classoption$$sep$,$endfor$$if(classoption)$$else$9pt,a4paper,twoside$endif$]{rho-class/rho}
+\usepackage[english]{babel}
+
+\setbool{rho-abstract}{$if(abstract)$true$else$false$endif$}
+\setbool{corres-info}{$if(corres)$true$else$$if(email)$true$else$$if(doi)$true$else$false$endif$$endif$$endif$}
+
+% Journal / footer metadata from YAML frontmatter
+$if(journalname)$\journalname{$journalname$}$endif$
+$if(dates)$\dates{$dates$}$endif$
+$if(leadauthor)$\leadauthor{$leadauthor$}$endif$
+$if(footinfo)$\footinfo{$footinfo$}$endif$
+$if(smalltitle)$\smalltitle{$smalltitle$}$endif$
+$if(institution)$\institution{$institution$}$endif$
+$if(theday)$\theday{$theday$}$endif$
+
+\title{$if(title)$$title$$else$Untitled$endif$}
+
+% Structured authors: rho-authors[].name, rho-authors[].superscript
+% plus rho-affiliations[].superscript, rho-affiliations[].text
+$if(rho-authors)$
+$for(rho-authors)$
+\author[$rho-authors.superscript$]{$rho-authors.name$}
+$endfor$
+$for(rho-affiliations)$
+\affil[$rho-affiliations.superscript$]{$rho-affiliations.text$}
+$endfor$
+$elseif(author)$
+$for(author)$
+\author{$author$}
+$endfor$
+$endif$
+
+% Corresponding author section
+$if(corres)$\corres{$corres$}$endif$
+$if(email)$\email{$email$}$endif$
+$if(doi)$\doi{$doi$}$endif$
+$if(received)$\received{$received$}$endif$
+$if(revised)$\revised{$revised$}$endif$
+$if(accepted)$\accepted{$accepted$}$endif$
+$if(published)$\published{$published$}$endif$
+$if(license)$\license{$license$}$endif$
+
+% Abstract and keywords (declared in preamble per rho convention)
+$if(abstract)$
+\begin{abstract}
+$abstract$
+\end{abstract}
+$endif$
+
+$if(keywords)$\keywords{$keywords$}$endif$
+
+% Pandoc longtable in twocolumn: redirect to table float + tabular.
+\usepackage{longtable}
+\makeatletter
+\newcommand{\rho@colspec}{}
+\renewenvironment{longtable}[2][]{%
+  \begin{table}[H]%
+  \centering
+  \gdef\rho@colspec{#2}%
+  \let\rho@origtabularnewline\tabularnewline
+  \def\tabularnewline{%
+    \let\tabularnewline\rho@origtabularnewline
+    \expandafter\tabular\expandafter{\rho@colspec}%
+  }%
+}{%
+  \endtabular
+  \end{table}%
+}
+\def\endfirsthead#1\endhead{}
+\def\endhead{}
+\def\endfoot{}
+\def\endlastfoot{}
+\makeatother
+
+% Pandoc syntax highlighting
+\usepackage{framed}
+\usepackage{fancyvrb}
+\definecolor{shadecolor}{RGB}{248,248,248}
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{0.94,0.16,0.16}{#1}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.77,0.63,0.00}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\BuiltInTok}[1]{#1}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.64,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\ImportTok}[1]{#1}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+
+% Pandoc compatibility
+\providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\makeatletter
+\providecommand\pandocbounded[1]{%
+  \sbox\z@{#1}%
+  \ifdim\wd\z@>\linewidth\resizebox{\linewidth}{!}{#1}\else\usebox\z@\fi
+}
+\makeatother
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\makeatother
+\setkeys{Gin}{width=\maxwidth,keepaspectratio}
+\NewDocumentCommand\citeproctext{}{}
+\NewDocumentCommand\citeproc{mm}{%
+  \begingroup\def\citeproctext{#2}\cite{#1}\endgroup}
+\makeatletter
+ \let\@cite@ofmt\@firstofone
+ \def\@biblabel#1{}
+ \def\@cite#1#2{{#1\if@tempswa , #2\fi}}
+\makeatother
+\newlength{\cslhangindent}\setlength{\cslhangindent}{1.5em}
+\newlength{\csllabelwidth}\setlength{\csllabelwidth}{3em}
+\newenvironment{CSLReferences}[2]%
+ {\begin{list}{}{%
+  \setlength{\itemindent}{0pt}%
+  \setlength{\leftmargin}{0pt}%
+  \setlength{\parsep}{0pt}%
+  \ifodd #1
+   \setlength{\leftmargin}{\cslhangindent}%
+   \setlength{\itemindent}{-1\cslhangindent}%
+  \fi
+  \setlength{\itemsep}{#2\baselineskip}}}
+ {\end{list}}
+\newcommand{\CSLBlock}[1]{\hfill\break\parbox[t]{\linewidth}{\strut\ignorespaces#1\strut}}
+\newcommand{\CSLLeftMargin}[1]{\parbox[t]{\csllabelwidth}{\strut#1\strut}}
+\newcommand{\CSLRightInline}[1]{\parbox[t]{\linewidth - \csllabelwidth}{\strut#1\strut}}
+\newcommand{\CSLIndent}[1]{\hspace{\cslhangindent}#1}
+\makeatletter
+\@ifundefined{c@none}{\newcounter{none}}{}
+\makeatother
+
+$for(header-includes)$
+$header-includes$
+$endfor$
+
+\begin{document}
+
+\maketitle
+\thispagestyle{firststyle}
+
+$if(toc)$\tableofcontents$endif$
+$if(lof)$\listoffigures$endif$
+$if(lot)$\listoftables$endif$
+
+$body$
+
+\end{document}
