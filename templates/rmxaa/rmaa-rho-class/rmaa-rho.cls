@@ -364,9 +364,9 @@
             \begin{minipage}[t]{\textwidth} 
                 \RaggedLeft
                 \vspace*{-3.39\baselineskip}
-                %\includegraphics[width=1.2217in, height=0.4329in]
-                 \includegraphics[width=1.45in, height=0.5031in]
-                {\logofile}
+                \IfFileExists{\logofile}{%
+                  \includegraphics[width=1.45in, height=0.5031in]{\logofile}%
+                }{}
             \end{minipage}
         \vskip15pt
             {\RaggedRight\bfseries\fontsize{20}{25}\selectfont\@title\par}

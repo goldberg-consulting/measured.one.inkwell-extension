@@ -201,6 +201,7 @@
 \newcommand{\journalsubtitle}[1]{\renewcommand{\@journalsubtitle}{#1}}
 \newcommand{\journalurl}[1]{\renewcommand{\@journalurl}{#1}}
 \newcommand{\institution}[1]{\renewcommand{\@institution}{#1}}
+\newcommand{\logofile}[1]{\def\@logofile{#1}}
 \newcommand{\conferencename}[1]{\renewcommand{\@conferencename}{#1}}
 \newcommand{\issuenumber}[1]{\renewcommand{\@issuenumber}{#1}}
 \newcommand{\publicationyear}[1]{\renewcommand{\@publicationyear}{#1}}
@@ -245,17 +246,11 @@
         \raisebox{-0.3\height}{\fontsize{7.5}{9}\selectfont\sffamily\textcolor{darkgray}{\@institution}}%
     }
     \fancyhead[C]{%
-        % Logo centered, height approximately 5mm (adapted to original headheight)
-        \IfFileExists{../logo.png}{%
-            \includegraphics[height=5mm]{../logo.png}%
-        }{%
-            \IfFileExists{logo.png}{%
-                \includegraphics[height=5mm]{logo.png}%
-            }{%
-                % If logo does not exist, display placeholder text
-                \fontsize{7.5}{9}\selectfont\sffamily\textcolor{darkgray}{[LOGO]}%
-            }%
-        }%
+        \ifx\@logofile\undefined\else
+            \IfFileExists{\@logofile}{%
+                \includegraphics[height=5mm]{\@logofile}%
+            }{}%
+        \fi
     }
     \fancyhead[R]{%
         \raisebox{-0.3\height}{\fontsize{7.5}{9}\selectfont\sffamily\textcolor{darkgray}{\@journalurl}}%
