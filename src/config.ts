@@ -59,14 +59,18 @@ export function loadManifest(projectRoot: string): InkwellManifest {
 }
 
 export function findBibFiles(projectRoot: string): string[] {
-  try {
-    return fs
-      .readdirSync(projectRoot)
-      .filter((f) => f.endsWith(".bib"))
-      .map((f) => path.join(projectRoot, f));
-  } catch {
-    return [];
+  const results: string[] = [];
+  const bibDirs = [projectRoot, path.join(projectRoot, "references")];
+  for (const dir of bibDirs) {
+    try {
+      for (const f of fs.readdirSync(dir)) {
+        if (f.endsWith(".bib")) {
+          results.push(path.join(dir, f));
+        }
+      }
+    } catch {}
   }
+  return results;
 }
 
 export function findDefaultsYaml(projectRoot: string): string | undefined {
