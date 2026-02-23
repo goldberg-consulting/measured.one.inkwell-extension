@@ -62,17 +62,13 @@ Inline Python generates a scatter plot with regression:
 
 # Results
 
-| Component       | Status     |
-|-----------------|------------|
-| Template        | Functional |
-| Code blocks     | Functional |
-| Citations       | Functional |
-| Figure captions | Functional |
+Table 1 shows the convergence behavior of the Fourier partial sums at the midpoint $x = \pi/2$, where the true value is $f(x) = 1$. The peak overshoot column quantifies the Gibbs phenomenon: regardless of $n$, the maximum value overshoots by approximately 9% of the jump magnitude.
 
-: Feature status for the Ludus template demo.
+```{python file="scripts/convergence_table.py" output="convergence" caption="Convergence of Fourier partial sums at x = pi/2." label="convergence"}
+```
 
 # Conclusion
 
-The Ludus template compiles correctly from markdown through Inkwell, producing the journal's native two-column layout with themed headers, figure captions, and bibliography.
+The Ludus template compiles correctly from markdown through Inkwell, producing the journal's native two-column layout with themed headers, figure captions, generated tables, and bibliography.
 
 ## References
