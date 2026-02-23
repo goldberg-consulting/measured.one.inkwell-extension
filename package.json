@@ -4,7 +4,7 @@
   "description": "Markdown to publication-quality PDF. Live preview, Pandoc + XeLaTeX compilation, runnable code blocks, and LaTeX template management.",
   "version": "0.1.0",
   "publisher": "measure-one",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "engines": {
     "vscode": "^1.85.0"
   },
