@@ -75,7 +75,7 @@ $endif$
 \newcommand{\rmxaa@colspec}{}
 \renewenvironment{longtable}[2][]{%
   \begin{table}[H]%
-  \centering
+  \centering\small
   \gdef\rmxaa@colspec{#2}%
   \let\rmxaa@origtabularnewline\tabularnewline
   \def\tabularnewline{%
@@ -83,10 +83,11 @@ $endif$
     \expandafter\tabular\expandafter{\rmxaa@colspec}%
   }%
 }{%
+  \bottomrule
   \endtabular
   \end{table}%
 }
-\def\endfirsthead#1\endhead{}
+\def\endfirsthead#1\endlastfoot{}
 \def\endhead{}
 \def\endfoot{}
 \def\endlastfoot{}
@@ -95,9 +96,10 @@ $endif$
 % Pandoc syntax highlighting
 \usepackage{framed}
 \usepackage{fancyvrb}
+\usepackage{fvextra}
 \definecolor{shadecolor}{RGB}{248,248,248}
 \newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
-\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\},breaklines,breakanywhere,fontsize=\small}
 \newcommand{\AlertTok}[1]{\textcolor[rgb]{0.94,0.16,0.16}{#1}}
 \newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
 \newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.77,0.63,0.00}{#1}}
