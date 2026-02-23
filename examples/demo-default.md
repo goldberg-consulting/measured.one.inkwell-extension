@@ -65,6 +65,8 @@ print(f"n = {len(x)}, r = {np.corrcoef(x, y)[0,1]:.3f}")
 
 ## Tables
 
+Static markdown tables work as expected:
+
 | Method    | Time (ms) | Accuracy (%) |
 |-----------|----------:|-------------:|
 | Baseline  |      12.5 |         91.2 |
@@ -72,6 +74,22 @@ print(f"n = {len(x)}, r = {np.corrcoef(x, y)[0,1]:.3f}")
 | Optimized |       8.7 |         94.4 |
 
 : Comparison of three methods on the benchmark dataset.
+
+Tables can also be generated from code. A block that writes a `.csv` to the output directory is rendered as a formatted table:
+
+```{python output="summary_stats" caption="Descriptive statistics for the simulated bivariate data." label="stats"}
+import os, numpy as np
+
+rng = np.random.default_rng(42)
+x = rng.normal(0, 1, 150)
+y = 0.7 * x + rng.normal(0, 0.35, 150)
+
+out = os.environ.get("INKWELL_OUTPUT_DIR", ".")
+with open(os.path.join(out, "summary_stats.csv"), "w") as f:
+    f.write("Variable,n,Mean,Std,Min,Max\n")
+    for name, vals in [("x", x), ("y", y)]:
+        f.write(f"{name},{len(vals)},{vals.mean():.3f},{vals.std():.3f},{vals.min():.3f},{vals.max():.3f}\n")
+```
 
 ## Math
 

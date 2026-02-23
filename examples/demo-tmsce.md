@@ -1,8 +1,17 @@
 ---
 template: tmsce
 title: "On the Convergence of Fourier Partial Sums"
-authors: "J.\\,Smith$^{1}$ and A.\\,Jones$^{2}$"
-affiliation: "$^{1}$Department of Mathematics, State University, USA\\\\$^{2}$Department of Applied Sciences, Tech Institute, UK\\\\\\textit{Corresponding author:} j.smith@stateuniv.edu"
+tmsce-authors:
+  - name: "J. Smith"
+    superscript: "1"
+  - name: "A. Jones"
+    superscript: "2"
+tmsce-affiliations:
+  - superscript: "1"
+    text: "Department of Mathematics, State University, USA"
+  - superscript: "2"
+    text: "Department of Applied Sciences, Tech Institute, UK"
+corresponding-email: "j.smith@stateuniv.edu"
 abstract: |
   We present a numerical investigation of the convergence behavior
   of Fourier partial sums for discontinuous periodic functions.

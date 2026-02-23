@@ -3,15 +3,20 @@ template: ludus
 classoption:
   - red
   - fullpaper
-title: "Procedural Content Generation in\\\\Digital Narratives"
+title: "Procedural Content Generation in Digital Narratives"
 shorttitle: "Procedural Content in Digital Narratives"
 shortauthor: "Smith & Jones"
-author:
-  - |
-    \textbf{John Smith}\textsuperscript{1}, \textbf{Alice Jones}\textsuperscript{2}\\[0.2cm]
-    \mdseries\small\textsuperscript{1}Department of Computer Science, State University, USA\\
-    \small\textsuperscript{2}School of Digital Media, Tech Institute, UK\\
-    \small Corresponding: john.smith@stateuniv.edu
+ludus-authors:
+  - name: "John Smith"
+    superscript: "1"
+  - name: "Alice Jones"
+    superscript: "2"
+ludus-affiliations:
+  - superscript: "1"
+    text: "Department of Computer Science, State University, USA"
+  - superscript: "2"
+    text: "School of Digital Media, Tech Institute, UK"
+corresponding-email: "john.smith@stateuniv.edu"
 journalname: "LUDUS"
 journalsubtitle: "International Journal of Game Studies"
 publicationyear: 2026
