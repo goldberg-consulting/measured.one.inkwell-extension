@@ -8,6 +8,7 @@ $if(journalsubtitle)$\journalsubtitle{$journalsubtitle$}$endif$
 $if(conferencename)$\conferencename{$conferencename$}$endif$
 $if(publicationyear)$\publicationyear{$publicationyear$}$endif$
 $if(articledoi)$\articledoi{$articledoi$}$endif$
+$if(logo)$\logofile{$logo$}$endif$
 
 \title{$if(title)$$title$$else$Untitled$endif$}
 $if(shorttitle)$\shorttitle{$shorttitle$}$endif$
@@ -29,6 +30,7 @@ $endif$
 \usepackage{enumitem}
 \usepackage{float}
 \usepackage{adjustbox}
+\usepackage[switch]{lineno}
 \usepackage{xurl}
 
 % Pandoc emits longtable, which fails in twocolumn mode.
@@ -154,6 +156,7 @@ $endif$
 $if(keywords)$\keywords{$keywords$}$endif$
 
 \maketitle
+$if(linenumbers)$\linenumbers$endif$
 
 $if(toc)$\tableofcontents$endif$
 $if(lof)$\listoffigures$endif$
