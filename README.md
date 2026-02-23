@@ -457,18 +457,23 @@ Features: theme selection (`red`, `blue`, `green`, `orange`), article type (`ful
 
 ## Commands
 
+All commands are available from the command palette (`Cmd+Shift+P` / `Ctrl+Shift+P`). Type "Inkwell" to filter.
+
 | Command | Shortcut | Description |
 |---------|----------|-------------|
-| New Project | | Scaffold an Inkwell project |
-| Open Preview | `Cmd+Shift+V` | Live HTML, PDF, and log tabs |
-| Compile PDF | `Cmd+Shift+R` | Pandoc + XeLaTeX/pdfLaTeX (per template) |
-| Run Code Blocks | `Cmd+Shift+B` | Execute blocks, cache results |
-| Cancel Run | | Stop in-progress execution |
-| Clear Cache | | Force all blocks to re-run |
-| Export PDF | | Save PDF to a specific file |
-| Select Template | | Pick from installed templates |
-| Setup Python Env | | Create venv, install deps |
-| Check Toolchain | | Verify or install Pandoc/XeLaTeX |
+| **Inkwell: New Project** | | Scaffold a project with starter files, bibliography, and example scripts |
+| **Inkwell: Update Project** | | Add missing `.gitignore` entries, migrate manifest, create new starter files. Never overwrites your existing files |
+| **Inkwell: Open Preview** | `Cmd+Shift+V` | Side panel with live HTML, compiled PDF, and build log tabs |
+| **Inkwell: Compile PDF** | `Cmd+Shift+R` | Compile through Pandoc + XeLaTeX/pdfLaTeX (engine selected per template) |
+| **Inkwell: Run Code Blocks** | `Cmd+Shift+B` | Execute all code blocks, cache results in `.inkwell/outputs/` |
+| **Inkwell: Cancel Running Code Blocks** | | Stop in-progress code execution |
+| **Inkwell: Clear Code Block Cache** | | Delete cached outputs so all blocks re-run on next execution |
+| **Inkwell: Export PDF to File...** | | Save the compiled PDF to a chosen location |
+| **Inkwell: Select LaTeX Template** | | Pick from built-in, global, or project-local templates |
+| **Inkwell: Setup Python Environment** | | Create a venv and install from `requirements.txt` |
+| **Inkwell: Check / Install Toolchain** | | Verify Pandoc and XeLaTeX are installed, with guided setup if missing |
+
+**Tip:** If you are developing from source and rebuild the extension (`npm run compile`), reload the editor window with `Cmd+Shift+P` > **Developer: Reload Window** to pick up the changes.
 
 ## Settings
 
