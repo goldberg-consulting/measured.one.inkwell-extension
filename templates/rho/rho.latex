@@ -60,7 +60,7 @@ $if(keywords)$\keywords{$keywords$}$endif$
 \newcommand{\rho@colspec}{}
 \renewenvironment{longtable}[2][]{%
   \begin{table}[H]%
-  \centering
+  \centering\small
   \gdef\rho@colspec{#2}%
   \let\rho@origtabularnewline\tabularnewline
   \def\tabularnewline{%
@@ -68,10 +68,11 @@ $if(keywords)$\keywords{$keywords$}$endif$
     \expandafter\tabular\expandafter{\rho@colspec}%
   }%
 }{%
+  \bottomrule
   \endtabular
   \end{table}%
 }
-\def\endfirsthead#1\endhead{}
+\def\endfirsthead#1\endlastfoot{}
 \def\endhead{}
 \def\endfoot{}
 \def\endlastfoot{}
@@ -80,9 +81,10 @@ $if(keywords)$\keywords{$keywords$}$endif$
 % Pandoc syntax highlighting
 \usepackage{framed}
 \usepackage{fancyvrb}
+\usepackage{fvextra}
 \definecolor{shadecolor}{RGB}{248,248,248}
 \newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
-\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\},breaklines,breakanywhere,fontsize=\small}
 \newcommand{\AlertTok}[1]{\textcolor[rgb]{0.94,0.16,0.16}{#1}}
 \newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
 \newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.77,0.63,0.00}{#1}}
