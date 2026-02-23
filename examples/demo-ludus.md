@@ -33,6 +33,9 @@ acknowledgments: |
   The authors thank the Inkwell contributors for the template system.
 bibliography: references/refs.bib
 link-citations: true
+figPrefix: "figure"
+tblPrefix: "table"
+eqnPrefix: "equation"
 inkwell:
   code-display: output
   python-env: ./venv
@@ -50,27 +53,27 @@ We demonstrate with a Fourier series visualization [@fourier1822]. The partial s
 
 $$f_n(x) = \sum_{k=1}^{n} \frac{4}{(2k-1)\pi}\sin\bigl((2k-1)x\bigr)$$ {#eq:fourier}
 
-@fig:fourier shows the partial sums converging to the square wave as $n$ increases. The overshoot at the discontinuity is the Gibbs phenomenon.
+@Fig:fourier shows the partial sums converging to the square wave as $n$ increases. The overshoot at the discontinuity is the Gibbs phenomenon.
 
 ```{python file="scripts/sine_plot.py" output="sine_plot" caption="Fourier partial sums converging to a square wave." label="fourier"}
 ```
 
 # Data Visualization
 
-@fig:scatter shows a simulated scatter plot with linear regression, generated inline by Python.
+@Fig:scatter shows a simulated scatter plot with linear regression, generated inline by Python.
 
 ```{python file="scripts/scatter.py" output="scatter" caption="Simulated regression with n = 150 data points." label="scatter"}
 ```
 
 # Results
 
-@tbl:convergence shows the convergence behavior of the Fourier partial sums at the midpoint $x = \pi/2$, where the true value is $f(x) = 1$. The peak overshoot column quantifies the Gibbs phenomenon: regardless of $n$, the maximum value overshoots by approximately 9% of the jump magnitude.
+@Tbl:convergence shows the convergence behavior of the Fourier partial sums at the midpoint $x = \pi/2$, where the true value is $f(x) = 1$. The peak overshoot column quantifies the Gibbs phenomenon: regardless of $n$, the maximum value overshoots by approximately 9% of the jump magnitude.
 
 ```{python file="scripts/convergence_table.py" output="convergence" caption="Convergence of Fourier partial sums at x = pi/2." label="convergence"}
 ```
 
 # Conclusion
 
-As shown in @fig:fourier and @fig:scatter, Inkwell produces publication-quality figures from Python scripts. @tbl:convergence demonstrates CSV-to-table rendering, and @eq:fourier confirms that LaTeX math compiles correctly. The Ludus template handles all of these in a two-column layout with themed headers and bibliography.
+As shown in @Fig:fourier and @Fig:scatter, Inkwell produces publication-quality figures from Python scripts. @Tbl:convergence demonstrates CSV-to-table rendering, and @Eq:fourier confirms that LaTeX math compiles correctly. The Ludus template handles all of these in a two-column layout with themed headers and bibliography.
 
 ## References

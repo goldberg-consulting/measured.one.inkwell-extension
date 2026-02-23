@@ -31,24 +31,24 @@ $endif$
 \usepackage{xurl}
 
 % Pandoc emits longtable, which fails in twocolumn mode.
-% We intercept it: redirect to a table float with tabular,
-% capture \caption so it emits at the float level (not inside
-% the alignment), and suppress the multi-page section markers.
+% We redirect to a table float with tabular. Pandoc puts
+% \caption{...}\label{...}\tabularnewline at the TOP of the longtable
+% (inside the alignment), but caption and label must be at the float
+% level. We defer \tabular until the first \tabularnewline fires, so
+% \caption and \label execute at the float level before tabular starts.
 \makeatletter
-\newcommand{\ludus@savedcaption}{}
-\renewenvironment{longtable}[1][]{%
-  \gdef\ludus@savedcaption{}%
-  \let\ludus@origcaption\caption
-  \renewcommand{\caption}[1]{\gdef\ludus@savedcaption{##1}}%
+\newcommand{\ludus@colspec}{}
+\renewenvironment{longtable}[2][]{%
   \begin{table}[H]%
   \centering
-  \tabular%
+  \gdef\ludus@colspec{#2}%
+  \let\ludus@origtabularnewline\tabularnewline
+  \def\tabularnewline{%
+    \let\tabularnewline\ludus@origtabularnewline
+    \expandafter\tabular\expandafter{\ludus@colspec}%
+  }%
 }{%
   \endtabular
-  \ifx\ludus@savedcaption\@empty\else
-    \vspace{4pt}%
-    \ludus@origcaption{\ludus@savedcaption}%
-  \fi
   \end{table}%
 }
 \def\endfirsthead#1\endhead{}

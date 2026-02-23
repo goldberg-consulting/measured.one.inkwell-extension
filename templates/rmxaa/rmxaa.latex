@@ -67,24 +67,23 @@ $resumen$
 \end{resumen}
 $endif$
 
-% Pandoc longtable in twocolumn: redirect to table float + tabular,
-% capturing \caption for emission at the float level.
+% Pandoc longtable in twocolumn: redirect to table float + tabular.
+% Defer \tabular start until first \tabularnewline so that \caption and
+% \label run at the float level where the caption package handles them.
 \usepackage{float}
 \makeatletter
-\newcommand{\rmxaa@savedcaption}{}
-\renewenvironment{longtable}[1][]{%
-  \gdef\rmxaa@savedcaption{}%
-  \let\rmxaa@origcaption\caption
-  \renewcommand{\caption}[1]{\gdef\rmxaa@savedcaption{##1}}%
+\newcommand{\rmxaa@colspec}{}
+\renewenvironment{longtable}[2][]{%
   \begin{table}[H]%
   \centering
-  \tabular%
+  \gdef\rmxaa@colspec{#2}%
+  \let\rmxaa@origtabularnewline\tabularnewline
+  \def\tabularnewline{%
+    \let\tabularnewline\rmxaa@origtabularnewline
+    \expandafter\tabular\expandafter{\rmxaa@colspec}%
+  }%
 }{%
   \endtabular
-  \ifx\rmxaa@savedcaption\@empty\else
-    \vspace{4pt}%
-    \rmxaa@origcaption{\rmxaa@savedcaption}%
-  \fi
   \end{table}%
 }
 \def\endfirsthead#1\endhead{}
