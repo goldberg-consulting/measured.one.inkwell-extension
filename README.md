@@ -6,8 +6,6 @@ Inkwell lets you stay in markdown, stay in your editor, and still get publicatio
 
 ## How it works
 
-![Write, Run, Compile, PDF](media/workflow.png)
-
 1. **Write** in markdown with YAML frontmatter for metadata and styling
 2. **Run** code blocks (Python, R, Shell, Node) that produce figures, tables, and text
 3. **Compile** through Pandoc and LaTeX (XeLaTeX or pdfLaTeX, per template) with your chosen journal template
