@@ -2,5 +2,5 @@
   "name": "Ludus Academik",
   "description": "Ludus Academik Journal. Set classoption (theme + article type), journalname, publicationyear, articledoi, shorttitle, shortauthor, keywords, acknowledgments in YAML frontmatter.",
   "documentclass": "ludusofficial",
-  "type": "xelatex"
+  "engine": "xelatex"
 }

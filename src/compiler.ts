@@ -1,3 +1,9 @@
+// Compilation pipeline. Two modes: Pandoc (markdown -> PDF via XeLaTeX)
+// and direct XeLaTeX (for .tex files). Both compile in an isolated temp
+// directory so the user's working tree stays clean. The Pandoc path
+// injects cached code block outputs, applies the selected template, and
+// generates a dynamic LaTeX preamble from frontmatter style options.
+
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
@@ -6,7 +12,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { findInkwellRoot, findBibFiles, findDefaultsYaml } from "./config";
 import { InkwellDiagnostics, CompileError } from "./diagnostics";
-import { getTemplateForDocument, copySupportingFiles } from "./templates";
+import { getTemplateForDocument, copySupportingFiles, PdfEngine } from "./templates";
 import { prepareForCompilation } from "./inject";
 import { writePreambleFile } from "./preamble";
 
@@ -27,12 +33,20 @@ const PANDOC_EXTENSIONS = [
   "smart",
 ].join("+");
 
+// VS Code child processes do not inherit the user's shell PATH, so TeX
+// binaries are invisible unless we reconstruct the search path ourselves.
 function buildTexPath(): string {
   const base = ["/usr/local/bin", "/usr/bin"];
-  if (process.platform === "darwin") {
-    return ["/Library/TeX/texbin", "/opt/homebrew/bin", ...base, process.env.PATH].join(":");
-  }
   const home = os.homedir();
+  if (process.platform === "darwin") {
+    return [
+      "/Library/TeX/texbin",
+      "/opt/homebrew/bin",
+      `${home}/Library/TinyTeX/bin/universal-darwin`,
+      ...base,
+      process.env.PATH,
+    ].join(":");
+  }
   return [
     ...base,
     `${home}/.TinyTeX/bin/x86_64-linux`,
@@ -71,18 +85,9 @@ export function isCompilable(document: vscode.TextDocument): boolean {
   return compilableExtensions.includes(ext) || document.languageId === "markdown" || document.languageId === "latex";
 }
 
-function installTemplate(
-  document: vscode.TextDocument,
-  cacheDir: string
-): string {
-  const template = getTemplateForDocument(document);
-  const templateName = path.basename(template.pandocTemplate);
-  const templateDst = path.join(cacheDir, templateName);
-  fs.copyFileSync(template.pandocTemplate, templateDst);
-  copySupportingFiles(template, cacheDir);
-  return templateDst;
-}
-
+// Deterministic per-file cache directory in the OS temp folder.
+// The hex prefix of the absolute path avoids collisions across projects
+// while keeping directory names short enough for TeX path limits.
 function getCacheDir(sourceFile: string): string {
   const hash = Buffer.from(sourceFile).toString("hex").slice(0, 16);
   const dir = path.join(os.tmpdir(), "inkwell-vscode", hash);
@@ -94,7 +99,12 @@ async function findBinary(name: string): Promise<string | undefined> {
   const common = [`/usr/local/bin/${name}`, `/usr/bin/${name}`];
   const home = os.homedir();
   const platformPaths = process.platform === "darwin"
-    ? [`/opt/homebrew/bin/${name}`, `/Library/TeX/texbin/${name}`, ...common]
+    ? [
+        `/opt/homebrew/bin/${name}`,
+        `/Library/TeX/texbin/${name}`,
+        `${home}/Library/TinyTeX/bin/universal-darwin/${name}`,
+        ...common,
+      ]
     : [
         ...common,
         `${home}/.TinyTeX/bin/x86_64-linux/${name}`,
@@ -148,10 +158,7 @@ async function compileTeX(
   const tmpSource = path.join(cacheDir, path.basename(sourceFile));
   fs.writeFileSync(tmpSource, document.getText(), "utf-8");
 
-  // Copy supporting files from the source directory (.cls, .sty, .bst, images)
   copySiblingFiles(sourceDir, cacheDir);
-
-  // Also copy template supporting files if an inkwell template is selected
   const template = getTemplateForDocument(document);
   copySupportingFiles(template, cacheDir);
 
@@ -162,16 +169,22 @@ async function compileTeX(
     tmpSource,
   ];
 
+  const texEnv = {
+    ...TEX_ENV,
+    TEXINPUTS: [cacheDir, template.dir, sourceDir, ""].join(":"),
+  };
+
   let stderr = "";
   let stdout = "";
 
-  // XeLaTeX needs two passes for references/TOC
+  // Two passes required: the first resolves cross-references and TOC
+  // entries; the second incorporates them into the final PDF.
   for (let pass = 0; pass < 2; pass++) {
     try {
       const result = await exec(xelatex, args, {
         cwd: sourceDir,
         timeout: 120_000,
-        env: TEX_ENV,
+        env: texEnv,
       });
       stdout = result.stdout;
       stderr = result.stderr;
@@ -182,7 +195,7 @@ async function compileTeX(
     }
   }
 
-  // Check for bibtex/biber if .bib files referenced
+  // Bibliography requires an extra pass: xelatex -> biber/bibtex -> xelatex.
   const hasBib = document.getText().includes("\\bibliography{") ||
     document.getText().includes("\\addbibresource{");
   if (hasBib) {
@@ -194,14 +207,13 @@ async function compileTeX(
         await exec(bibTool, [path.join(cacheDir, baseName)], {
           cwd: cacheDir,
           timeout: 30_000,
-          env: TEX_ENV,
+          env: texEnv,
         });
-        // Third pass after bibliography
         try {
           await exec(xelatex, args, {
             cwd: sourceDir,
             timeout: 120_000,
-            env: TEX_ENV,
+            env: texEnv,
           });
         } catch {}
       } catch {}
@@ -216,7 +228,6 @@ async function compileTeX(
     fs.copyFileSync(tmpOutput, pdfOutput);
   }
 
-  // Read the .log file for better error info
   const logFile = path.join(cacheDir, `${baseName}.log`);
   let logContent = "";
   try {
@@ -236,6 +247,9 @@ async function compileTeX(
   };
 }
 
+// Copy TeX support files and images from the source directory into the
+// compile cache. Only overwrites when the source is newer, so repeated
+// compilations stay fast for large asset directories.
 function copySiblingFiles(sourceDir: string, cacheDir: string): void {
   const copyExts = new Set([
     ".cls", ".sty", ".bst", ".bib", ".def", ".fd", ".cfg", ".clo",
@@ -278,9 +292,15 @@ async function compilePandoc(
     };
   }
 
-  const xelatex = await findBinary("xelatex");
   const cacheDir = getCacheDir(sourceFile);
-  const templatePath = installTemplate(document, cacheDir);
+  const template = getTemplateForDocument(document);
+  const templateName = path.basename(template.pandocTemplate);
+  const templateDst = path.join(cacheDir, templateName);
+  fs.copyFileSync(template.pandocTemplate, templateDst);
+  copySupportingFiles(template, cacheDir);
+
+  const preferredEngine: PdfEngine = template.manifest.engine || "xelatex";
+  const engine = await findBinary(preferredEngine) || await findBinary("xelatex");
 
   const pdfOutput =
     outputPath || path.join(sourceDir, `${baseName}.pdf`);
@@ -299,14 +319,17 @@ async function compilePandoc(
   else if (ext === ".org") fromFormat = "org";
   else if (ext === ".txt") fromFormat = `markdown+${PANDOC_EXTENSIONS}`;
 
+  const resourcePath = [cacheDir, template.dir, sourceDir].join(":");
+
   const args = [
     tmpSource,
     "-o",
     tmpOutput,
-    `--pdf-engine=${xelatex || "xelatex"}`,
+    `--pdf-engine=${engine || preferredEngine}`,
     "--standalone",
-    `--template=${templatePath}`,
+    `--template=${templateDst}`,
     `--from=${fromFormat}`,
+    `--resource-path=${resourcePath}`,
     "-V",
     "graphics=true",
     "-V",
@@ -338,17 +361,38 @@ async function compilePandoc(
     }
   }
 
-  // Also pick up .bib files next to the source
   copySiblingFiles(sourceDir, cacheDir);
 
   let stderr = "";
   let stdout = "";
 
+  // TEXINPUTS lets the TeX engine find .cls, .sty, and other supporting
+  // files that live in the cache dir, the template's own directory (for
+  // subdirectory-structured classes like rmaa-rho-class/), or beside
+  // the source document. The trailing colon preserves default TeX paths.
+  const texInputs = [cacheDir, template.dir, sourceDir, ""].join(":");
+  const texEnv = {
+    ...TEX_ENV,
+    TEXINPUTS: texInputs,
+  };
+
+  const clsExpected = path.join(template.dir, "rmaa-rho-class", "rmaa-rho.cls");
+  const clsCached = path.join(cacheDir, "rmaa-rho-class", "rmaa-rho.cls");
+  const diagnosticLog = [
+    `[inkwell] template: ${template.id} (${template.dir})`,
+    `[inkwell] pandoc template: ${templateDst}`,
+    `[inkwell] TEXINPUTS: ${texInputs}`,
+    `[inkwell] resource-path: ${resourcePath}`,
+    `[inkwell] cls in template dir: ${fs.existsSync(clsExpected)}`,
+    `[inkwell] cls in cache dir: ${fs.existsSync(clsCached)}`,
+    `[inkwell] engine: ${engine || preferredEngine}`,
+  ].join("\n");
+
   try {
     const result = await exec(pandoc, args, {
       cwd: sourceDir,
       timeout: 120_000,
-      env: TEX_ENV,
+      env: texEnv,
     });
     stdout = result.stdout;
     stderr = result.stderr;
@@ -369,7 +413,7 @@ async function compilePandoc(
     success: pdfExists,
     pdfPath: pdfExists ? pdfOutput : undefined,
     errors,
-    log: stderr + "\n" + stdout,
+    log: diagnosticLog + "\n\n" + stderr + "\n" + stdout,
     duration,
   };
 }

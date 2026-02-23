@@ -1,20 +1,19 @@
+\PassOptionsToPackage{dvipsnames}{xcolor}
+
 \documentclass{tmsce}
 
+% tmsce.cls already loads: geometry, fancyhdr, titlesec, setspace,
+% hyperref, etoolbox. We add only what it does not provide.
 \usepackage{amsmath,amsfonts,amsthm}
-\usepackage{algorithmic}
-\usepackage{algorithm}
 \usepackage{array}
-\usepackage[caption=false,font=normalsize,labelfont=sf,textfont=sf]{subfig}
-\usepackage{textcomp}
-\usepackage{stfloats}
-\usepackage{url}
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{longtable}
 \usepackage{enumitem}
 \usepackage{float}
-\usepackage[dvipsnames]{xcolor}
-\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{xurl}
+
 \hypersetup{
   colorlinks=true,
   linkcolor=$if(linkcolor)$$linkcolor$$else$RoyalBlue$endif$,
@@ -22,7 +21,6 @@
   urlcolor=$if(urlcolor)$$urlcolor$$else$RoyalBlue$endif$,
   pdfborder={0 0 0},
 }
-\usepackage{xurl}
 
 \hyphenation{op-tical net-works semi-conduc-tor IEEE-Xplore}
 
@@ -37,7 +35,14 @@ $if(pagerange)$\pagerange{$pagerange$}$endif$
 
 \title{$if(title)$$title$$else$Untitled$endif$}
 
-$if(authors)$\authors{$authors$}$endif$
+$if(tmsce-authors)$
+\authors{$for(tmsce-authors)$$tmsce-authors.name$$$^{$tmsce-authors.superscript$}$$$sep$ and $endfor$}
+\affiliation{%
+$for(tmsce-affiliations)$$$^{$tmsce-affiliations.superscript$}$$$tmsce-affiliations.text$\\
+$endfor$
+$if(corresponding-email)$\textit{Corresponding author:} $corresponding-email$$endif$
+}
+$elseif(authors)$\authors{$authors$}$endif$
 $if(affiliation)$\affiliation{$affiliation$}$endif$
 
 $if(received)$\received{$received$}$endif$

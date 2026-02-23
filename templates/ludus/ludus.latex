@@ -1,6 +1,8 @@
+% Pass dvipsnames before the class loads xcolor, avoiding option clash.
+\PassOptionsToPackage{dvipsnames}{xcolor}
+
 \documentclass[$for(classoption)$$classoption$$sep$,$endfor$]{ludusofficial}
 
-% Journal metadata from YAML frontmatter
 $if(journalname)$\journalname{$journalname$}$endif$
 $if(journalsubtitle)$\journalsubtitle{$journalsubtitle$}$endif$
 $if(conferencename)$\conferencename{$conferencename$}$endif$
@@ -11,26 +13,49 @@ $if(articledoi)$\articledoi{$articledoi$}$endif$
 $if(shorttitle)$\shorttitle{$shorttitle$}$endif$
 $if(shortauthor)$\shortauthor{$shortauthor$}$endif$
 
-$if(author)$
+$if(ludus-authors)$
+\author{%
+$for(ludus-authors)$\textbf{$ludus-authors.name$}\textsuperscript{$ludus-authors.superscript$}$sep$, $endfor$\\[0.2cm]%
+$for(ludus-affiliations)$\mdseries\small\textsuperscript{$ludus-affiliations.superscript$}$ludus-affiliations.text$\\%
+$endfor$$if(corresponding-email)$\small Corresponding: $corresponding-email$$endif$}
+$elseif(author)$
 \author{$for(author)$$author$$sep$ \\ $endfor$}
 $endif$
 
+% Packages not already provided by ludusofficial.cls
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
 \usepackage{longtable}
 \usepackage{enumitem}
 \usepackage{float}
-\usepackage{graphicx}
-\usepackage[dvipsnames]{xcolor}
-\usepackage{hyperref}
-\hypersetup{
-  colorlinks=true,
-  linkcolor=$if(linkcolor)$$linkcolor$$else$RoyalBlue$endif$,
-  citecolor=$if(citecolor)$$citecolor$$else$OliveGreen$endif$,
-  urlcolor=$if(urlcolor)$$urlcolor$$else$RoyalBlue$endif$,
-  pdfborder={0 0 0},
-}
 \usepackage{xurl}
+
+% Pandoc emits longtable, which fails in twocolumn mode.
+% We intercept it: redirect to a table float with tabular,
+% capture \caption so it emits at the float level (not inside
+% the alignment), and suppress the multi-page section markers.
+\makeatletter
+\newcommand{\ludus@savedcaption}{}
+\renewenvironment{longtable}[1][]{%
+  \gdef\ludus@savedcaption{}%
+  \let\ludus@origcaption\caption
+  \renewcommand{\caption}[1]{\gdef\ludus@savedcaption{##1}}%
+  \begin{table}[H]%
+  \centering
+  \tabular%
+}{%
+  \endtabular
+  \ifx\ludus@savedcaption\@empty\else
+    \vspace{4pt}%
+    \ludus@origcaption{\ludus@savedcaption}%
+  \fi
+  \end{table}%
+}
+\def\endfirsthead{}
+\def\endhead{}
+\def\endfoot{}
+\def\endlastfoot{}
+\makeatother
 
 % Pandoc syntax highlighting
 \usepackage{framed}
