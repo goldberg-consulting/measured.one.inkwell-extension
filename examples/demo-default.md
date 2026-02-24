@@ -7,6 +7,9 @@ geometry: "margin=1in"
 toc: true
 lof: true
 lot: true
+# header-includes: |
+#   \usepackage{xcolor}
+#   \setlength{\parindent}{0pt}
 bibliography: references/refs.bib
 link-citations: true
 inkwell:
