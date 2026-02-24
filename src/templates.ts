@@ -194,16 +194,27 @@ export function resolveTemplate(
   return all.get(templateId);
 }
 
-// Resolution order: frontmatter template field > manifest.json > built-in.
+const outputChannel = vscode.window.createOutputChannel("Inkwell Templates");
+
+// Resolution order: frontmatter template field > manifest.json > built-in default.
 // This lets per-document overrides coexist with a project-level default.
 export function getTemplateForDocument(
   document: vscode.TextDocument
 ): ResolvedTemplate {
   const text = document.getText();
   const fmTemplate = extractFrontmatterTemplate(text);
+
   if (fmTemplate) {
     const resolved = resolveTemplate(fmTemplate, document.uri);
-    if (resolved) return resolved;
+    if (resolved) {
+      outputChannel.appendLine(
+        `[template] ${path.basename(document.fileName)}: using frontmatter template "${fmTemplate}"`
+      );
+      return resolved;
+    }
+    outputChannel.appendLine(
+      `[template] ${path.basename(document.fileName)}: frontmatter says "${fmTemplate}" but template not found, falling through`
+    );
   }
 
   const root = findInkwellRoot(document.uri);
@@ -214,19 +225,27 @@ export function getTemplateForDocument(
       const manifest = JSON.parse(raw);
       if (manifest.template) {
         const resolved = resolveTemplate(manifest.template, document.uri);
-        if (resolved) return resolved;
+        if (resolved) {
+          outputChannel.appendLine(
+            `[template] ${path.basename(document.fileName)}: using manifest template "${manifest.template}" (${manifestPath})`
+          );
+          return resolved;
+        }
       }
     } catch {}
   }
 
+  outputChannel.appendLine(
+    `[template] ${path.basename(document.fileName)}: using built-in default`
+  );
   return resolveTemplate("inkwell", document.uri)!;
 }
 
 function extractFrontmatterTemplate(text: string): string | undefined {
-  const match = text.match(/^---\n([\s\S]*?)\n---/);
+  const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!match) return undefined;
-  const templateMatch = match[1].match(/^template:\s*['"]?(.+?)['"]?\s*$/m);
-  return templateMatch ? templateMatch[1] : undefined;
+  const templateMatch = match[1].match(/^template:\s*['"]?([^#'"}\r\n]+?)['"]?\s*$/m);
+  return templateMatch ? templateMatch[1].trim() : undefined;
 }
 
 export function copySupportingFiles(
