@@ -1,30 +1,75 @@
 ---
 title: "Inkwell Default Template Demo"
-author: "Inkwell"
+subtitle: "A Complete Frontmatter Reference"
+author:
+  - "Author One"
+  - "Author Two"
 date: "February 2026"
-linestretch: 1.4
-geometry: "margin=1in"
-toc: true
-lof: true
-lot: true
-# header-includes: |
-#   \usepackage{xcolor}
-#   \setlength{\parindent}{0pt}
+abstract: |
+  This document demonstrates every frontmatter option available in the
+  default Inkwell template. It compiles markdown to publication-quality
+  PDF through Pandoc and XeLaTeX, with runnable code blocks, inline
+  data binding, mermaid diagrams, and cross-references.
+keywords: "Inkwell; literate programming; reproducible documents"
+
+# --- Document class and page layout ---
+# documentclass: article             # default: article
+fontsize: 11pt                        # 10pt, 11pt, 12pt
+# classoption:                        # passed to \documentclass
+#   - twocolumn
+#   - landscape
+geometry: "margin=1in"                # any geometry package string
+linestretch: 1.4                      # line spacing multiplier
+
+# --- Fonts (XeLaTeX) ---
+# mainfont: "Palatino"               # system font name
+# mainfontoptions:
+#   - BoldFont=Palatino Bold
+# sansfont: "Helvetica"
+# sansfontoptions: []
+# monofont: "Fira Code"
+# monofontoptions:
+#   - Scale=0.85
+
+# --- Hyperlink colors ---
+# linkcolor: RoyalBlue               # internal links (default: RoyalBlue)
+# citecolor: OliveGreen              # citation links (default: OliveGreen)
+# urlcolor: RoyalBlue                # URL links (default: RoyalBlue)
+
+# --- Front matter sections ---
+toc: true                             # table of contents
+lof: true                             # list of figures
+lot: true                             # list of tables
+
+# --- Bibliography ---
 bibliography: references/refs.bib
 link-citations: true
+
+# --- Cross-reference prefixes (pandoc-crossref) ---
 figPrefix: "Figure"
 tblPrefix: "Table"
 eqnPrefix: "Equation"
 secPrefix: "Section"
+
+# --- Custom LaTeX in the preamble ---
+# header-includes: |
+#   \usepackage{tikz}
+#   \definecolor{accent}{HTML}{2E86AB}
+
+# --- Inkwell styling ---
 inkwell:
-  code-bg: "#f5f5f5"
-  code-border: true
-  code-font-size: small
-  tables: booktabs
-  table-font-size: small
-  hanging-indent: false
-  code-display: output
-  python-env: ./venv
+  code-bg: "#f5f5f5"                  # background color for code blocks
+  code-border: true                   # border around code blocks
+  code-rounded: true                  # rounded corners on code blocks
+  code-font-size: small               # tiny, scriptsize, footnotesize, small, normalsize
+  code-display: output                # default display: output, both, code, none
+  tables: booktabs                    # booktabs, grid, plain
+  table-font-size: small              # tiny, scriptsize, footnotesize, small, normalsize
+  table-stripe: false                 # alternating row shading
+  hanging-indent: false               # hanging indent for bibliography
+  caption-style: above                # above or below figures/tables
+  # columns: 2                        # force two-column layout
+  python-env: ./venv                  # Python virtual environment path
 ---
 
 # Introduction {#sec:intro}

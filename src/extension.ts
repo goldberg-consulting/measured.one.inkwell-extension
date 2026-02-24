@@ -8,7 +8,7 @@ import { compile, exportPDF, isCompilable } from "./compiler";
 import { InkwellDiagnostics } from "./diagnostics";
 import { selectTemplateCommand } from "./templates";
 import { findInkwellRoot, saveManifestField } from "./config";
-import { checkToolchain, showToolchainStatus } from "./toolchain";
+import { checkToolchain, showToolchainStatus, setExtensionPath } from "./toolchain";
 import { runAllBlocks, parseCodeBlocks, RunCancellation } from "./runner";
 import { clearCache } from "./cache";
 import { initProject, updateProject } from "./scaffold";
@@ -21,6 +21,7 @@ let isCompiling = false;
 let activeRunCancel: RunCancellation | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
+  setExtensionPath(context.extensionPath);
   diagnostics = new InkwellDiagnostics();
 
   const previewProvider = new InkwellPreviewProvider(context);

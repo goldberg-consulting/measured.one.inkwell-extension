@@ -17,9 +17,53 @@ Inkwell lets you stay in markdown, stay in your editor, and still get publicatio
 
 ## Installation
 
-### From source
+### 1. Install dependencies
 
-1. Clone and build:
+**macOS (Homebrew):**
+
+```bash
+brew install pandoc
+brew install --cask mactex
+npm install -g @mermaid-js/mermaid-cli
+```
+
+That gives you everything: Pandoc, LaTeX (XeLaTeX + pdfLaTeX), and Mermaid diagram support.
+
+**Smaller macOS install (~150 MB instead of ~5 GB):**
+
+Replace `mactex` with TinyTeX if you want a minimal footprint. You will need to install LaTeX packages as Inkwell's templates require them.
+
+```bash
+brew install pandoc
+curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh
+npm install -g @mermaid-js/mermaid-cli
+```
+
+Then install the LaTeX packages Inkwell's templates need (listed in [`requirements-latex.txt`](requirements-latex.txt)):
+
+```bash
+sed 's/#.*//' requirements-latex.txt | xargs tlmgr install && texhash
+```
+
+**Linux:**
+
+```bash
+sudo apt install pandoc texlive-full                 # Debian/Ubuntu
+sudo dnf install pandoc texlive-scheme-full          # Fedora
+npm install -g @mermaid-js/mermaid-cli
+```
+
+**Python** (optional, for runnable `{python}` code blocks): set up per-project with `Cmd+Shift+P` > **Inkwell: Setup Python Environment**, or manually:
+
+```bash
+python3 -m venv venv && source venv/bin/activate && pip install numpy matplotlib
+```
+
+> **Troubleshooting:** If compilation fails with `Missing file: foo.sty`, run `tlmgr install foo`. The build log (`Cmd+Shift+U` > **Inkwell LaTeX**) shows the exact missing filename. Mermaid blocks without `mmdc` installed render in the live preview but appear as code listings in PDFs.
+
+### 2. Install the extension
+
+Clone and build from source:
 
 ```bash
 git clone https://github.com/goldberg-consulting/measured.one.inkwell-extension.git
@@ -28,79 +72,11 @@ npm install
 npm run compile
 ```
 
-2. Install the extension in your editor:
+Then install in your editor:
    - Open VS Code or Cursor
    - `Cmd+Shift+P` > **Developer: Install Extension from Location...**
    - Select the `measured.one.inkwell-extension` folder
    - Reload the window when prompted
-
-### Prerequisites
-
-Inkwell needs Pandoc and a LaTeX distribution (providing both XeLaTeX and pdfLaTeX) installed on your system. On first activation, it checks for both and offers guided installation if either is missing.
-
-**macOS (Homebrew):**
-
-```bash
-brew install pandoc
-brew install --cask basictex    # minimal (~300 MB), requires extra packages below
-# or
-brew install --cask mactex      # full install (~5 GB), includes everything
-```
-
-**macOS (TinyTeX, recommended):**
-
-```bash
-curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh
-```
-
-**Linux:**
-
-```bash
-# Minimal (requires extra packages below)
-sudo apt install pandoc texlive-xetex               # Debian/Ubuntu
-sudo dnf install pandoc texlive-xetex               # Fedora
-
-# Full (includes everything)
-sudo apt install pandoc texlive-full                 # Debian/Ubuntu
-sudo dnf install pandoc texlive-scheme-full          # Fedora
-```
-
-**LaTeX packages (minimal installs only):** If you chose TinyTeX, BasicTeX, or `texlive-xetex`, run this once to install the packages Inkwell's templates need. Skip this if you installed MacTeX or `texlive-full`.
-
-```bash
-tlmgr install fancyhdr titlesec setspace etoolbox enumitem float xcolor \
-  xurl parskip framed fancyvrb fvextra booktabs longtable caption array \
-  microtype mdframed zref needspace titling lettrine lineno footmisc adjustbox lastpage \
-  listings csquotes ragged2e subcaption stfloats authblk tcolorbox colortbl \
-  mathtools thmtools amssymb amsfonts amsthm here multirow environ abstract \
-  multicol bookmark cleveref natbib stix2 helvet titletoc adforn xifthen \
-  ccicons imakeidx fontawesome5 orcidlink pdflscape rotating balance flushend \
-  chemfig circuitikz supertabular matlab-prettifier lipsum lettrine
-```
-
-If you still hit a "missing file" error during compilation (e.g., `Missing file: foo.sty`), install the package with `tlmgr install foo`. Some packages have dependencies that `tlmgr` does not auto-resolve; for example, `mdframed` also needs `zref` and `needspace`:
-
-```bash
-tlmgr install mdframed zref needspace
-```
-
-The Inkwell build log (`Cmd+Shift+U` > **Inkwell LaTeX**) shows the exact missing filename.
-
-**Mermaid diagrams** (optional, for `{mermaid}` code blocks in PDF):
-
-```bash
-npm install -g @mermaid-js/mermaid-cli
-```
-
-`mmdc` renders diagrams to high-resolution PNG for PDF compilation and SVG for the live preview. Without it, mermaid blocks still render in the preview (client-side) but appear as code listings in compiled PDFs.
-
-**Python** (optional, for runnable code blocks):
-
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install numpy matplotlib
-```
 
 See the **[Syntax Guide](guide.md)** for the complete reference on YAML frontmatter, code blocks, math, citations, and template-specific fields.
 

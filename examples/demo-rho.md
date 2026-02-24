@@ -1,7 +1,20 @@
 ---
 template: rho
 title: "Template for preparing an academic article using the Rho LaTeX class with Inkwell"
-journalname: "Rho Journal"
+abstract: |
+  This document demonstrates the Rho LaTeX class rendered through
+  Inkwell's Pandoc pipeline. Rho provides a two-column academic
+  article layout with colored section headers, a styled abstract box,
+  corresponding-author metadata, and footer fields. All of these are
+  controlled from YAML frontmatter: no LaTeX editing required.
+keywords: "Inkwell, Pandoc, Rho class, academic template, reproducible documents"
+
+# --- Class options ---
+# classoption:                        # default: 9pt, a4paper, twoside
+#   - 10pt
+#   - letterpaper
+
+# --- Authors and affiliations ---
 rho-authors:
   - name: "Author One"
     superscript: "1,*"
@@ -18,12 +31,18 @@ rho-affiliations:
     text: "Affiliation of author three"
   - superscript: "*"
     text: "These authors contributed equally to this work"
-dates: "This manuscript was compiled on February 22, 2026"
-leadauthor: "Author et al."
-footinfo: "Creative Commons CC BY 4.0"
+
+# --- Journal and header metadata ---
+journalname: "Rho Journal"
 smalltitle: "Rho Template"
+leadauthor: "Author et al."
 institution: "University Name"
+dates: "This manuscript was compiled on February 22, 2026"
 theday: "February 22, 2026"
+footinfo: "Creative Commons CC BY 4.0"
+logo: "logo.png"                      # path to masthead logo; set to false to suppress
+
+# --- Corresponding author block ---
 corres: "Provide the corresponding author information here."
 email: "example@organization.com"
 doi: "https://www.doi.org/exampledoi/XXXXXXXXXX"
@@ -32,23 +51,36 @@ revised: "February 1, 2026"
 accepted: "February 15, 2026"
 published: "February 22, 2026"
 license: "This document is licensed under Creative Commons CC BY 4.0."
-logo: "logo.png"
-abstract: |
-  This document demonstrates the Rho LaTeX class rendered through
-  Inkwell's Pandoc pipeline. Rho provides a two-column academic
-  article layout with colored section headers, a styled abstract box,
-  corresponding-author metadata, and footer fields. All of these are
-  controlled from YAML frontmatter: no LaTeX editing required.
-keywords: "Inkwell, Pandoc, Rho class, academic template, reproducible documents"
-# header-includes: |
-#   \usepackage{xcolor}
-#   \setlength{\parindent}{0pt}
+
+# --- Layout options ---
+linenumbers: false                    # line numbers in the margin
+# toc: true                           # table of contents
+# lof: true                           # list of figures
+# lot: true                           # list of tables
+
+# --- Bibliography ---
 bibliography: references/refs.bib
 link-citations: true
+
+# --- Cross-reference prefixes ---
 figPrefix: "figure"
 tblPrefix: "table"
 eqnPrefix: "equation"
 secPrefix: "section"
+
+# --- Custom LaTeX in the preamble ---
+# header-includes: |
+#   \usepackage{tikz}
+
+# --- Inkwell styling ---
+inkwell:
+  code-display: output                # default display: output, both, code, none
+  # code-bg: "#f5f5f5"
+  # code-border: true
+  # code-font-size: small
+  # tables: booktabs                  # booktabs, grid, plain
+  # table-font-size: small
+  # python-env: ./venv
 ---
 
 # Introduction {#sec:intro}

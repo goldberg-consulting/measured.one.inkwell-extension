@@ -1,0 +1,89 @@
+# LaTeX packages required by Inkwell templates.
+# These are tlmgr package names (not .sty filenames).
+#
+# Install all at once:
+#   sed 's/#.*//' requirements-latex.txt | xargs tlmgr install && texhash
+
+# layout and formatting
+fancyhdr
+titlesec
+setspace
+etoolbox
+enumitem
+float
+xcolor
+xurl
+parskip
+framed
+fancyvrb
+fvextra
+booktabs
+caption
+microtype
+mdframed
+zref
+needspace
+titling
+lettrine
+lineno
+footmisc
+adjustbox
+lastpage
+listings
+csquotes
+ragged2e
+tcolorbox
+colortbl
+mathtools
+thmtools
+here
+multirow
+environ
+abstract
+bookmark
+cleveref
+natbib
+adforn
+xifthen
+ccicons
+imakeidx
+fontawesome5
+orcidlink
+pdflscape
+chemfig
+circuitikz
+supertabular
+matlab-prettifier
+lipsum
+hardwrap
+units
+silence
+
+# bundles (provide multiple .sty files each)
+# amsfonts -> amssymb.sty, amsfonts.sty
+# amscls -> amsthm.sty
+# tools -> array.sty, longtable.sty, multicol.sty
+# preprint -> authblk.sty, balance.sty
+# sttools -> stfloats.sty, flushend.sty
+# graphics -> rotating.sty, graphicx.sty
+# oberdiek -> iflang.sty
+# psnfss -> helvet.sty, mathpazo.sty, times.sty
+amsfonts
+amscls
+tools
+preprint
+sttools
+graphics
+oberdiek
+psnfss
+
+# fonts
+mathpazo
+palatino
+bera
+soul
+stix2-type1
+tex-gyre
+
+# document classes
+tufte-latex

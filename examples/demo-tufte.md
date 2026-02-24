@@ -1,6 +1,7 @@
 ---
 template: tufte
 title: "On the Principles of Analytical Display"
+# subtitle: "A Companion Guide"
 author: "Inkwell"
 date: "February 2026"
 abstract: |
@@ -8,17 +9,47 @@ abstract: |
   This handout demonstrates the Tufte layout through margin notes,
   sidenotes, margin figures, and full-width displays, all authored in
   Markdown and compiled through Inkwell.
+
+# --- Class options ---
 classoption:
-  - justified
-  - a4paper
+  - justified                         # justified text (default is ragged-right)
+  - a4paper                           # or: letterpaper (default)
+  # - sfsidenotes                     # sans-serif sidenotes
+
+# --- Hyperlink colors ---
+# linkcolor: DarkSlateBlue            # internal links (default: DarkSlateBlue)
+# citecolor: DarkSlateBlue            # citation links (default: DarkSlateBlue)
+# urlcolor: DarkSlateBlue             # URL links (default: DarkSlateBlue)
+
+# --- Front matter sections ---
+# toc: true                           # table of contents
+# lof: true                           # list of figures
+# lot: true                           # list of tables
+
+# --- Bibliography ---
 bibliography: references/refs.bib
 link-citations: true
+
+# --- Cross-reference prefixes ---
 figPrefix: "Figure"
 tblPrefix: "Table"
 eqnPrefix: "Equation"
 secPrefix: "Section"
+
+# --- Custom LaTeX in the preamble ---
+# header-includes: |
+#   \usepackage{tikz}
+
+# --- Inkwell styling ---
 inkwell:
-  code-display: output
+  code-display: output                # default display: output, both, code, none
+  # code-bg: "#f5f5f5"
+  # code-border: true
+  # code-rounded: true
+  # code-font-size: small             # tiny, scriptsize, footnotesize, small, normalsize
+  # tables: booktabs                  # booktabs, grid, plain
+  # table-font-size: small
+  # python-env: ./venv
 ---
 
 # Data-Ink and Visual Evidence {#sec:data-ink}
