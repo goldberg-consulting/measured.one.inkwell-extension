@@ -137,6 +137,7 @@ import numpy as np
 | `env`     | Override the Python environment for this block |
 | `caption` | Caption text for the figure or table |
 | `label`   | Cross-reference label (produces `fig:label` or `tbl:label`) |
+| `cache`   | Set to `"false"` to skip caching and re-run every time |
 
 ### Languages
 
@@ -155,6 +156,14 @@ fig.savefig(os.path.join(out, "my_figure.png"), dpi=200)
 ### Caching
 
 Results are cached in `.inkwell/outputs/`. Blocks only re-run when their source code changes. Use **Inkwell: Clear Code Block Cache** to force a full re-run.
+
+To suppress caching for a specific block (e.g., one that reads live data or uses randomness without a seed), set `cache="false"`:
+
+````markdown
+```{python cache="false" output="live_metrics" caption="Current metrics."}
+# this block re-runs every time
+```
+````
 
 ### Display modes
 
