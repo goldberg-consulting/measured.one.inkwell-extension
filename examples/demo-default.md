@@ -63,8 +63,14 @@ fig.tight_layout()
 fig.savefig(os.path.join(os.environ.get("INKWELL_OUTPUT_DIR", "."),
             "scatter.png"), dpi=200, bbox_inches="tight")
 plt.close(fig)
-print(f"n = {len(x)}, r = {np.corrcoef(x, y)[0,1]:.3f}")
+r_val = np.corrcoef(x, y)[0, 1]
+print(f"n = {len(x)}, r = {r_val:.3f}")
+print(f"::inkwell scatter_n={len(x)}")
+print(f"::inkwell scatter_r={r_val:.3f}")
+print(f"::inkwell scatter_slope={m:.3f}")
 ```
+
+The regression was fitted to {{scatter_n}} observations, yielding a Pearson correlation of $r = `{python} f"{float(scatter_r):.2f}"`$ and estimated slope $\hat\beta = {{scatter_slope}}$.
 
 ## Tables
 
