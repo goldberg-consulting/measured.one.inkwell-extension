@@ -11,9 +11,35 @@
 
 import * as path from "path";
 import * as fs from "fs";
+import * as os from "os";
 import * as crypto from "crypto";
 import { execFileSync } from "child_process";
 import { BlockResult, CodeBlock, DisplayMode, parseCodeBlocks, parseRunConfig, RunConfig } from "./runner";
+
+function buildShellPath(): string {
+  const base = ["/usr/local/bin", "/usr/bin"];
+  const home = os.homedir();
+  const npmGlobal = path.join(home, ".npm-global", "bin");
+  if (process.platform === "darwin") {
+    return [
+      "/opt/homebrew/bin",
+      npmGlobal,
+      `${home}/Library/TinyTeX/bin/universal-darwin`,
+      "/Library/TeX/texbin",
+      ...base,
+      process.env.PATH,
+    ].join(":");
+  }
+  return [
+    npmGlobal,
+    ...base,
+    `${home}/.TinyTeX/bin/x86_64-linux`,
+    `${home}/.TinyTeX/bin/aarch64-linux`,
+    process.env.PATH,
+  ].join(":");
+}
+
+const INJECT_ENV = { ...process.env, PATH: buildShellPath() };
 
 const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".svg", ".pdf", ".eps"]);
 
@@ -457,7 +483,7 @@ function mmdcAvailable(): boolean {
   if (_mmdcAvailable !== undefined) return _mmdcAvailable;
   try {
     execFileSync("mmdc", ["--version"], {
-      encoding: "utf-8", timeout: 5000, stdio: "pipe",
+      encoding: "utf-8", timeout: 5000, stdio: "pipe", env: INJECT_ENV,
     });
     _mmdcAvailable = true;
   } catch {
@@ -519,6 +545,7 @@ export function renderMermaidBlocks(markdown: string, workDir: string): string {
           cwd: workDir,
           timeout: 30_000,
           stdio: "pipe",
+          env: INJECT_ENV,
         });
         // mmdc v9 and earlier may append -1 to the filename
         if (!fs.existsSync(svgPath)) {
