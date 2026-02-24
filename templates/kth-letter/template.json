@@ -1,0 +1,6 @@
+{
+  "name": "KTH Letter",
+  "description": "Official KTH (Royal Institute of Technology) letterhead with logo and institutional footer.",
+  "documentclass": "kth-letter",
+  "engine": "pdflatex"
+}

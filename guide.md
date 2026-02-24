@@ -30,7 +30,7 @@ lot: true                          # list of tables
 Set `template:` to use a journal template. Omit it (or set `template: default`) for the default article layout.
 
 ```yaml
-template: rho      # or: rmxaa, ludus, tmsce, default
+template: tufte    # or: rho, rmxaa, ludus, tmsce, kth-letter, default
 ```
 
 ### The `inkwell:` styling namespace
@@ -175,6 +175,52 @@ To suppress caching for a specific block (e.g., one that reads live data or uses
 | `none`   | Nothing visible; the block still runs and its exports are available |
 
 Set a document-wide default with `code-display:` in the `inkwell:` namespace.
+
+---
+
+## Mermaid Diagrams
+
+Mermaid diagrams render to high-resolution PNG at compile time via `mmdc` (mermaid-cli) for PDF output, and to SVG for the live HTML preview. Both `{mermaid}` (with attributes) and plain `mermaid` fences are supported. Any diagram type that `mmdc` supports works: flowcharts, sequence diagrams, class diagrams, ER diagrams, state diagrams, Gantt charts, pie charts, and more.
+
+### With caption and cross-reference
+
+````markdown
+```{mermaid caption="System architecture" label="arch"}
+graph LR
+    A[Client] --> B[API]
+    B --> C[Database]
+```
+````
+
+This produces a numbered figure referenceable as `@Fig:arch`.
+
+### Plain (no caption)
+
+````markdown
+```mermaid
+sequenceDiagram
+    Alice->>Bob: Hello
+    Bob-->>Alice: Hi back
+```
+````
+
+### Supported diagram types
+
+Any diagram type that `mmdc` supports works: `graph`, `sequenceDiagram`, `classDiagram`, `stateDiagram`, `erDiagram`, `gantt`, `pie`, `flowchart`, `gitgraph`, `mindmap`, `timeline`, and others.
+
+### Caching
+
+Rendered diagrams are cached in `.inkwell/mermaid/` by content hash (both SVG for preview and PNG for PDF). A diagram only re-renders when its source changes.
+
+### Prerequisites
+
+Install mermaid-cli globally:
+
+```bash
+npm install -g @mermaid-js/mermaid-cli
+```
+
+If `mmdc` is not installed, mermaid blocks pass through as code listings in the compiled PDF but still render in the live preview (client-side via mermaid.js).
 
 ---
 
@@ -389,6 +435,94 @@ geometry: "margin=1in"
 
 Additional fields: `subtitle`, `fontsize`, `mainfont`, `sansfont`, `monofont`, `documentclass`.
 
+### Tufte Handout (pdfLaTeX)
+
+Edward Tufte-inspired layout with wide margins for sidenotes, margin figures, and annotations. Uses the `tufte-handout` class from CTAN with Palatino typography.
+
+```yaml
+template: tufte
+title: "Handout Title"
+author: "Author Name"
+date: "February 2026"
+abstract: |
+  Abstract text appears below the title.
+classoption:
+  - justified        # justified text (default is ragged-right)
+  - a4paper          # or: letterpaper (default)
+  - sfsidenotes      # sans-serif sidenotes (optional)
+```
+
+Additional fields: `subtitle`, `linkcolor`, `citecolor`, `urlcolor`.
+
+#### Margin notes
+
+Use `::: {.aside}` fenced divs for margin notes:
+
+```markdown
+::: {.aside}
+This text appears in the margin alongside the main column.
+:::
+```
+
+For inline margin notes, use raw LaTeX: `\marginnote{Short note.}` or `\sidenote{Numbered note.}`.
+
+#### Margin figures
+
+Use raw LaTeX for figures placed in the margin:
+
+```markdown
+\begin{marginfigure}
+\centering
+\includegraphics[width=\linewidth]{figures/small-plot.pdf}
+\caption{A plot in the margin.}
+\end{marginfigure}
+```
+
+Standard `![caption](path)` images appear in the main column with captions set in the margin by the Tufte class.
+
+#### Full-width sections
+
+Extend content into the margin area with `::: {.fullwidth}`:
+
+```markdown
+::: {.fullwidth}
+This paragraph and any tables or figures within it
+span the full page width, including the margin.
+:::
+```
+
+#### New thoughts
+
+Use `\newthought{Opening words}` to start a paragraph with small-caps, following Tufte's convention:
+
+```markdown
+\newthought{The central argument} of this section is that...
+```
+
+### KTH Letter (pdfLaTeX)
+
+Official KTH (Royal Institute of Technology) letterhead. Produces a formatted letter with institutional logo, address block, and footer.
+
+```yaml
+template: kth-letter
+name: "Sender Name"
+email: "sender@kth.se"
+web: "www.kth.se"
+telephone: "+46 8 790 60 00"
+dnr: "Dnr: 2026-0042"
+recipient:
+  - "Recipient Name"
+  - "Department"
+  - "Address Line"
+  - "Country"
+opening: "Dear Dr. Name,"
+closing: "Kind regards,"
+```
+
+Additional fields: `location` (office address), `signature-name` (for the signature block), `signature-cols` (number of signature columns for multiple signatories), `cc` (carbon copy), `encl` (enclosures).
+
+The `recipient` field accepts a list; each item becomes a line in the address block. The body of the markdown file becomes the letter content between the salutation and closing.
+
 ### Rho Academic Article (pdfLaTeX)
 
 Two-column layout with colored section headers, abstract box, and footer metadata.
@@ -509,6 +643,7 @@ tmsce-affiliations:
   - superscript: "2"
     text: "Department of Applied Sciences, Tech Institute, UK"
 corresponding-email: "j.smith@stateuniv.edu"
+journalname: "Transactions on Mathematical Sciences and Computational Engineering"
 doi: "10.0000/tmsce.2026.042"
 vol: 1
 issue: 1
@@ -518,6 +653,8 @@ received: "15 January 2026"
 revised: "10 February 2026"
 accepted: "20 February 2026"
 ```
+
+Additional fields: `copyrightline`, `permissions`. The `journalname` field sets the text in the page footer; if omitted, the default class name is used.
 
 ---
 

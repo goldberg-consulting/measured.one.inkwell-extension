@@ -140,6 +140,7 @@ export function parseCodeBlocks(markdown: string): CodeBlock[] {
   BLOCK_PATTERN.lastIndex = 0;
   while ((match = BLOCK_PATTERN.exec(markdown)) !== null) {
     const lang = match[1];
+    if (lang === "mermaid") continue;
     const attrsStr = match[2].trim();
     const source = match[3];
     const raw = match[0];

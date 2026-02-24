@@ -29,7 +29,7 @@ inkwell:
 
 # Introduction {#sec:intro}
 
-This document demonstrates the default Inkwell template. It compiles markdown to publication-quality PDF through Pandoc [@macfarlane2023] and XeLaTeX, with code blocks that execute in place. The result is a literate programming workflow where analysis and writing coexist in a single file [@knuth1984].
+This document demonstrates the default Inkwell template. It compiles markdown to publication-quality PDF through Pandoc [@macfarlane2023] and XeLaTeX, with code blocks that execute in place. The result is a literate programming workflow where analysis and writing coexist in a single file [@knuth1984]. Mermaid diagrams (@sec:diagrams) also compile inline as cross-referenceable SVG figures.
 
 ## Runnable Code: Fourier Partial Sums {#sec:fourier}
 
@@ -129,6 +129,19 @@ $$e^{i\pi} + 1 = 0$$ {#eq:euler}
 **Cauchy-Schwarz Inequality.** For all vectors $u, v$ in an inner product space,
 $$|\langle u, v \rangle|^2 \leq \langle u, u \rangle \cdot \langle v, v \rangle$$ {#eq:cauchy-schwarz}
 :::
+
+## Diagrams {#sec:diagrams}
+
+Mermaid diagrams render to SVG and are cross-referenceable like any figure. @Fig:pipeline shows the Inkwell compilation pipeline.
+
+```{mermaid caption="The Inkwell compilation pipeline, from source markdown to final PDF." label="pipeline"}
+graph LR
+    A[Markdown + YAML] --> B[Run Code Blocks]
+    B --> C[Inject Results]
+    C --> D[Bind Variables]
+    D --> E[Pandoc + XeLaTeX]
+    E --> F[PDF]
+```
 
 ## Environment
 

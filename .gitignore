@@ -4,3 +4,6 @@ node_modules/
 .vscode-test/
 examples/venv/
 examples/.inkwell/outputs/
+examples/.inkwell/mermaid/
+examples/figures/
+examples/*.pdf
