@@ -178,6 +178,59 @@ Set a document-wide default with `code-display:` in the `inkwell:` namespace.
 
 ---
 
+## Mermaid Diagrams
+
+Mermaid diagrams render to SVG at compile time via `mmdc` (mermaid-cli). The preview panel renders them client-side. Both `{mermaid}` (with attributes) and plain `mermaid` fences are supported.
+
+### With caption and cross-reference
+
+````markdown
+```{mermaid caption="System architecture" label="arch"}
+graph LR
+    A[Client] --> B[API]
+    B --> C[Database]
+```
+````
+
+This produces a numbered figure referenceable as `@Fig:arch`.
+
+### Plain (no caption)
+
+````markdown
+```mermaid
+sequenceDiagram
+    Alice->>Bob: Hello
+    Bob-->>Alice: Hi back
+```
+````
+
+### Supported diagram types
+
+Any diagram type that `mmdc` supports works: `graph`, `sequenceDiagram`, `classDiagram`, `stateDiagram`, `erDiagram`, `gantt`, `pie`, `flowchart`, `gitgraph`, `mindmap`, `timeline`, and others.
+
+### Caching
+
+Rendered SVGs are cached in `.inkwell/mermaid/` by content hash. A diagram only re-renders when its source changes.
+
+### Prerequisites
+
+Install mermaid-cli globally:
+
+```bash
+npm install -g @mermaid-js/mermaid-cli
+```
+
+For SVG support in PDF output, install `librsvg` so Pandoc can convert SVGs to PDF:
+
+```bash
+brew install librsvg          # macOS
+sudo apt install librsvg2-bin  # Debian/Ubuntu
+```
+
+If `mmdc` is not installed, mermaid blocks pass through as code listings.
+
+---
+
 ## Inline Data Binding
 
 Code blocks can export named values that you reference later in prose, captions, or table cells. There are two mechanisms.
