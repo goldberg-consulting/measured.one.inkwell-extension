@@ -56,6 +56,8 @@ $if(keywords)$\keywords{$keywords$}$endif$
 \newtheorem{proposition}{Proposition}
 \newtheorem{corollary}{Corollary}
 
+\usepackage{parskip}
+
 % Pandoc syntax highlighting
 \usepackage{framed}
 \usepackage{fancyvrb}

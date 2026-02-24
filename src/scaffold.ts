@@ -303,6 +303,7 @@ Write your content here. Cite sources with [@knuth1984] and use inline math like
   }
 
   copyDemoFiles(opts.dir);
+  copyGuide(opts.dir);
 }
 
 // ── Update Project ─────────────────────────────────────────────────
@@ -317,6 +318,15 @@ const STARTER_FILES: Array<{ rel: string; content: string }> = [
   { rel: "references/refs.bib", content: STARTER_BIB },
   { rel: "figures/.gitkeep", content: "" },
 ];
+
+function copyGuide(projectRoot: string): boolean {
+  const src = path.join(__dirname, "..", "GUIDE.md");
+  const dest = path.join(projectRoot, ".inkwell", "GUIDE.md");
+  if (!fs.existsSync(src)) return false;
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.copyFileSync(src, dest);
+  return true;
+}
 
 function copyDemoFiles(projectRoot: string): string[] {
   const extensionExamples = path.join(__dirname, "..", "examples");
@@ -448,6 +458,8 @@ export async function updateProject(): Promise<void> {
 
   const demos = copyDemoFiles(projectRoot);
   if (demos.length) report.push(`Copied demo files: ${demos.join(", ")}`);
+
+  if (copyGuide(projectRoot)) report.push("Updated .inkwell/GUIDE.md");
 
   if (report.length) {
     vscode.window.showInformationMessage(

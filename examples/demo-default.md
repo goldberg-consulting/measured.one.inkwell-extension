@@ -18,7 +18,7 @@ inkwell:
   code-font-size: small
   tables: booktabs
   table-font-size: small
-  hanging-indent: true
+  hanging-indent: false
   code-display: output
   python-env: ./venv
 ---
@@ -68,9 +68,22 @@ print(f"n = {len(x)}, r = {r_val:.3f}")
 print(f"::inkwell scatter_n={len(x)}")
 print(f"::inkwell scatter_r={r_val:.3f}")
 print(f"::inkwell scatter_slope={m:.3f}")
+print(f"::inkwell scatter_intercept={b:.3f}")
 ```
 
-The regression was fitted to {{scatter_n}} observations, yielding a Pearson correlation of $r = `{python} f"{float(scatter_r):.2f}"`$ and estimated slope $\hat\beta = {{scatter_slope}}$.
+## Inline Data Binding
+
+Code blocks can export named values to the document with `print("::inkwell key=value")` in their stdout. These values are then available in two ways.
+
+**Variable substitution** uses double-brace syntax. Writing `{{scatter_n}}` in prose inserts the exported value directly: this dataset has {{scatter_n}} observations with Pearson $r = {{scatter_r}}$.
+
+**Inline expressions** use `` `{python} expr` `` to evaluate arbitrary Python. All exported variables are pre-loaded, so you can cast, format, and compute:
+
+- Formatted correlation: $r = `{python} f"{float(scatter_r):.2f}"`$
+- Slope to one decimal: $\hat\beta \approx `{python} f"{float(scatter_slope):.1f}"`$
+- Arithmetic: the slope-to-correlation ratio is `{python} f"{float(scatter_slope) / float(scatter_r):.2f}"`.
+
+The full regression line is $\hat{y} = `{python} f"{float(scatter_slope):.3f}"`\,x `{python} f"+ {float(scatter_intercept):.3f}" if float(scatter_intercept) >= 0 else f"- {abs(float(scatter_intercept)):.3f}"`$, fitted to $n = {{scatter_n}}$ points.
 
 ## Tables
 
