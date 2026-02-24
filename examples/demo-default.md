@@ -12,6 +12,10 @@ lot: true
 #   \setlength{\parindent}{0pt}
 bibliography: references/refs.bib
 link-citations: true
+figPrefix: "Figure"
+tblPrefix: "Table"
+eqnPrefix: "Equation"
+secPrefix: "Section"
 inkwell:
   code-bg: "#f5f5f5"
   code-border: true
@@ -23,26 +27,26 @@ inkwell:
   python-env: ./venv
 ---
 
-# Introduction
+# Introduction {#sec:intro}
 
 This document demonstrates the default Inkwell template. It compiles markdown to publication-quality PDF through Pandoc [@macfarlane2023] and XeLaTeX, with code blocks that execute in place. The result is a literate programming workflow where analysis and writing coexist in a single file [@knuth1984].
 
-## Runnable Code: Fourier Partial Sums
+## Runnable Code: Fourier Partial Sums {#sec:fourier}
 
-The Fourier series of a square wave [@fourier1822] converges pointwise but exhibits overshoot at discontinuities. The partial sum is:
+The Fourier series of a square wave [@fourier1822] converges pointwise but exhibits overshoot at discontinuities. The partial sum is given by @eq:fourier, and @Fig:fourier shows the convergence for increasing $n$.
 
 \begin{equation}\label{eq:fourier}
 f_n(x) = \sum_{k=1}^{n} \frac{4}{(2k-1)\pi} \sin\bigl((2k-1)x\bigr)
 \end{equation}
 
-```{python file="scripts/sine_plot.py" output="sine_plot" caption="Fourier partial sums of a square wave for n = 1, 3, 5, 9."}
+```{python cache="false" file="scripts/sine_plot.py" output="sine_plot" caption="Fourier partial sums of a square wave for n = 1, 3, 5, 9." label="fourier"}
 ```
 
-## Inline Code with Output
+## Inline Code with Output {#sec:scatter}
 
-Generate a scatter plot directly in the document using NumPy [@harris2020] and Matplotlib [@hunter2007]:
+@Fig:scatter is generated directly in the document using NumPy [@harris2020] and Matplotlib [@hunter2007]:
 
-```{python display="both" output="scatter" caption="Simulated bivariate data with OLS regression line."}
+```{python display="both" output="scatter" caption="Simulated bivariate data with OLS regression line." label="scatter"}
 import os, numpy as np
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -71,7 +75,7 @@ print(f"::inkwell scatter_slope={m:.3f}")
 print(f"::inkwell scatter_intercept={b:.3f}")
 ```
 
-## Inline Data Binding
+## Inline Data Binding {#sec:binding}
 
 Code blocks can export named values to the document with `print("::inkwell key=value")` in their stdout. These values are then available in two ways.
 
@@ -83,11 +87,11 @@ Code blocks can export named values to the document with `print("::inkwell key=v
 - Slope to one decimal: $\hat\beta \approx `{python} f"{float(scatter_slope):.1f}"`$
 - Arithmetic: the slope-to-correlation ratio is `{python} f"{float(scatter_slope) / float(scatter_r):.2f}"`.
 
-The full regression line is $\hat{y} = `{python} f"{float(scatter_slope):.3f}"`\,x `{python} f"+ {float(scatter_intercept):.3f}" if float(scatter_intercept) >= 0 else f"- {abs(float(scatter_intercept)):.3f}"`$, fitted to $n = {{scatter_n}}$ points.
+The full regression line from @sec:scatter is $\hat{y} = `{python} f"{float(scatter_slope):.3f}"`\,x `{python} f"+ {float(scatter_intercept):.3f}" if float(scatter_intercept) >= 0 else f"- {abs(float(scatter_intercept)):.3f}"`$, fitted to $n = {{scatter_n}}$ points.
 
-## Tables
+## Tables {#sec:tables}
 
-Static markdown tables work as expected:
+@Tbl:methods shows a static markdown pipe table. @Tbl:stats below is generated from a code block that writes a CSV file.
 
 | Method    | Time (ms) | Accuracy (%) |
 |-----------|----------:|-------------:|
@@ -95,9 +99,9 @@ Static markdown tables work as expected:
 | Proposed  |      10.1 |         93.8 |
 | Optimized |       8.7 |         94.4 |
 
-: Comparison of three methods on the benchmark dataset.
+: Comparison of three methods on the benchmark dataset. {#tbl:methods}
 
-Tables can also be generated from code. A block that writes a `.csv` to the output directory is rendered as a formatted table:
+Code blocks that write a `.csv` to the output directory are rendered as formatted tables:
 
 ```{python output="summary_stats" caption="Descriptive statistics for the simulated bivariate data." label="stats"}
 import os, numpy as np
@@ -113,17 +117,17 @@ with open(os.path.join(out, "summary_stats.csv"), "w") as f:
         f.write(f"{name},{len(vals)},{vals.mean():.3f},{vals.std():.3f},{vals.min():.3f},{vals.max():.3f}\n")
 ```
 
-## Math
+## Math {#sec:math}
 
-Euler's identity [@euler1748] connects five fundamental constants:
+@Eq:euler, Euler's identity [@euler1748], connects five fundamental constants:
 
-$$e^{i\pi} + 1 = 0$$
+$$e^{i\pi} + 1 = 0$$ {#eq:euler}
 
-A theorem environment rendered by the template:
+@Eq:cauchy-schwarz is rendered inside a theorem environment:
 
 ::: {.theorem}
 **Cauchy-Schwarz Inequality.** For all vectors $u, v$ in an inner product space,
-$$|\langle u, v \rangle|^2 \leq \langle u, u \rangle \cdot \langle v, v \rangle$$
+$$|\langle u, v \rangle|^2 \leq \langle u, u \rangle \cdot \langle v, v \rangle$$ {#eq:cauchy-schwarz}
 :::
 
 ## Environment
