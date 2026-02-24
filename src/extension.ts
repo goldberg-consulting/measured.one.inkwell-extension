@@ -308,7 +308,7 @@ async function setupPythonEnv(document: vscode.TextDocument): Promise<void> {
   } else {
     const installPick = await vscode.window.showInputBox({
       prompt: "Packages to install (space-separated, or leave empty)",
-      placeHolder: "numpy matplotlib pandas",
+      placeHolder: "numpy matplotlib pandas polars scikit-learn seaborn",
     });
     if (installPick?.trim()) {
       commands.push(`pip install ${installPick.trim()}`);
