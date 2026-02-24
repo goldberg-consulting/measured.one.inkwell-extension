@@ -45,18 +45,22 @@ linenumbers: false
 #   \setlength{\parindent}{0pt}
 bibliography: references/refs.bib
 link-citations: true
+figPrefix: "figure"
+tblPrefix: "table"
+eqnPrefix: "equation"
+secPrefix: "section"
 inkwell:
   code-display: output
   python-env: ./venv
 ---
 
-# INTRODUCTION
+# INTRODUCTION {#sec:intro}
 
 Stellar light curve analysis often requires decomposing periodic signals into frequency components. The Fourier series provides the mathematical framework for this decomposition [@fourier1822], and modern computational tools allow rapid visualization of convergence properties.
 
 This document demonstrates the RMxAA journal template compiled from markdown through Pandoc [@macfarlane2023] and LaTeX. Code blocks execute in place, producing figures that appear in the compiled PDF.
 
-# FOURIER ANALYSIS
+# FOURIER ANALYSIS {#sec:fourier}
 
 The partial sum of a square wave's Fourier series is
 
@@ -69,7 +73,7 @@ Figure 1 shows the convergence for increasing $n$.
 ```{python file="scripts/sine_plot.py" output="sine_plot" caption="Fourier partial sums for n = 1, 3, 5, 9."}
 ```
 
-# DATA EXAMPLE
+# DATA EXAMPLE {#sec:data}
 
 A simulated regression demonstrates inline code execution:
 
@@ -88,6 +92,6 @@ A simulated regression demonstrates inline code execution:
 
 # CONCLUSION
 
-The RMxAA template compiles from markdown with the journal's native two-column layout, dual-language abstracts, and standard bibliography formatting. Inkwell's code blocks produce embedded figures without manual export steps, following the literate programming paradigm [@knuth1984].
+The RMxAA template compiles from markdown with the journal's native two-column layout, dual-language abstracts, and standard bibliography formatting. As demonstrated in @sec:fourier and @sec:data, Inkwell's code blocks produce embedded figures without manual export steps, following the literate programming paradigm [@knuth1984].
 
 ## References

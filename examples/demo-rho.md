@@ -48,15 +48,16 @@ link-citations: true
 figPrefix: "figure"
 tblPrefix: "table"
 eqnPrefix: "equation"
+secPrefix: "section"
 ---
 
-# Introduction
+# Introduction {#sec:intro}
 
 The Rho LaTeX class provides a polished two-column layout for academic articles and lab reports. Originally designed for Overleaf, it is adapted here as an Inkwell template so that authors can write in markdown and produce publication-quality PDFs.
 
 Rho's visual identity includes colored section headers, a tinted abstract box with keywords, and a corresponding-author block with dates, DOI, and license. All metadata is set in the YAML frontmatter above.
 
-# Equations
+# Equations {#sec:equations}
 
 The Schrodinger equation serves as a typesetting example:
 
@@ -64,7 +65,7 @@ $$\frac{\hbar^2}{2m}\nabla^2\Psi + V(\mathbf{r})\Psi = -i\hbar \frac{\partial\Ps
 
 @Eq:schrodinger renders through Pandoc's `tex_math_dollars` extension. The `stix2` font bundled with Rho provides high-quality mathematical symbols without additional packages.
 
-# Code Highlighting
+# Code Highlighting {#sec:code}
 
 Pandoc syntax highlighting works alongside Rho's built-in listings style. Fenced code blocks produce colored output:
 
@@ -79,7 +80,7 @@ def fourier_partial_sum(x, n_terms):
     return result
 ```
 
-# Tables
+# Tables {#sec:tables}
 
 Pandoc pipe tables compile into single-column table floats. Rho's caption style applies automatically.
 
@@ -91,9 +92,9 @@ Pandoc pipe tables compile into single-column table floats. Rho's caption style 
 
 : Weekly forecast example. {#tbl:forecast}
 
-# Cross-References
+# Cross-References {#sec:crossref}
 
-Pandoc-crossref handles numbered references: @Eq:schrodinger for equations, @Tbl:forecast for tables. Section numbers, figure labels, and bibliography citations [@macfarlane2023] all resolve in the compiled output.
+Pandoc-crossref handles numbered references: @Eq:schrodinger for equations, @Tbl:forecast for tables, and @sec:equations or @sec:tables for sections. Bibliography citations [@macfarlane2023] also resolve in the compiled output. As discussed in @sec:intro, all metadata is controlled from YAML frontmatter.
 
 # Conclusion
 

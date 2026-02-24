@@ -39,18 +39,19 @@ link-citations: true
 figPrefix: "figure"
 tblPrefix: "table"
 eqnPrefix: "equation"
+secPrefix: "section"
 inkwell:
   code-display: output
   python-env: ./venv
 ---
 
-# Introduction
+# Introduction {#sec:intro}
 
 Academic publishing requires precise formatting that varies by journal. Inkwell addresses this by compiling markdown to journal-specific LaTeX classes through Pandoc [@macfarlane2023]. This document uses the Ludus Academik template, producing a two-column layout with themed section headers.
 
 The literate programming paradigm [@knuth1984] allows code and prose to coexist. Inkwell extends this to compiled PDF output: code blocks execute, and their results (figures, tables, text) appear in the final document.
 
-# Computational Example
+# Computational Example {#sec:computation}
 
 We demonstrate with a Fourier series visualization [@fourier1822]. The partial sum approximating a square wave is given by @eq:fourier.
 
@@ -61,14 +62,14 @@ $$f_n(x) = \sum_{k=1}^{n} \frac{4}{(2k-1)\pi}\sin\bigl((2k-1)x\bigr)$$ {#eq:four
 ```{python file="scripts/sine_plot.py" output="sine_plot" caption="Fourier partial sums converging to a square wave." label="fourier"}
 ```
 
-# Data Visualization
+# Data Visualization {#sec:dataviz}
 
 @Fig:scatter shows a simulated scatter plot with linear regression, generated inline by Python.
 
 ```{python file="scripts/scatter.py" output="scatter" caption="Simulated regression with n = 150 data points." label="scatter"}
 ```
 
-# Results
+# Results {#sec:results}
 
 @Tbl:convergence shows the convergence behavior of the Fourier partial sums at the midpoint $x = \pi/2$, where the true value is $f(x) = 1$. The peak overshoot column quantifies the Gibbs phenomenon: regardless of $n$, the maximum value overshoots by approximately 9% of the jump magnitude.
 
@@ -77,6 +78,6 @@ $$f_n(x) = \sum_{k=1}^{n} \frac{4}{(2k-1)\pi}\sin\bigl((2k-1)x\bigr)$$ {#eq:four
 
 # Conclusion
 
-As shown in @Fig:fourier and @Fig:scatter, Inkwell produces publication-quality figures from Python scripts. @Tbl:convergence demonstrates CSV-to-table rendering, and @Eq:fourier confirms that LaTeX math compiles correctly. The Ludus template handles all of these in a two-column layout with themed headers and bibliography.
+The regression in @Fig:scatter was fitted to $n = {{sample_n}}$ observations, yielding $r = {{corr_r}}$ and $\hat\beta = `{python} f"{float(slope):.2f}"`$. As shown in @Fig:fourier and @Fig:scatter, Inkwell produces publication-quality figures from Python scripts. @Tbl:convergence in @sec:results demonstrates CSV-to-table rendering, and @Eq:fourier in @sec:computation confirms that LaTeX math compiles correctly. The Ludus template handles all of these in a two-column layout with themed headers and bibliography.
 
 ## References
