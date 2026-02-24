@@ -63,6 +63,7 @@ export interface CodeBlock {
   display?: DisplayMode;
   caption?: string;
   label?: string;
+  noCache?: boolean;
   startLine: number;
   endLine: number;
   raw: string;
@@ -149,6 +150,7 @@ export function parseCodeBlocks(markdown: string): CodeBlock[] {
     const attrs = parseAttrs(attrsStr);
 
     const display = (attrs.display as DisplayMode) || undefined;
+    const noCache = attrs.cache === "false" || attrs.cache === "no";
 
     blocks.push({
       index: index++,
@@ -160,6 +162,7 @@ export function parseCodeBlocks(markdown: string): CodeBlock[] {
       display,
       caption: attrs.caption,
       label: attrs.label,
+      noCache: noCache || undefined,
       startLine,
       endLine,
       raw,
@@ -441,7 +444,7 @@ export async function runAllBlocks(
     const blockDir = path.join(cacheDir, `block_${block.index}`);
     const cached = cache.blocks[block.index];
 
-    if (cached && cached.hash === hash && cached.exitCode === 0) {
+    if (!block.noCache && cached && cached.hash === hash && cached.exitCode === 0) {
       const artifacts = discoverArtifacts(blockDir);
       let stdout = "";
       try {

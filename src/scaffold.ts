@@ -304,6 +304,7 @@ Write your content here. Cite sources with [@knuth1984] and use inline math like
 
   copyDemoFiles(opts.dir);
   copyGuide(opts.dir);
+  copyAgent(opts.dir);
 }
 
 // ── Update Project ─────────────────────────────────────────────────
@@ -320,8 +321,17 @@ const STARTER_FILES: Array<{ rel: string; content: string }> = [
 ];
 
 function copyGuide(projectRoot: string): boolean {
-  const src = path.join(__dirname, "..", "GUIDE.md");
-  const dest = path.join(projectRoot, ".inkwell", "GUIDE.md");
+  const src = path.join(__dirname, "..", "guide.md");
+  const dest = path.join(projectRoot, ".inkwell", "guide.md");
+  if (!fs.existsSync(src)) return false;
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.copyFileSync(src, dest);
+  return true;
+}
+
+function copyAgent(projectRoot: string): boolean {
+  const src = path.join(__dirname, "..", ".cursor", "agents", "inkwell-guide.md");
+  const dest = path.join(projectRoot, ".cursor", "agents", "inkwell-guide.md");
   if (!fs.existsSync(src)) return false;
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   fs.copyFileSync(src, dest);
@@ -459,7 +469,8 @@ export async function updateProject(): Promise<void> {
   const demos = copyDemoFiles(projectRoot);
   if (demos.length) report.push(`Copied demo files: ${demos.join(", ")}`);
 
-  if (copyGuide(projectRoot)) report.push("Updated .inkwell/GUIDE.md");
+  if (copyGuide(projectRoot)) report.push("Updated .inkwell/guide.md");
+  if (copyAgent(projectRoot)) report.push("Updated .cursor/agents/inkwell-guide.md");
 
   if (report.length) {
     vscode.window.showInformationMessage(

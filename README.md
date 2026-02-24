@@ -60,7 +60,7 @@ source venv/bin/activate
 pip install numpy matplotlib
 ```
 
-See the **[Syntax Guide](GUIDE.md)** for the complete reference on YAML frontmatter, code blocks, math, citations, and template-specific fields.
+See the **[Syntax Guide](guide.md)** for the complete reference on YAML frontmatter, code blocks, math, citations, and template-specific fields.
 
 ## Quick start
 
@@ -85,7 +85,7 @@ my-paper/
   venv/                    # Python environment (if enabled)
   .inkwell/
     manifest.json          # project config (template, settings)
-    GUIDE.md               # syntax reference (frontmatter, code blocks, data binding)
+    guide.md               # syntax reference (frontmatter, code blocks, data binding)
     outputs/               # cached code block results (gitignored)
   .gitignore
 ```
@@ -138,6 +138,7 @@ echo "Built on $(date)"
 | `env`     | Point a specific block at a different venv |
 | `caption` | Figure or table caption in the compiled PDF |
 | `label`   | Cross-reference label (produces `fig:label` or `tbl:label`) |
+| `cache`   | Set to `"false"` to re-run every time, skipping the content cache |
 
 Results cache in `.inkwell/outputs/`. Only re-run when the code actually changes.
 
@@ -589,7 +590,7 @@ Inkwell includes a Cursor agent at `.cursor/agents/inkwell-guide.md`. When worki
 - Debugging compilation errors and stale caches
 - Adding custom LaTeX packages via `header-includes`
 
-The agent references the full [Syntax Guide](GUIDE.md) for field names, attribute tables, and conversion rules.
+The agent references the full [Syntax Guide](guide.md) for field names, attribute tables, and conversion rules.
 
 ## License
 

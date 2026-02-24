@@ -5,6 +5,7 @@ tsconfig.json
 
 # Dev and CI
 .cursor/**
+!.cursor/agents/inkwell-guide.md
 .vscode/**
 .vscode-test/**
 .git/**
