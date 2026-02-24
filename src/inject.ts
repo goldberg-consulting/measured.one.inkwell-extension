@@ -11,9 +11,35 @@
 
 import * as path from "path";
 import * as fs from "fs";
+import * as os from "os";
 import * as crypto from "crypto";
 import { execFileSync } from "child_process";
 import { BlockResult, CodeBlock, DisplayMode, parseCodeBlocks, parseRunConfig, RunConfig } from "./runner";
+
+function buildShellPath(): string {
+  const base = ["/usr/local/bin", "/usr/bin"];
+  const home = os.homedir();
+  const npmGlobal = path.join(home, ".npm-global", "bin");
+  if (process.platform === "darwin") {
+    return [
+      "/opt/homebrew/bin",
+      npmGlobal,
+      `${home}/Library/TinyTeX/bin/universal-darwin`,
+      "/Library/TeX/texbin",
+      ...base,
+      process.env.PATH,
+    ].join(":");
+  }
+  return [
+    npmGlobal,
+    ...base,
+    `${home}/.TinyTeX/bin/x86_64-linux`,
+    `${home}/.TinyTeX/bin/aarch64-linux`,
+    process.env.PATH,
+  ].join(":");
+}
+
+const INJECT_ENV = { ...process.env, PATH: buildShellPath() };
 
 const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".svg", ".pdf", ".eps"]);
 
@@ -447,26 +473,157 @@ function applyInlineResults(
   return result;
 }
 
+// ── Layer 3: Mermaid diagrams ─────────────────────────────────────────
+
+const MERMAID_BLOCK_RE = /^```(?:\{mermaid([^}]*)\}|mermaid)\s*\n([\s\S]*?)^```/gm;
+
+let _mmdcAvailable: boolean | undefined;
+function mmdcAvailable(): boolean {
+  if (_mmdcAvailable !== undefined) return _mmdcAvailable;
+  try {
+    execFileSync("mmdc", ["--version"], {
+      encoding: "utf-8", timeout: 5000, stdio: "pipe", env: INJECT_ENV,
+    });
+    _mmdcAvailable = true;
+  } catch {
+    _mmdcAvailable = false;
+  }
+  return _mmdcAvailable;
+}
+
+function parseMermaidAttrs(raw: string | undefined): Record<string, string> {
+  if (!raw?.trim()) return {};
+  const attrs: Record<string, string> = {};
+  const re = /(\w+)="([^"]+)"/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(raw)) !== null) {
+    attrs[m[1]] = m[2];
+  }
+  return attrs;
+}
+
+export function renderMermaidBlocks(markdown: string, workDir: string): string {
+  if (!mmdcAvailable()) return markdown;
+
+  const matches: { raw: string; attrsStr?: string; source: string }[] = [];
+  MERMAID_BLOCK_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = MERMAID_BLOCK_RE.exec(markdown)) !== null) {
+    matches.push({ raw: m[0], attrsStr: m[1], source: m[2].trim() });
+  }
+  if (!matches.length) return markdown;
+
+  const mermaidDir = path.join(workDir, ".inkwell", "mermaid");
+  fs.mkdirSync(mermaidDir, { recursive: true });
+
+  let output = markdown;
+  let offset = 0;
+
+  for (const match of matches) {
+    const attrs = parseMermaidAttrs(match.attrsStr);
+    const hash = crypto
+      .createHash("sha256")
+      .update(match.source)
+      .digest("hex")
+      .substring(0, 16);
+
+    const svgPath = path.join(mermaidDir, `${hash}.svg`);
+    const metaPath = path.join(mermaidDir, `${hash}.json`);
+
+    let cached = false;
+    try {
+      const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+      if (meta.hash === hash && fs.existsSync(svgPath)) cached = true;
+    } catch {}
+
+    const pngPath = path.join(mermaidDir, `${hash}.png`);
+
+    if (!cached) {
+      const inputPath = path.join(mermaidDir, `${hash}.mmd`);
+      fs.writeFileSync(inputPath, match.source, "utf-8");
+      try {
+        // Render SVG for HTML preview (browser handles foreignObject text)
+        execFileSync("mmdc", ["-i", inputPath, "-o", svgPath], {
+          cwd: workDir,
+          timeout: 30_000,
+          stdio: "pipe",
+          env: INJECT_ENV,
+        });
+        if (!fs.existsSync(svgPath)) {
+          const alt = svgPath.replace(".svg", "-1.svg");
+          if (fs.existsSync(alt)) fs.renameSync(alt, svgPath);
+        }
+        // Render PNG at 4x for PDF compilation (rsvg-convert can't render foreignObject text)
+        execFileSync("mmdc", ["-i", inputPath, "-o", pngPath, "-s", "4"], {
+          cwd: workDir,
+          timeout: 30_000,
+          stdio: "pipe",
+          env: INJECT_ENV,
+        });
+        if (!fs.existsSync(pngPath)) {
+          const alt = pngPath.replace(".png", "-1.png");
+          if (fs.existsSync(alt)) fs.renameSync(alt, pngPath);
+        }
+        if (fs.existsSync(svgPath) || fs.existsSync(pngPath)) {
+          fs.writeFileSync(metaPath, JSON.stringify({ hash }), "utf-8");
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    if (!fs.existsSync(pngPath) && !fs.existsSync(svgPath)) continue;
+
+    const imagePath = fs.existsSync(pngPath) ? pngPath : svgPath;
+    const alt = attrs.caption || "Mermaid diagram";
+    const labelAttr = attrs.label ? `{#fig:${attrs.label}}` : "";
+    const replacement = `![${alt}](${imagePath})${labelAttr}`;
+
+    const start = output.indexOf(match.raw, offset);
+    if (start === -1) continue;
+
+    output =
+      output.substring(0, start) +
+      replacement +
+      output.substring(start + match.raw.length);
+    offset = start + replacement.length;
+  }
+
+  return output;
+}
+
+function normalizeMermaidForPreview(markdown: string): string {
+  return markdown.replace(/^```\{mermaid[^}]*\}\s*$/gm, "```mermaid");
+}
+
+// ── Compilation and preview entry points ──────────────────────────────
+
 export function prepareForCompilation(
   markdown: string,
   sourceFile: string,
 ): { injected: string; tempFile: string } {
   const workDir = path.dirname(sourceFile);
-  const blocks = parseCodeBlocks(markdown);
-  const hasBlocks = blocks.length > 0;
-  const hasVarRefs = /\{\{\w+\}\}/.test(markdown);
-  const hasInlineExprs = /`\{python\}\s+[^`]+`/.test(markdown);
 
-  if (!hasBlocks && !hasVarRefs && !hasInlineExprs) {
+  const hasMermaid = /^```(?:\{mermaid|mermaid)/m.test(markdown);
+  const processed = hasMermaid
+    ? renderMermaidBlocks(markdown, workDir)
+    : markdown;
+
+  const blocks = parseCodeBlocks(processed);
+  const hasBlocks = blocks.length > 0;
+  const hasVarRefs = /\{\{\w+\}\}/.test(processed);
+  const hasInlineExprs = /`\{python\}\s+[^`]+`/.test(processed);
+
+  if (!hasBlocks && !hasVarRefs && !hasInlineExprs && !hasMermaid) {
     return { injected: markdown, tempFile: sourceFile };
   }
 
-  const runConfig = parseRunConfig(markdown);
+  const runConfig = parseRunConfig(processed);
   const defaultDisplay = runConfig.defaultDisplay || "output";
-  const results = gatherCachedResults(markdown, sourceFile);
+  const results = gatherCachedResults(processed, sourceFile);
   const vars = collectVariables(results);
 
-  let injected = injectResults(markdown, results, defaultDisplay, workDir);
+  let injected = injectResults(processed, results, defaultDisplay, workDir);
   injected = substituteVariables(injected, vars);
 
   const cacheDir = path.join(workDir, ".inkwell", "outputs");
@@ -484,20 +641,25 @@ export function prepareForPreview(
   markdown: string,
   sourceFile: string,
 ): string {
-  const blocks = parseCodeBlocks(markdown);
-  const hasBlocks = blocks.length > 0;
-  const hasVarRefs = /\{\{\w+\}\}/.test(markdown);
-  const hasInlineExprs = /`\{python\}\s+[^`]+`/.test(markdown);
+  const hasMermaid = /^```\{mermaid/m.test(markdown);
+  const processed = hasMermaid
+    ? normalizeMermaidForPreview(markdown)
+    : markdown;
 
-  if (!hasBlocks && !hasVarRefs && !hasInlineExprs) return markdown;
+  const blocks = parseCodeBlocks(processed);
+  const hasBlocks = blocks.length > 0;
+  const hasVarRefs = /\{\{\w+\}\}/.test(processed);
+  const hasInlineExprs = /`\{python\}\s+[^`]+`/.test(processed);
+
+  if (!hasBlocks && !hasVarRefs && !hasInlineExprs) return processed;
 
   const workDir = path.dirname(sourceFile);
-  const runConfig = parseRunConfig(markdown);
+  const runConfig = parseRunConfig(processed);
   const defaultDisplay = runConfig.defaultDisplay || "both";
-  const results = gatherCachedResults(markdown, sourceFile);
+  const results = gatherCachedResults(processed, sourceFile);
   const vars = collectVariables(results);
 
-  let injected = injectResults(markdown, results, defaultDisplay, workDir);
+  let injected = injectResults(processed, results, defaultDisplay, workDir);
   injected = substituteVariables(injected, vars);
 
   const cacheDir = path.join(workDir, ".inkwell", "outputs");

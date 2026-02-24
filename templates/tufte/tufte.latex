@@ -1,70 +1,46 @@
-\PassOptionsToPackage{dvipsnames}{xcolor}
+\documentclass[nobib,$for(classoption)$$classoption$$sep$,$endfor$]{tufte-handout}
 
-\documentclass{tmsce}
+% nobib: Pandoc handles citations via --citeproc, so we skip natbib.
 
-% tmsce.cls already loads: geometry, fancyhdr, titlesec, setspace,
-% hyperref, etoolbox. We add only what it does not provide.
-\usepackage{amsmath,amsfonts,amsthm}
-\usepackage{array}
+\usepackage{amsmath,amssymb}
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{longtable}
-\usepackage{enumitem}
 \usepackage{float}
-\usepackage{xcolor}
-\usepackage{xurl}
+\usepackage{units}
+\usepackage{multicol}
+\usepackage{enumitem}
+\setlist{nosep}
+
+% Pandoc image sizing
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\makeatother
+\setkeys{Gin}{width=\maxwidth,keepaspectratio}
 
 \hypersetup{
   colorlinks=true,
-  linkcolor=$if(linkcolor)$$linkcolor$$else$RoyalBlue$endif$,
-  citecolor=$if(citecolor)$$citecolor$$else$OliveGreen$endif$,
-  urlcolor=$if(urlcolor)$$urlcolor$$else$RoyalBlue$endif$,
+  linkcolor=$if(linkcolor)$$linkcolor$$else$DarkSlateBlue$endif$,
+  citecolor=$if(citecolor)$$citecolor$$else$DarkSlateBlue$endif$,
+  urlcolor=$if(urlcolor)$$urlcolor$$else$DarkSlateBlue$endif$,
   pdfborder={0 0 0},
 }
 
-\hyphenation{op-tical net-works semi-conduc-tor IEEE-Xplore}
+\usepackage{xurl}
 
-% Journal metadata from YAML frontmatter
-$if(journalname)$\renewcommand{\journalname}{$journalname$}$endif$
-$if(doi)$\doi{$doi$}$endif$
-$if(copyrightline)$\copyrightline{$copyrightline$}$endif$
-$if(permissions)$\permissions{$permissions$}$endif$
-$if(vol)$\vol{$vol$}$endif$
-$if(issue)$\issue{$issue$}$endif$
-$if(yearofpub)$\yearofpub{$yearofpub$}$endif$
-$if(pagerange)$\pagerange{$pagerange$}$endif$
-
-\title{$if(title)$$title$$else$Untitled$endif$}
-
-$if(tmsce-authors)$
-\authors{$for(tmsce-authors)$$tmsce-authors.name$$$^{$tmsce-authors.superscript$}$$$sep$ and $endfor$}
-\affiliation{%
-$for(tmsce-affiliations)$$$^{$tmsce-affiliations.superscript$}$$$tmsce-affiliations.text$\\
-$endfor$
-$if(corresponding-email)$\textit{Corresponding author:} $corresponding-email$$endif$
-}
-$elseif(authors)$\authors{$authors$}$endif$
-$if(affiliation)$\affiliation{$affiliation$}$endif$
-
-$if(received)$\received{$received$}$endif$
-$if(revised)$\revised{$revised$}$endif$
-$if(accepted)$\accepted{$accepted$}$endif$
-
-$if(keywords)$\keywords{$keywords$}$endif$
-
-\newtheorem{theorem}{Theorem}
-\newtheorem{lemma}{Lemma}
-\newtheorem{proposition}{Proposition}
-\newtheorem{corollary}{Corollary}
+% Margin-note environment for Pandoc fenced divs:
+%   ::: {.aside}
+%   Text in the margin.
+%   :::
+\usepackage{environ}
+\NewEnviron{aside}{\marginnote{\BODY}}
 
 \usepackage{parskip}
 
 % Pandoc syntax highlighting
-\usepackage{framed}
 \usepackage{fancyvrb}
-\definecolor{shadecolor}{RGB}{248,248,248}
-\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
-\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\},fontsize=\small}
+\newenvironment{Shaded}{\begin{quote}\small}{\end{quote}}
 \newcommand{\AlertTok}[1]{\textcolor[rgb]{0.94,0.16,0.16}{#1}}
 \newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
 \newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.77,0.63,0.00}{#1}}
@@ -105,10 +81,6 @@ $if(keywords)$\keywords{$keywords$}$endif$
   \ifdim\wd\z@>\linewidth\resizebox{\linewidth}{!}{#1}\else\usebox\z@\fi
 }
 \makeatother
-\makeatletter
-\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
-\makeatother
-\setkeys{Gin}{width=\maxwidth,keepaspectratio}
 \NewDocumentCommand\citeproctext{}{}
 \NewDocumentCommand\citeproc{mm}{%
   \begingroup\def\citeproctext{#2}\cite{#1}\endgroup}
@@ -142,18 +114,18 @@ $for(header-includes)$
 $header-includes$
 $endfor$
 
+\title{$if(title)$$title$$else$Untitled$endif$}
+$if(author)$\author{$for(author)$$author$$sep$ \and $endfor$}$endif$
+$if(date)$\date{$date$}$endif$
+
 \begin{document}
 \maketitle
 
 $if(abstract)$
 \begin{abstract}
-$abstract$
+\noindent $abstract$
 \end{abstract}
 $endif$
-
-$if(keywords)$\printkeywords$endif$
-$if(received)$\printdates$endif$
-\tmsceendfrontmatter
 
 $if(toc)$\tableofcontents$endif$
 $if(lof)$\listoffigures$endif$

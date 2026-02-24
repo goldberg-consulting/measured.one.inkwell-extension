@@ -1,0 +1,6 @@
+{
+  "name": "Tufte Handout",
+  "description": "Edward Tufte-inspired handout with wide margins, sidenotes, and margin figures. Uses the tufte-handout class from CTAN.",
+  "documentclass": "tufte-handout",
+  "engine": "pdflatex"
+}
