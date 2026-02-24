@@ -86,6 +86,15 @@ tlmgr install mdframed zref needspace
 
 The Inkwell build log (`Cmd+Shift+U` > **Inkwell LaTeX**) shows the exact missing filename.
 
+**Mermaid diagrams** (optional, for `{mermaid}` code blocks in PDF):
+
+```bash
+npm install -g @mermaid-js/mermaid-cli
+brew install librsvg    # macOS; Debian/Ubuntu: sudo apt install librsvg2-bin
+```
+
+`mmdc` renders diagrams to SVG; `librsvg` provides `rsvg-convert` so Pandoc can embed SVGs in LaTeX PDFs. Without these, mermaid blocks still render in the live preview (client-side) but appear as code listings in compiled PDFs.
+
 **Python** (optional, for runnable code blocks):
 
 ```bash
@@ -229,6 +238,23 @@ $\hat\beta = `{python} f"{float(slope):.1f}"`$.
 ```
 
 Re-run the code blocks (`Cmd+Shift+B`) after adding or changing `::inkwell` exports so the variable store picks up the new values.
+
+### Mermaid diagrams
+
+Fenced mermaid blocks compile to SVG figures with full cross-reference support. The preview panel renders them client-side; PDF compilation uses `mmdc` (mermaid-cli) to produce SVGs that Pandoc embeds in the LaTeX output.
+
+````markdown
+```{mermaid caption="System architecture" label="arch"}
+graph LR
+    A[Client] --> B[API Gateway]
+    B --> C[Service]
+    C --> D[Database]
+```
+````
+
+Plain ` ```mermaid ` blocks (without attributes) also render, but without captions or labels. Rendered SVGs are cached in `.inkwell/mermaid/` by content hash.
+
+**Requirements:** `npm install -g @mermaid-js/mermaid-cli` for PDF compilation. For SVG-to-PDF conversion, install `librsvg` (`brew install librsvg` on macOS). If `mmdc` is not installed, mermaid blocks pass through as code listings.
 
 ### Citations and bibliography
 
