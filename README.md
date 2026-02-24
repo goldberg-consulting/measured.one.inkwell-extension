@@ -110,7 +110,7 @@ See the **[Syntax Guide](guide.md)** for the complete reference on YAML frontmat
 1. `Cmd+Shift+P` > **Inkwell: New Project**
 2. Select a folder for your project
 3. Name your document (this becomes the main `.md` filename)
-4. Pick a template (Default, Rho, TMSCE, Ludus, or RMxAA)
+4. Pick a template (Default, Tufte, Rho, TMSCE, Ludus, RMxAA, or KTH Letter)
 5. Choose whether to set up a Python virtual environment (recommended if your document will have code blocks)
 6. Inkwell creates the project with starter files, example scripts, bibliography, and a syntax guide at `.inkwell/guide.md`
 7. Write your markdown in the generated `.md` file
@@ -296,17 +296,19 @@ inkwell:
 
 ## Templates
 
-Inkwell ships with five templates. Each journal template includes a Pandoc `.latex` wrapper that compiles with the journal's native document class. Templates declare their preferred PDF engine (`xelatex` or `pdflatex`) in `template.json`; Inkwell selects the right one automatically.
+Inkwell ships with seven templates. Each template includes a Pandoc `.latex` wrapper that compiles with the template's native document class. Templates declare their preferred PDF engine (`xelatex` or `pdflatex`) in `template.json`; Inkwell selects the right one automatically.
 
 | Template | Class | Engine | Description |
 |----------|-------|--------|-------------|
 | **Inkwell Default** | `article` | xelatex | Clean article with theorem environments, code highlighting, title page |
+| **Tufte Handout** | `tufte-handout` | pdflatex | Edward Tufte-inspired layout with wide margins, sidenotes, and margin figures |
 | **Rho Academic** | `rho` | pdflatex | Two-column academic article with colored headers, abstract box, footer metadata |
 | **TMSCE** | `tmsce` | pdflatex | Transactions on Mathematical Sciences and Computational Engineering |
 | **Ludus Academik** | `ludusofficial` | xelatex | Ludus Academik Journal (themed, two-column) |
 | **RMxAA** | `rmaa-rho` | pdflatex | Revista Mexicana de Astronomia y Astrofisica (v4.6, two-column) |
+| **KTH Letter** | `kth-letter` | pdflatex | Official KTH (Royal Institute of Technology) letterhead |
 
-Select a template with `template: tmsce` in your YAML frontmatter, or use `Cmd+Shift+P` > **Inkwell: Select LaTeX Template**.
+Select a template with `template: tufte` in your YAML frontmatter, or use `Cmd+Shift+P` > **Inkwell: Select LaTeX Template**.
 
 Journal-specific metadata (DOI, volume, issue, author affiliations, received/accepted dates) is set through YAML frontmatter. See the example files in [`examples/`](examples/) for complete working documents with each template.
 
@@ -445,6 +447,78 @@ Features: TOC, list of figures/tables, numbered equations, runnable Python code 
 <td width="50%">
 
 ![Inkwell Default output](media/examples/demo-default.png)
+
+</td>
+</tr></table>
+
+---
+
+### Tufte Handout
+
+Edward Tufte-inspired layout with wide margins for sidenotes, margin figures, and annotations.
+
+<table><tr>
+<td width="50%">
+
+```yaml
+template: tufte
+title: "On the Principles of Analytical Display"
+author: "Inkwell"
+date: "February 2026"
+abstract: |
+  Good information design relies on showing
+  the data above all else.
+classoption:
+  - justified
+  - a4paper
+bibliography: references/refs.bib
+```
+
+Features: margin notes via `::: {.aside}` divs, margin figures via raw `\begin{marginfigure}`, full-width sections via `::: {.fullwidth}`, `\newthought` for paragraph openers, Palatino typography.
+
+[Source](examples/demo-tufte.md) | [PDF](examples/demo-tufte.pdf)
+
+</td>
+<td width="50%">
+
+![Tufte Handout output](media/examples/demo-tufte.png)
+
+</td>
+</tr></table>
+
+---
+
+### KTH Letter
+
+Official KTH (Royal Institute of Technology) letterhead with institutional logo and footer.
+
+<table><tr>
+<td width="50%">
+
+```yaml
+template: kth-letter
+name: "Elis Goldberg"
+email: "elis@kth.se"
+web: "www.kth.se"
+telephone: "+46 8 790 60 00"
+dnr: "Dnr: 2026-0042"
+recipient:
+  - "Prof. Ada Lovelace"
+  - "Department of Computing"
+  - "University of London"
+  - "United Kingdom"
+opening: "Dear Professor Lovelace,"
+closing: "Kind regards,"
+```
+
+Features: KTH branded letterhead with school logo, institutional footer with address and contact details, page numbering, recipient address block.
+
+[Source](examples/demo-kth-letter.md) | [PDF](examples/demo-kth-letter.pdf)
+
+</td>
+<td width="50%">
+
+![KTH Letter output](media/examples/demo-kth-letter.png)
 
 </td>
 </tr></table>

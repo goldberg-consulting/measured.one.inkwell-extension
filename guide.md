@@ -30,7 +30,7 @@ lot: true                          # list of tables
 Set `template:` to use a journal template. Omit it (or set `template: default`) for the default article layout.
 
 ```yaml
-template: rho      # or: rmxaa, ludus, tmsce, default
+template: tufte    # or: rho, rmxaa, ludus, tmsce, kth-letter, default
 ```
 
 ### The `inkwell:` styling namespace
@@ -441,6 +441,94 @@ geometry: "margin=1in"
 ```
 
 Additional fields: `subtitle`, `fontsize`, `mainfont`, `sansfont`, `monofont`, `documentclass`.
+
+### Tufte Handout (pdfLaTeX)
+
+Edward Tufte-inspired layout with wide margins for sidenotes, margin figures, and annotations. Uses the `tufte-handout` class from CTAN with Palatino typography.
+
+```yaml
+template: tufte
+title: "Handout Title"
+author: "Author Name"
+date: "February 2026"
+abstract: |
+  Abstract text appears below the title.
+classoption:
+  - justified        # justified text (default is ragged-right)
+  - a4paper          # or: letterpaper (default)
+  - sfsidenotes      # sans-serif sidenotes (optional)
+```
+
+Additional fields: `subtitle`, `linkcolor`, `citecolor`, `urlcolor`.
+
+#### Margin notes
+
+Use `::: {.aside}` fenced divs for margin notes:
+
+```markdown
+::: {.aside}
+This text appears in the margin alongside the main column.
+:::
+```
+
+For inline margin notes, use raw LaTeX: `\marginnote{Short note.}` or `\sidenote{Numbered note.}`.
+
+#### Margin figures
+
+Use raw LaTeX for figures placed in the margin:
+
+```markdown
+\begin{marginfigure}
+\centering
+\includegraphics[width=\linewidth]{figures/small-plot.pdf}
+\caption{A plot in the margin.}
+\end{marginfigure}
+```
+
+Standard `![caption](path)` images appear in the main column with captions set in the margin by the Tufte class.
+
+#### Full-width sections
+
+Extend content into the margin area with `::: {.fullwidth}`:
+
+```markdown
+::: {.fullwidth}
+This paragraph and any tables or figures within it
+span the full page width, including the margin.
+:::
+```
+
+#### New thoughts
+
+Use `\newthought{Opening words}` to start a paragraph with small-caps, following Tufte's convention:
+
+```markdown
+\newthought{The central argument} of this section is that...
+```
+
+### KTH Letter (pdfLaTeX)
+
+Official KTH (Royal Institute of Technology) letterhead. Produces a formatted letter with institutional logo, address block, and footer.
+
+```yaml
+template: kth-letter
+name: "Sender Name"
+email: "sender@kth.se"
+web: "www.kth.se"
+telephone: "+46 8 790 60 00"
+dnr: "Dnr: 2026-0042"
+recipient:
+  - "Recipient Name"
+  - "Department"
+  - "Address Line"
+  - "Country"
+opening: "Dear Dr. Name,"
+closing: "Kind regards,"
+```
+
+Additional fields: `location` (office address), `signature-name` (for the signature block), `signature-cols` (number of signature columns for multiple signatories), `cc` (carbon copy), `encl` (enclosures).
+
+The `recipient` field accepts a list; each item becomes a line in the address block. The body of the markdown file becomes the letter content between the salutation and closing.
 
 ### Rho Academic Article (pdfLaTeX)
 
