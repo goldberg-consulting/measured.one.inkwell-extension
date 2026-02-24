@@ -1,6 +1,17 @@
 ---
 template: tmsce
 title: "On the Convergence of Fourier Partial Sums"
+abstract: |
+  We present a numerical investigation of the convergence behavior
+  of Fourier partial sums for discontinuous periodic functions.
+  Using computational methods, we visualize the Gibbs phenomenon
+  and quantify the overshoot at jump discontinuities.
+  Our analysis confirms the classical 9\% overshoot bound
+  and demonstrates the utility of literate programming
+  for reproducible mathematical exposition.
+keywords: "Fourier series; Gibbs phenomenon; convergence; literate programming"
+
+# --- Authors and affiliations ---
 tmsce-authors:
   - name: "J. Smith"
     superscript: "1"
@@ -12,28 +23,55 @@ tmsce-affiliations:
   - superscript: "2"
     text: "Department of Applied Sciences, Tech Institute, UK"
 corresponding-email: "j.smith@stateuniv.edu"
+
+# --- Journal metadata ---
 journalname: "Transactions on Mathematical Sciences and Computational Engineering"
-abstract: |
-  We present a numerical investigation of the convergence behavior
-  of Fourier partial sums for discontinuous periodic functions.
-  Using computational methods, we visualize the Gibbs phenomenon
-  and quantify the overshoot at jump discontinuities.
-  Our analysis confirms the classical 9\% overshoot bound
-  and demonstrates the utility of literate programming
-  for reproducible mathematical exposition.
-keywords: "Fourier series; Gibbs phenomenon; convergence; literate programming"
 doi: "10.0000/tmsce.2026.042"
 vol: 1
 issue: 1
 yearofpub: 2026
 pagerange: "1--8"
+# copyrightline: "Copyright 2026 by the authors."
+# permissions: "Licensed under CC BY 4.0."
+
+# --- Submission dates ---
 received: "15 January 2026"
 revised: "10 February 2026"
 accepted: "20 February 2026"
+
+# --- Hyperlink colors ---
+# linkcolor: RoyalBlue                # internal links (default: RoyalBlue)
+# citecolor: OliveGreen               # citation links (default: OliveGreen)
+# urlcolor: RoyalBlue                 # URL links (default: RoyalBlue)
+
+# --- Front matter sections ---
+# toc: true                           # table of contents
+# lof: true                           # list of figures
+# lot: true                           # list of tables
+
+# --- Bibliography ---
 bibliography: references/refs.bib
 link-citations: true
+
+# --- Cross-reference prefixes ---
+figPrefix: "Figure"
+tblPrefix: "Table"
+eqnPrefix: "Equation"
+secPrefix: "Section"
+
+# --- Custom LaTeX in the preamble ---
+# header-includes: |
+#   \usepackage{tikz}
+
+# --- Inkwell styling ---
 inkwell:
-  code-display: output
+  code-display: output                # default display: output, both, code, none
+  # code-bg: "#f5f5f5"
+  # code-border: true
+  # code-rounded: true
+  # code-font-size: small             # tiny, scriptsize, footnotesize, small, normalsize
+  # tables: booktabs                  # booktabs, grid, plain
+  # table-font-size: small
   python-env: ./venv
 ---
 

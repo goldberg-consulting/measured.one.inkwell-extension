@@ -1,25 +1,6 @@
 ---
 template: rmxaa
-classoption:
-  - 9pt
-  - twoside
 title: "Signal Decomposition in Stellar Light Curves"
-rmxaa-authors:
-  - name: "J. Smith"
-    affiliations: "1"
-  - name: "A. Jones"
-    affiliations: "2"
-  - name: "C. Rivera"
-    affiliations: "1,2"
-rmxaa-affiliations:
-  - id: "1"
-    text: "Universidad Nacional, Instituto de Astronomia, Mexico"
-  - id: "2"
-    text: "State University, Department of Physics, USA"
-leadauthor: "Smith et al."
-smalltitle: "Signal Decomposition"
-corresponding-author: "J. Smith"
-corresponding-email: "j.smith@unam.mx"
 abstract: |
   We demonstrate the RMxAA journal template compiled from markdown
   using the Inkwell extension. Fourier analysis of periodic signals
@@ -34,23 +15,71 @@ resumen: |
   con figuras generadas desde bloques de codigo Python e
   integradas directamente en la salida.
 keywords: "Fourier analysis, signal processing, literate programming"
+
+# --- Class options ---
+classoption:
+  - 9pt                               # font size
+  - twoside                           # two-sided layout
+
+# --- Authors and affiliations ---
+rmxaa-authors:
+  - name: "J. Smith"
+    affiliations: "1"
+  - name: "A. Jones"
+    affiliations: "2"
+  - name: "C. Rivera"
+    affiliations: "1,2"
+rmxaa-affiliations:
+  - id: "1"
+    text: "Universidad Nacional, Instituto de Astronomia, Mexico"
+  - id: "2"
+    text: "State University, Department of Physics, USA"
+corresponding-author: "J. Smith"
+corresponding-email: "j.smith@unam.mx"
+
+# --- Journal metadata ---
+leadauthor: "Smith et al."
+smalltitle: "Signal Decomposition"
 vol: 100
 pages: "1--6"
 yearofpub: 2026
+# doi: "10.0000/rmxaa.2026.001"
+# startpage: 1                        # sets the starting page number
+# logo: "logo.png"                    # masthead logo; omit for default
+# license: "Creative Commons CC BY 4.0."
+
+# --- Submission dates ---
 received: "January 15, 2026"
 accepted: "February 20, 2026"
-linenumbers: false
-# header-includes: |
-#   \usepackage{xcolor}
-#   \setlength{\parindent}{0pt}
+
+# --- Layout options ---
+linenumbers: false                    # line numbers in the margin
+# toc: true                           # table of contents
+# lof: true                           # list of figures
+# lot: true                           # list of tables
+
+# --- Bibliography ---
 bibliography: references/refs.bib
 link-citations: true
+
+# --- Cross-reference prefixes ---
 figPrefix: "figure"
 tblPrefix: "table"
 eqnPrefix: "equation"
 secPrefix: "section"
+
+# --- Custom LaTeX in the preamble ---
+# header-includes: |
+#   \usepackage{tikz}
+
+# --- Inkwell styling ---
 inkwell:
-  code-display: output
+  code-display: output                # default display: output, both, code, none
+  # code-bg: "#f5f5f5"
+  # code-border: true
+  # code-font-size: small
+  # tables: booktabs                  # booktabs, grid, plain
+  # table-font-size: small
   python-env: ./venv
 ---
 

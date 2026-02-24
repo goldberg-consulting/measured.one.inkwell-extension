@@ -8,14 +8,55 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import * as fs from "fs";
 import * as os from "os";
+import * as path from "path";
 
 const exec = promisify(execFile);
 
 export interface ToolchainStatus {
   pandoc: { installed: boolean; version?: string; path?: string };
   xelatex: { installed: boolean; version?: string; path?: string };
+  mmdc: { installed: boolean; version?: string; path?: string };
   texDistribution?: "full" | "basic" | "tinytex" | "unknown";
+  missingPackages: string[];
 }
+
+let _extensionPath = "";
+
+export function setExtensionPath(p: string): void {
+  _extensionPath = p;
+}
+
+function loadRequiredPackages(): string[] {
+  const reqFile = path.join(_extensionPath, "requirements-latex.txt");
+  if (fs.existsSync(reqFile)) {
+    return fs
+      .readFileSync(reqFile, "utf-8")
+      .split("\n")
+      .map((line) => line.replace(/#.*/, "").trim())
+      .filter(Boolean);
+  }
+  return FALLBACK_PACKAGES;
+}
+
+const FALLBACK_PACKAGES = [
+  "fancyhdr", "titlesec", "setspace", "etoolbox", "enumitem", "float",
+  "xcolor", "xurl", "parskip", "framed", "fancyvrb", "fvextra",
+  "booktabs", "caption", "microtype", "mdframed",
+  "zref", "needspace", "titling", "lettrine", "lineno", "footmisc",
+  "adjustbox", "lastpage", "listings", "csquotes", "ragged2e",
+  "tcolorbox", "colortbl",
+  "mathtools", "thmtools", "here",
+  "multirow", "environ", "abstract", "bookmark", "cleveref",
+  "natbib", "adforn", "xifthen",
+  "ccicons", "imakeidx", "fontawesome5", "orcidlink", "pdflscape",
+  "chemfig", "circuitikz",
+  "supertabular", "matlab-prettifier", "lipsum", "hardwrap",
+  "units", "silence",
+  "amsfonts", "amscls", "tools", "preprint", "sttools",
+  "graphics", "oberdiek", "psnfss",
+  "mathpazo", "palatino", "bera", "soul", "stix2-type1", "tex-gyre",
+  "tufte-latex",
+];
 
 const isMac = process.platform === "darwin";
 const isLinux = process.platform === "linux";
@@ -91,20 +132,100 @@ function detectDistribution(xelatexPath: string | undefined): ToolchainStatus["t
   return "unknown";
 }
 
+async function findKpsewhich(): Promise<string | undefined> {
+  for (const dir of searchPaths()) {
+    const candidate = `${dir}/kpsewhich`;
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  try {
+    const { stdout } = await exec("which", ["kpsewhich"]);
+    const p = stdout.trim();
+    if (p) return p;
+  } catch {}
+  return undefined;
+}
+
+async function checkLatexPackages(kpsewhich: string | undefined): Promise<string[]> {
+  const requiredPackages = loadRequiredPackages();
+  if (!kpsewhich) return requiredPackages;
+
+  // Run texhash first to ensure the file database is current
+  const texhashDir = kpsewhich.replace(/\/kpsewhich$/, "/texhash");
+  if (fs.existsSync(texhashDir)) {
+    try {
+      await exec(texhashDir, [], { timeout: 30000 });
+    } catch {}
+  }
+
+  const packageFiles: Record<string, string> = {
+    "tufte-latex": "tufte-handout.cls",
+    "bera": "beramono.sty",
+    "palatino": "pplr8r.tfm",
+    "tex-gyre": "qplr.tfm",
+    "stix2-type1": "stix2.sty",
+    "amsfonts": "amssymb.sty",
+    "amscls": "amsthm.sty",
+    "tools": "array.sty",
+    "preprint": "authblk.sty",
+    "sttools": "flushend.sty",
+    "graphics": "rotating.sty",
+    "oberdiek": "iflang.sty",
+    "psnfss": "helvet.sty",
+  };
+
+  const missing: string[] = [];
+  const batchSize = 20;
+  for (let i = 0; i < requiredPackages.length; i += batchSize) {
+    const batch = requiredPackages.slice(i, i + batchSize);
+    const results = await Promise.all(
+      batch.map(async (pkg) => {
+        const file = packageFiles[pkg] || `${pkg}.sty`;
+        try {
+          const { stdout } = await exec(kpsewhich, [file], { timeout: 5000 });
+          return stdout.trim() ? null : pkg;
+        } catch {
+          return pkg;
+        }
+      })
+    );
+    for (const r of results) {
+      if (r) missing.push(r);
+    }
+  }
+  return missing;
+}
+
 export async function checkToolchain(): Promise<ToolchainStatus> {
-  const [pandoc, xelatex] = await Promise.all([
+  const [pandoc, xelatex, mmdc] = await Promise.all([
     probe("pandoc"),
     probe("xelatex"),
+    probe("mmdc"),
   ]);
+
+  const kpsewhich = xelatex.installed ? await findKpsewhich() : undefined;
+  const missingPackages = xelatex.installed
+    ? await checkLatexPackages(kpsewhich)
+    : [];
+
   return {
     pandoc,
     xelatex,
+    mmdc,
     texDistribution: detectDistribution(xelatex.path),
+    missingPackages,
   };
 }
 
 export async function showToolchainStatus(): Promise<void> {
-  const status = await checkToolchain();
+  const status = await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: "Inkwell: checking toolchain...",
+      cancellable: false,
+    },
+    () => checkToolchain()
+  );
+
   const lines: string[] = [];
 
   if (status.pandoc.installed) {
@@ -122,42 +243,124 @@ export async function showToolchainStatus(): Promise<void> {
     lines.push("XeLaTeX: not found");
   }
 
-  const allGood = status.pandoc.installed && status.xelatex.installed;
+  if (status.mmdc.installed) {
+    lines.push(`mmdc (Mermaid): ${status.mmdc.version || "installed"} (${status.mmdc.path})`);
+  } else {
+    lines.push("mmdc (Mermaid): not found (optional, for mermaid diagrams in PDF)");
+  }
+
+  const pkgCount = loadRequiredPackages().length;
+  const missingCount = status.missingPackages.length;
+  if (missingCount === 0 && status.xelatex.installed) {
+    lines.push(`LaTeX packages: all ${pkgCount} required packages found`);
+  } else if (missingCount > 0) {
+    lines.push(`LaTeX packages: ${missingCount} missing (${status.missingPackages.slice(0, 5).join(", ")}${missingCount > 5 ? ", ..." : ""})`);
+  }
+
+  const coreReady = status.pandoc.installed && status.xelatex.installed;
+  const allGood = coreReady && missingCount === 0;
 
   if (allGood) {
+    const mmdcNote = status.mmdc.installed
+      ? ""
+      : "\n(mmdc not found; mermaid diagrams will render as code in PDFs)";
     vscode.window.showInformationMessage(
-      `Inkwell toolchain ready.\n${lines.join("\n")}`,
+      `Inkwell toolchain ready.\n${lines.join("\n")}${mmdcNote}`,
       "OK"
     );
     return;
   }
 
-  const missing: string[] = [];
-  if (!status.pandoc.installed) missing.push("pandoc");
-  if (!status.xelatex.installed) missing.push("xelatex (TeX distribution)");
+  // Core tools missing
+  if (!coreReady) {
+    const missing: string[] = [];
+    if (!status.pandoc.installed) missing.push("pandoc");
+    if (!status.xelatex.installed) missing.push("xelatex (TeX distribution)");
 
-  const buttons: string[] = [];
-  if (isMac) {
-    buttons.push("Install with Homebrew");
-  } else if (isLinux) {
-    buttons.push("Install with apt/dnf");
+    const buttons: string[] = [];
+    if (isMac) {
+      buttons.push("Install with Homebrew");
+    } else if (isLinux) {
+      buttons.push("Install with apt/dnf");
+    }
+    buttons.push("Install TinyTeX", "Show instructions");
+
+    const choice = await vscode.window.showWarningMessage(
+      `Missing: ${missing.join(", ")}`,
+      ...buttons
+    );
+
+    if (choice === "Install with Homebrew") {
+      await installWithHomebrew(status);
+    } else if (choice === "Install with apt/dnf") {
+      await installWithPackageManager(status);
+    } else if (choice === "Install TinyTeX") {
+      await installTinyTeX(status);
+    } else if (choice === "Show instructions") {
+      showInstructions(status);
+    }
+    return;
   }
-  buttons.push("Install TinyTeX", "Show instructions");
 
-  const choice = await vscode.window.showWarningMessage(
-    `Missing: ${missing.join(", ")}`,
-    ...buttons
+  // Core tools present but packages missing
+  if (missingCount > 0) {
+    const choice = await vscode.window.showWarningMessage(
+      `${missingCount} LaTeX package${missingCount > 1 ? "s" : ""} missing: ${status.missingPackages.join(", ")}`,
+      "Install now",
+      "Show details"
+    );
+
+    if (choice === "Install now") {
+      await installMissingPackages(status.missingPackages);
+    } else if (choice === "Show details") {
+      showPackageDetails(status);
+    }
+  }
+}
+
+async function installMissingPackages(packages: string[]): Promise<void> {
+  const terminal = vscode.window.createTerminal("Inkwell Setup");
+  terminal.show();
+  const cmd = `tlmgr install ${packages.join(" ")} && texhash`;
+  terminal.sendText(cmd);
+}
+
+function showPackageDetails(status: ToolchainStatus): void {
+  const doc: string[] = ["# Inkwell: LaTeX Package Status\n"];
+
+  const installed = loadRequiredPackages().filter(
+    (p) => !status.missingPackages.includes(p)
   );
 
-  if (choice === "Install with Homebrew") {
-    await installWithHomebrew(status);
-  } else if (choice === "Install with apt/dnf") {
-    await installWithPackageManager(status);
-  } else if (choice === "Install TinyTeX") {
-    await installTinyTeX(status);
-  } else if (choice === "Show instructions") {
-    showInstructions(status);
+  if (status.missingPackages.length > 0) {
+    doc.push(`## Missing (${status.missingPackages.length})\n`);
+    doc.push("Install all at once:\n");
+    doc.push("```bash");
+    doc.push(`tlmgr install ${status.missingPackages.join(" ")} && texhash`);
+    doc.push("```\n");
+    doc.push("Packages:\n");
+    for (const pkg of status.missingPackages) {
+      doc.push(`- [ ] ${pkg}`);
+    }
+    doc.push("");
   }
+
+  doc.push(`## Installed (${installed.length})\n`);
+  for (const pkg of installed) {
+    doc.push(`- [x] ${pkg}`);
+  }
+  doc.push("");
+
+  if (!status.mmdc.installed) {
+    doc.push("## Mermaid CLI (optional)\n");
+    doc.push("```bash");
+    doc.push("npm install -g @mermaid-js/mermaid-cli");
+    doc.push("```\n");
+  }
+
+  vscode.workspace
+    .openTextDocument({ content: doc.join("\n"), language: "markdown" })
+    .then((d) => vscode.window.showTextDocument(d));
 }
 
 async function installWithHomebrew(status: ToolchainStatus): Promise<void> {
@@ -317,6 +520,20 @@ function showInstructions(status: ToolchainStatus): void {
       doc.push("sudo apt-get install texlive-full  # Debian/Ubuntu");
       doc.push("```\n");
     }
+  }
+
+  if (status.missingPackages.length > 0) {
+    doc.push("## Missing LaTeX Packages\n");
+    doc.push("```bash");
+    doc.push(`tlmgr install ${status.missingPackages.join(" ")} && texhash`);
+    doc.push("```\n");
+  }
+
+  if (!status.mmdc.installed) {
+    doc.push("## Mermaid CLI (optional, for diagrams in PDF)\n");
+    doc.push("```bash");
+    doc.push("npm install -g @mermaid-js/mermaid-cli");
+    doc.push("```\n");
   }
 
   vscode.workspace

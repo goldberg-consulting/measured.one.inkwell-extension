@@ -1,11 +1,21 @@
 ---
 template: ludus
-classoption:
-  - red
-  - fullpaper
 title: "Procedural Content Generation in Digital Narratives"
-shorttitle: "Procedural Content in Digital Narratives"
-shortauthor: "Smith & Jones"
+abstract: |
+  This paper demonstrates the Ludus Academik journal template
+  within the Inkwell extension. We present computational examples
+  that generate figures directly from markdown, combining
+  mathematical analysis with reproducible output.
+  The two-column layout, themed headers, and bibliography
+  are all produced from YAML frontmatter and Pandoc compilation.
+keywords: "literate programming; reproducible research; Pandoc; LaTeX"
+
+# --- Class options ---
+classoption:
+  - red                               # theme: red, blue, green, orange
+  - fullpaper                         # type: fullpaper, shortpaper
+
+# --- Authors and affiliations ---
 ludus-authors:
   - name: "John Smith"
     superscript: "1"
@@ -17,31 +27,51 @@ ludus-affiliations:
   - superscript: "2"
     text: "School of Digital Media, Tech Institute, UK"
 corresponding-email: "john.smith@stateuniv.edu"
+
+# --- Header and running head ---
+shorttitle: "Procedural Content in Digital Narratives"
+shortauthor: "Smith & Jones"
+
+# --- Journal metadata ---
 journalname: "LUDUS"
 journalsubtitle: "International Journal of Game Studies"
+# conferencename: "GameSci 2026"     # for conference proceedings
 publicationyear: 2026
 articledoi: "10.1234/ludus.2026.demo"
-abstract: |
-  This paper demonstrates the Ludus Academik journal template
-  within the Inkwell extension. We present computational examples
-  that generate figures directly from markdown, combining
-  mathematical analysis with reproducible output.
-  The two-column layout, themed headers, and bibliography
-  are all produced from YAML frontmatter and Pandoc compilation.
-keywords: "literate programming; reproducible research; Pandoc; LaTeX"
+# logo: "logo.png"                    # journal or conference logo
+
+# --- End matter ---
 acknowledgments: |
   The authors thank the Inkwell contributors for the template system.
-# header-includes: |
-#   \usepackage{xcolor}
-#   \setlength{\parindent}{0pt}
+
+# --- Layout options ---
+linenumbers: false                    # line numbers in the margin
+# toc: true                           # table of contents
+# lof: true                           # list of figures
+# lot: true                           # list of tables
+
+# --- Bibliography ---
 bibliography: references/refs.bib
 link-citations: true
+
+# --- Cross-reference prefixes ---
 figPrefix: "figure"
 tblPrefix: "table"
 eqnPrefix: "equation"
 secPrefix: "section"
+
+# --- Custom LaTeX in the preamble ---
+# header-includes: |
+#   \usepackage{tikz}
+
+# --- Inkwell styling ---
 inkwell:
-  code-display: output
+  code-display: output                # default display: output, both, code, none
+  # code-bg: "#f5f5f5"
+  # code-border: true
+  # code-font-size: small
+  # tables: booktabs                  # booktabs, grid, plain
+  # table-font-size: small
   python-env: ./venv
 ---
 
