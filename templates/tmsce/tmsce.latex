@@ -25,6 +25,7 @@
 \hyphenation{op-tical net-works semi-conduc-tor IEEE-Xplore}
 
 % Journal metadata from YAML frontmatter
+$if(journalname)$\renewcommand{\journalname}{$journalname$}$endif$
 $if(doi)$\doi{$doi$}$endif$
 $if(copyrightline)$\copyrightline{$copyrightline$}$endif$
 $if(permissions)$\permissions{$permissions$}$endif$

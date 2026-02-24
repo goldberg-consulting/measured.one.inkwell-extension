@@ -12,6 +12,7 @@ tmsce-affiliations:
   - superscript: "2"
     text: "Department of Applied Sciences, Tech Institute, UK"
 corresponding-email: "j.smith@stateuniv.edu"
+journalname: "Transactions on Mathematical Sciences and Computational Engineering"
 abstract: |
   We present a numerical investigation of the convergence behavior
   of Fourier partial sums for discontinuous periodic functions.

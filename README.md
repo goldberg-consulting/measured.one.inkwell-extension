@@ -591,13 +591,14 @@ tmsce-affiliations:
     text: "Dept. of Mathematics, ..."
   - superscript: "2"
     text: "Dept. of Applied Sciences, ..."
+journalname: "Transactions on ..."
 doi: "https://doi.org/10.0000/..."
 keywords: "Fourier series, ..."
 received: "15 January 2026"
 accepted: "20 February 2026"
 ```
 
-Features: DOI link, corresponding author email, keywords with date stamps, numbered equations, syntax-highlighted code, bibliography.
+Features: DOI link, corresponding author email, configurable journal name in footer, keywords with date stamps, numbered equations, syntax-highlighted code, bibliography.
 
 [Source](examples/demo-tmsce.md) | [PDF](examples/demo-tmsce.pdf)
 

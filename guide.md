@@ -643,6 +643,7 @@ tmsce-affiliations:
   - superscript: "2"
     text: "Department of Applied Sciences, Tech Institute, UK"
 corresponding-email: "j.smith@stateuniv.edu"
+journalname: "Transactions on Mathematical Sciences and Computational Engineering"
 doi: "10.0000/tmsce.2026.042"
 vol: 1
 issue: 1
@@ -652,6 +653,8 @@ received: "15 January 2026"
 revised: "10 February 2026"
 accepted: "20 February 2026"
 ```
+
+Additional fields: `copyrightline`, `permissions`. The `journalname` field sets the text in the page footer; if omitted, the default class name is used.
 
 ---
 
