@@ -78,6 +78,8 @@ $if(keywords)$\keywords{$keywords$}$endif$
 \def\endlastfoot{}
 \makeatother
 
+\usepackage{parskip}
+
 % Pandoc syntax highlighting
 \usepackage{framed}
 \usepackage{fancyvrb}
