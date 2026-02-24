@@ -31,6 +31,9 @@ abstract: |
 keywords: "literate programming; reproducible research; Pandoc; LaTeX"
 acknowledgments: |
   The authors thank the Inkwell contributors for the template system.
+# header-includes: |
+#   \usepackage{xcolor}
+#   \setlength{\parindent}{0pt}
 bibliography: references/refs.bib
 link-citations: true
 figPrefix: "figure"
