@@ -301,13 +301,15 @@ Write your content here. Cite sources with [@knuth1984] and use inline math like
   if (!fs.existsSync(refsBib)) {
     fs.writeFileSync(refsBib, STARTER_BIB);
   }
+
+  copyDemoFiles(opts.dir);
 }
 
 // ── Update Project ─────────────────────────────────────────────────
 
 const GITIGNORE_LINES = GITIGNORE.split("\n").map((l) => l.trim()).filter(Boolean);
 
-const REQUIRED_DIRS = [".inkwell", ".inkwell/outputs", "scripts", "figures", "references"];
+const REQUIRED_DIRS = [".inkwell", ".inkwell/outputs", "scripts", "figures", "references", "examples"];
 
 const STARTER_FILES: Array<{ rel: string; content: string }> = [
   { rel: "scripts/sine_plot.py", content: SINE_PLOT_PY },
@@ -315,6 +317,26 @@ const STARTER_FILES: Array<{ rel: string; content: string }> = [
   { rel: "references/refs.bib", content: STARTER_BIB },
   { rel: "figures/.gitkeep", content: "" },
 ];
+
+function copyDemoFiles(projectRoot: string): string[] {
+  const extensionExamples = path.join(__dirname, "..", "examples");
+  const destDir = path.join(projectRoot, "examples");
+  const copied: string[] = [];
+
+  if (!fs.existsSync(extensionExamples)) return copied;
+
+  fs.mkdirSync(destDir, { recursive: true });
+  for (const entry of fs.readdirSync(extensionExamples)) {
+    if (!entry.endsWith(".md")) continue;
+    const src = path.join(extensionExamples, entry);
+    const dest = path.join(destDir, entry);
+    if (!fs.existsSync(dest)) {
+      fs.copyFileSync(src, dest);
+      copied.push(`examples/${entry}`);
+    }
+  }
+  return copied;
+}
 
 function updateGitignore(projectRoot: string): string[] {
   const gi = path.join(projectRoot, ".gitignore");
@@ -423,6 +445,9 @@ export async function updateProject(): Promise<void> {
 
   const files = ensureStarterFiles(projectRoot);
   if (files.length) report.push(`Created starter files: ${files.join(", ")}`);
+
+  const demos = copyDemoFiles(projectRoot);
+  if (demos.length) report.push(`Copied demo files: ${demos.join(", ")}`);
 
   if (report.length) {
     vscode.window.showInformationMessage(

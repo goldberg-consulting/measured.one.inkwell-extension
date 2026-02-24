@@ -11,8 +11,9 @@ tsconfig.json
 .gitignore
 node_modules/**
 
-# Documentation and examples (available on GitHub)
+# Documentation and examples
 examples/**
+!examples/*.md
 demo-project/**
 CHANGELOG.md
 
