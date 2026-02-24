@@ -80,10 +80,12 @@ my-paper/
   scripts/                 # analysis code
   figures/                 # static images, diagrams
   references/              # .bib files
+  examples/                # demo .md files for each template
   requirements.txt         # Python dependencies (if enabled)
   venv/                    # Python environment (if enabled)
   .inkwell/
     manifest.json          # project config (template, settings)
+    GUIDE.md               # syntax reference (frontmatter, code blocks, data binding)
     outputs/               # cached code block results (gitignored)
   .gitignore
 ```
@@ -139,6 +141,57 @@ echo "Built on $(date)"
 
 Results cache in `.inkwell/outputs/`. Only re-run when the code actually changes.
 
+### Generated tables and figures
+
+Code blocks that write files to `INKWELL_OUTPUT_DIR` automatically embed them in the PDF. The `output` attribute names the artifact, and the file extension determines how it renders:
+
+- **Images** (`.png`, `.jpg`, `.svg`, `.pdf`, `.eps`) render as figures
+- **CSV** files render as formatted tables with booktabs styling
+- **JSON** arrays of objects render as tables
+- **Markdown** (`.md`) and **LaTeX** (`.tex`) files are passed through raw
+
+````markdown
+```{python output="summary" caption="Descriptive statistics." label="stats"}
+import os, numpy as np
+out = os.environ.get("INKWELL_OUTPUT_DIR", ".")
+with open(os.path.join(out, "summary.csv"), "w") as f:
+    f.write("Variable,n,Mean,Std\n")
+    f.write("x,150,-0.05,0.85\n")
+    f.write("y,150,-0.05,0.71\n")
+```
+````
+
+The `caption` and `label` attributes add a numbered caption and a cross-referenceable label (`@Tbl:stats` in this case).
+
+### Inline data binding
+
+Code blocks can export named values that you reference later in prose, captions, or table cells. This connects your computed results to your writing so the numbers stay in sync.
+
+**Step 1: Export values from a code block** by printing `::inkwell key=value` lines. These lines are stripped from visible output:
+
+```python
+print(f"::inkwell sample_n={len(x)}")
+print(f"::inkwell corr_r={r_val:.3f}")
+print(f"::inkwell slope={m:.3f}")
+```
+
+**Step 2: Reference them in your markdown** using one of two syntaxes:
+
+| Syntax | What it does | Example |
+|--------|-------------|---------|
+| `{{key}}` | Inserts the raw value as-is | `{{sample_n}}` becomes `150` |
+| `` `{python} expr` `` | Evaluates a Python expression with all exported variables pre-loaded | `` `{python} f"{float(corr_r):.2f}"` `` becomes `0.87` |
+
+Use `{{key}}` for values that need no formatting (counts, labels). Use `` `{python} expr` `` when you need to format, round, or compute: f-strings, arithmetic, conditionals, and function calls all work. Variables are loaded as strings, so cast with `float()` or `int()` as needed.
+
+```markdown
+The model was fitted to {{sample_n}} observations, yielding
+$r = `{python} f"{float(corr_r):.2f}"`$ and
+$\hat\beta = `{python} f"{float(slope):.1f}"`$.
+```
+
+Re-run the code blocks (`Cmd+Shift+B`) after adding or changing `::inkwell` exports so the variable store picks up the new values.
+
 ### Citations and bibliography
 
 Add a `.bib` file and reference it in your frontmatter:
@@ -179,11 +232,12 @@ inkwell:
 
 ## Templates
 
-Inkwell ships with four templates. Each journal template includes a Pandoc `.latex` wrapper that compiles with the journal's native document class. Templates declare their preferred PDF engine (`xelatex` or `pdflatex`) in `template.json`; Inkwell selects the right one automatically.
+Inkwell ships with five templates. Each journal template includes a Pandoc `.latex` wrapper that compiles with the journal's native document class. Templates declare their preferred PDF engine (`xelatex` or `pdflatex`) in `template.json`; Inkwell selects the right one automatically.
 
 | Template | Class | Engine | Description |
 |----------|-------|--------|-------------|
 | **Inkwell Default** | `article` | xelatex | Clean article with theorem environments, code highlighting, title page |
+| **Rho Academic** | `rho` | pdflatex | Two-column academic article with colored headers, abstract box, footer metadata |
 | **TMSCE** | `tmsce` | pdflatex | Transactions on Mathematical Sciences and Computational Engineering |
 | **Ludus Academik** | `ludusofficial` | xelatex | Ludus Academik Journal (themed, two-column) |
 | **RMxAA** | `rmaa-rho` | pdflatex | Revista Mexicana de Astronomia y Astrofisica (v4.6, two-column) |
@@ -418,6 +472,48 @@ Features: DOI link, corresponding author email, keywords with date stamps, numbe
 
 ---
 
+### Rho Academic Article
+
+Two-column academic layout with colored section headers, styled abstract box, and footer metadata.
+
+<table><tr>
+<td width="50%">
+
+```yaml
+template: rho
+title: "Paper Title"
+journalname: "Rho Journal"
+rho-authors:
+  - name: "Author One"
+    superscript: "1,*"
+  - name: "Author Two"
+    superscript: "2"
+rho-affiliations:
+  - superscript: "1"
+    text: "First University, ..."
+  - superscript: "*"
+    text: "Equal contribution"
+leadauthor: "Author et al."
+logo: "logo.png"
+doi: "https://doi.org/10.0000/..."
+received: "January 10, 2026"
+accepted: "February 15, 2026"
+```
+
+Features: colored section headers, keyword box, corresponding-author block with dates/DOI/license, footer metadata, optional logo, optional line numbers.
+
+[Source](examples/demo-rho.md) | [PDF](examples/demo-rho.pdf)
+
+</td>
+<td width="50%">
+
+![Rho Academic output](media/examples/demo-rho.png)
+
+</td>
+</tr></table>
+
+---
+
 ### Ludus Academik
 
 Themed two-column layout with color-coded section headers and journal branding.
@@ -482,6 +578,18 @@ All commands are available from the command palette (`Cmd+Shift+P` / `Ctrl+Shift
 | `inkwell.autoCompile` | `off` | `off`, `onSave`, or `interval` |
 | `inkwell.autoCompileIntervalSeconds` | `60` | Seconds between auto-compilations |
 | `inkwell.defaultCodeDisplay` | `output` | Default code block visibility |
+
+## Cursor AI agent
+
+Inkwell includes a Cursor agent at `.cursor/agents/inkwell-guide.md`. When working in Cursor, invoke it with `@inkwell-guide` in chat to get help with:
+
+- Writing YAML frontmatter for any template
+- Converting LaTeX documents to Inkwell markdown
+- Setting up code blocks, inline data binding, and cross-references
+- Debugging compilation errors and stale caches
+- Adding custom LaTeX packages via `header-includes`
+
+The agent references the full [Syntax Guide](GUIDE.md) for field names, attribute tables, and conversion rules.
 
 ## License
 
