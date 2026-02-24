@@ -49,6 +49,7 @@ export interface BlockProgress {
   error?: string;
   interpreter?: string;
   warning?: string;
+  noCache?: boolean;
 }
 
 export type DisplayMode = "output" | "both" | "code" | "none";
@@ -466,6 +467,7 @@ export async function runAllBlocks(
     onProgress?.({
       index: block.index, total, lang: block.lang,
       label: blockLabel(block), status: "running",
+      noCache: block.noCache,
     });
 
     const t0 = Date.now();
@@ -482,6 +484,7 @@ export async function runAllBlocks(
       error: result.exitCode !== 0 ? result.stderr.split("\n")[0] : undefined,
       interpreter: result.interpreter,
       warning: result.warning,
+      noCache: block.noCache,
     });
 
     results.push(result);
