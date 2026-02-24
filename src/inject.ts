@@ -478,7 +478,6 @@ function applyInlineResults(
 const MERMAID_BLOCK_RE = /^```(?:\{mermaid([^}]*)\}|mermaid)\s*\n([\s\S]*?)^```/gm;
 
 let _mmdcAvailable: boolean | undefined;
-
 function mmdcAvailable(): boolean {
   if (_mmdcAvailable !== undefined) return _mmdcAvailable;
   try {
@@ -537,22 +536,35 @@ export function renderMermaidBlocks(markdown: string, workDir: string): string {
       if (meta.hash === hash && fs.existsSync(svgPath)) cached = true;
     } catch {}
 
+    const pngPath = path.join(mermaidDir, `${hash}.png`);
+
     if (!cached) {
       const inputPath = path.join(mermaidDir, `${hash}.mmd`);
       fs.writeFileSync(inputPath, match.source, "utf-8");
       try {
+        // Render SVG for HTML preview (browser handles foreignObject text)
         execFileSync("mmdc", ["-i", inputPath, "-o", svgPath], {
           cwd: workDir,
           timeout: 30_000,
           stdio: "pipe",
           env: INJECT_ENV,
         });
-        // mmdc v9 and earlier may append -1 to the filename
         if (!fs.existsSync(svgPath)) {
           const alt = svgPath.replace(".svg", "-1.svg");
           if (fs.existsSync(alt)) fs.renameSync(alt, svgPath);
         }
-        if (fs.existsSync(svgPath)) {
+        // Render PNG at 4x for PDF compilation (rsvg-convert can't render foreignObject text)
+        execFileSync("mmdc", ["-i", inputPath, "-o", pngPath, "-s", "4"], {
+          cwd: workDir,
+          timeout: 30_000,
+          stdio: "pipe",
+          env: INJECT_ENV,
+        });
+        if (!fs.existsSync(pngPath)) {
+          const alt = pngPath.replace(".png", "-1.png");
+          if (fs.existsSync(alt)) fs.renameSync(alt, pngPath);
+        }
+        if (fs.existsSync(svgPath) || fs.existsSync(pngPath)) {
           fs.writeFileSync(metaPath, JSON.stringify({ hash }), "utf-8");
         }
       } catch {
@@ -560,11 +572,12 @@ export function renderMermaidBlocks(markdown: string, workDir: string): string {
       }
     }
 
-    if (!fs.existsSync(svgPath)) continue;
+    if (!fs.existsSync(pngPath) && !fs.existsSync(svgPath)) continue;
 
+    const imagePath = fs.existsSync(pngPath) ? pngPath : svgPath;
     const alt = attrs.caption || "Mermaid diagram";
     const labelAttr = attrs.label ? `{#fig:${attrs.label}}` : "";
-    const replacement = `![${alt}](${svgPath})${labelAttr}`;
+    const replacement = `![${alt}](${imagePath})${labelAttr}`;
 
     const start = output.indexOf(match.raw, offset);
     if (start === -1) continue;

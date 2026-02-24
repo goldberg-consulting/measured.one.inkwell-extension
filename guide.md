@@ -180,7 +180,7 @@ Set a document-wide default with `code-display:` in the `inkwell:` namespace.
 
 ## Mermaid Diagrams
 
-Mermaid diagrams render to SVG at compile time via `mmdc` (mermaid-cli). The preview panel renders them client-side. Both `{mermaid}` (with attributes) and plain `mermaid` fences are supported.
+Mermaid diagrams render to high-resolution PNG at compile time via `mmdc` (mermaid-cli) for PDF output, and to SVG for the live HTML preview. Both `{mermaid}` (with attributes) and plain `mermaid` fences are supported. Any diagram type that `mmdc` supports works: flowcharts, sequence diagrams, class diagrams, ER diagrams, state diagrams, Gantt charts, pie charts, and more.
 
 ### With caption and cross-reference
 
@@ -210,7 +210,7 @@ Any diagram type that `mmdc` supports works: `graph`, `sequenceDiagram`, `classD
 
 ### Caching
 
-Rendered SVGs are cached in `.inkwell/mermaid/` by content hash. A diagram only re-renders when its source changes.
+Rendered diagrams are cached in `.inkwell/mermaid/` by content hash (both SVG for preview and PNG for PDF). A diagram only re-renders when its source changes.
 
 ### Prerequisites
 
@@ -220,14 +220,7 @@ Install mermaid-cli globally:
 npm install -g @mermaid-js/mermaid-cli
 ```
 
-For SVG support in PDF output, install `librsvg` so Pandoc can convert SVGs to PDF:
-
-```bash
-brew install librsvg          # macOS
-sudo apt install librsvg2-bin  # Debian/Ubuntu
-```
-
-If `mmdc` is not installed, mermaid blocks pass through as code listings.
+If `mmdc` is not installed, mermaid blocks pass through as code listings in the compiled PDF but still render in the live preview (client-side via mermaid.js).
 
 ---
 

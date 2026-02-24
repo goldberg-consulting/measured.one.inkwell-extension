@@ -90,10 +90,9 @@ The Inkwell build log (`Cmd+Shift+U` > **Inkwell LaTeX**) shows the exact missin
 
 ```bash
 npm install -g @mermaid-js/mermaid-cli
-brew install librsvg    # macOS; Debian/Ubuntu: sudo apt install librsvg2-bin
 ```
 
-`mmdc` renders diagrams to SVG; `librsvg` provides `rsvg-convert` so Pandoc can embed SVGs in LaTeX PDFs. Without these, mermaid blocks still render in the live preview (client-side) but appear as code listings in compiled PDFs.
+`mmdc` renders diagrams to high-resolution PNG for PDF compilation and SVG for the live preview. Without it, mermaid blocks still render in the preview (client-side) but appear as code listings in compiled PDFs.
 
 **Python** (optional, for runnable code blocks):
 
@@ -241,7 +240,7 @@ Re-run the code blocks (`Cmd+Shift+B`) after adding or changing `::inkwell` expo
 
 ### Mermaid diagrams
 
-Fenced mermaid blocks compile to SVG figures with full cross-reference support. The preview panel renders them client-side; PDF compilation uses `mmdc` (mermaid-cli) to produce SVGs that Pandoc embeds in the LaTeX output.
+Fenced mermaid blocks compile to figures with full cross-reference support. The preview panel renders them client-side via mermaid.js; PDF compilation uses `mmdc` (mermaid-cli) to produce high-resolution PNG images that Pandoc embeds directly in the LaTeX output.
 
 ````markdown
 ```{mermaid caption="System architecture" label="arch"}
@@ -252,9 +251,11 @@ graph LR
 ```
 ````
 
-Plain ` ```mermaid ` blocks (without attributes) also render, but without captions or labels. Rendered SVGs are cached in `.inkwell/mermaid/` by content hash.
+Reference the diagram with `@Fig:arch` anywhere in the document. Plain ` ```mermaid ` blocks (without attributes) also render, but without captions or labels. All diagram types that `mmdc` supports work: flowcharts, sequence diagrams, ER diagrams, state diagrams, Gantt charts, and more.
 
-**Requirements:** `npm install -g @mermaid-js/mermaid-cli` for PDF compilation. For SVG-to-PDF conversion, install `librsvg` (`brew install librsvg` on macOS). If `mmdc` is not installed, mermaid blocks pass through as code listings.
+Rendered artifacts are cached in `.inkwell/mermaid/` by content hash. A diagram only re-renders when its source changes.
+
+**Requirements:** `npm install -g @mermaid-js/mermaid-cli` for PDF compilation. If `mmdc` is not installed, mermaid blocks pass through as code listings.
 
 ### Citations and bibliography
 
