@@ -6,6 +6,8 @@
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{longtable}
+\usepackage{array}
+\usepackage{calc}
 \usepackage{float}
 \usepackage{units}
 \usepackage{multicol}
@@ -75,6 +77,14 @@
 
 % Pandoc compatibility
 \providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+
+% tufte-handout does not define \subsubsection; provide a fallback so
+% ### headings in Markdown compile instead of producing a hard error.
+\makeatletter
+\@ifundefined{subsubsection}{%
+  \newcommand{\subsubsection}[1]{\vspace{0.5\baselineskip}\noindent\textit{#1}\par\nobreak}%
+}{}
+\makeatother
 \makeatletter
 \providecommand\pandocbounded[1]{%
   \sbox\z@{#1}%

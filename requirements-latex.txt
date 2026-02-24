@@ -62,7 +62,7 @@ silence
 # bundles (provide multiple .sty files each)
 # amsfonts -> amssymb.sty, amsfonts.sty
 # amscls -> amsthm.sty
-# tools -> array.sty, longtable.sty, multicol.sty
+# tools -> array.sty, calc.sty, longtable.sty, multicol.sty
 # preprint -> authblk.sty, balance.sty
 # sttools -> stfloats.sty, flushend.sty
 # graphics -> rotating.sty, graphicx.sty
