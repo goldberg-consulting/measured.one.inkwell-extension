@@ -70,7 +70,7 @@ sudo dnf install pandoc texlive-scheme-full          # Fedora
 ```bash
 tlmgr install fancyhdr titlesec setspace etoolbox enumitem float xcolor \
   xurl parskip framed fancyvrb fvextra booktabs longtable caption array \
-  microtype mdframed titling lettrine lineno footmisc adjustbox lastpage \
+  microtype mdframed zref needspace titling lettrine lineno footmisc adjustbox lastpage \
   listings csquotes ragged2e subcaption stfloats authblk tcolorbox colortbl \
   mathtools thmtools amssymb amsfonts amsthm here multirow environ abstract \
   multicol bookmark cleveref natbib stix2 helvet titletoc adforn xifthen \
@@ -78,7 +78,13 @@ tlmgr install fancyhdr titlesec setspace etoolbox enumitem float xcolor \
   chemfig circuitikz supertabular matlab-prettifier lipsum lettrine
 ```
 
-If you still hit a "missing file" error during compilation, install the package with `tlmgr install <package-name>`.
+If you still hit a "missing file" error during compilation (e.g., `Missing file: foo.sty`), install the package with `tlmgr install foo`. Some packages have dependencies that `tlmgr` does not auto-resolve; for example, `mdframed` also needs `zref` and `needspace`:
+
+```bash
+tlmgr install mdframed zref needspace
+```
+
+The Inkwell build log (`Cmd+Shift+U` > **Inkwell LaTeX**) shows the exact missing filename.
 
 **Python** (optional, for runnable code blocks):
 
