@@ -58,6 +58,21 @@ sudo apt install pandoc texlive-xetex   # Debian/Ubuntu
 sudo dnf install pandoc texlive-xetex   # Fedora
 ```
 
+**LaTeX packages:** TinyTeX and BasicTeX ship minimal package sets. Inkwell's templates need additional packages. Run this once after installing your TeX distribution:
+
+```bash
+tlmgr install fancyhdr titlesec setspace etoolbox enumitem float xcolor \
+  xurl parskip framed fancyvrb fvextra booktabs longtable caption array \
+  microtype mdframed titling lettrine lineno footmisc adjustbox lastpage \
+  listings csquotes ragged2e subcaption stfloats authblk tcolorbox colortbl \
+  mathtools thmtools amssymb amsfonts amsthm here multirow environ abstract \
+  multicol bookmark cleveref natbib stix2 helvet titletoc adforn xifthen \
+  ccicons imakeidx fontawesome5 orcidlink pdflscape rotating balance flushend \
+  chemfig circuitikz supertabular matlab-prettifier lipsum lettrine
+```
+
+If you hit a "missing file" error during compilation, install the package with `tlmgr install <package-name>`.
+
 **Python** (optional, for runnable code blocks):
 
 ```bash
