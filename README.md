@@ -42,7 +42,9 @@ Inkwell needs Pandoc and a LaTeX distribution (providing both XeLaTeX and pdfLaT
 
 ```bash
 brew install pandoc
-brew install --cask basictex
+brew install --cask basictex    # minimal (~300 MB), requires extra packages below
+# or
+brew install --cask mactex      # full install (~5 GB), includes everything
 ```
 
 **macOS (TinyTeX, recommended):**
@@ -54,11 +56,16 @@ curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh
 **Linux:**
 
 ```bash
-sudo apt install pandoc texlive-xetex   # Debian/Ubuntu
-sudo dnf install pandoc texlive-xetex   # Fedora
+# Minimal (requires extra packages below)
+sudo apt install pandoc texlive-xetex               # Debian/Ubuntu
+sudo dnf install pandoc texlive-xetex               # Fedora
+
+# Full (includes everything)
+sudo apt install pandoc texlive-full                 # Debian/Ubuntu
+sudo dnf install pandoc texlive-scheme-full          # Fedora
 ```
 
-**LaTeX packages:** TinyTeX and BasicTeX ship minimal package sets. Inkwell's templates need additional packages. Run this once after installing your TeX distribution:
+**LaTeX packages (minimal installs only):** If you chose TinyTeX, BasicTeX, or `texlive-xetex`, run this once to install the packages Inkwell's templates need. Skip this if you installed MacTeX or `texlive-full`.
 
 ```bash
 tlmgr install fancyhdr titlesec setspace etoolbox enumitem float xcolor \
@@ -71,7 +78,7 @@ tlmgr install fancyhdr titlesec setspace etoolbox enumitem float xcolor \
   chemfig circuitikz supertabular matlab-prettifier lipsum lettrine
 ```
 
-If you hit a "missing file" error during compilation, install the package with `tlmgr install <package-name>`.
+If you still hit a "missing file" error during compilation, install the package with `tlmgr install <package-name>`.
 
 **Python** (optional, for runnable code blocks):
 
