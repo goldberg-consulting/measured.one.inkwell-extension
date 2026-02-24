@@ -40,6 +40,9 @@ abstract: |
   corresponding-author metadata, and footer fields. All of these are
   controlled from YAML frontmatter: no LaTeX editing required.
 keywords: "Inkwell, Pandoc, Rho class, academic template, reproducible documents"
+# header-includes: |
+#   \usepackage{xcolor}
+#   \setlength{\parindent}{0pt}
 bibliography: references/refs.bib
 link-citations: true
 figPrefix: "figure"

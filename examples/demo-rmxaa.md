@@ -40,6 +40,9 @@ yearofpub: 2026
 received: "January 15, 2026"
 accepted: "February 20, 2026"
 linenumbers: false
+# header-includes: |
+#   \usepackage{xcolor}
+#   \setlength{\parindent}{0pt}
 bibliography: references/refs.bib
 link-citations: true
 inkwell:
