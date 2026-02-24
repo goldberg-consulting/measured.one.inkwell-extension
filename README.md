@@ -19,6 +19,8 @@ Inkwell lets you stay in markdown, stay in your editor, and still get publicatio
 
 ### From source
 
+1. Clone and build:
+
 ```bash
 git clone https://github.com/goldberg-consulting/measured.one.inkwell-extension.git
 cd measured.one.inkwell-extension
@@ -26,7 +28,11 @@ npm install
 npm run compile
 ```
 
-Then in VS Code / Cursor: `Cmd+Shift+P` > "Developer: Install Extension from Location..." and select the `measured.one.inkwell-extension` directory.
+2. Install the extension in your editor:
+   - Open VS Code or Cursor
+   - `Cmd+Shift+P` > **Developer: Install Extension from Location...**
+   - Select the `measured.one.inkwell-extension` folder
+   - Reload the window when prompted
 
 ### Prerequisites
 
