@@ -70,13 +70,16 @@ See the **[Syntax Guide](guide.md)** for the complete reference on YAML frontmat
 
 ## Quick start
 
-1. Open VS Code / Cursor
-2. `Cmd+Shift+P` > **Inkwell: New Project**
-3. Pick a folder, name your document, choose a template
-4. Write your markdown
-5. `Cmd+Shift+B` to **Run** code blocks
-6. `Cmd+Shift+R` to **Compile** to PDF
-7. `Cmd+Shift+V` to open the **Preview** panel
+1. `Cmd+Shift+P` > **Inkwell: New Project**
+2. Select a folder for your project
+3. Name your document (this becomes the main `.md` filename)
+4. Pick a template (Default, Rho, TMSCE, Ludus, or RMxAA)
+5. Choose whether to set up a Python virtual environment (recommended if your document will have code blocks)
+6. Inkwell creates the project with starter files, example scripts, bibliography, and a syntax guide at `.inkwell/guide.md`
+7. Write your markdown in the generated `.md` file
+8. `Cmd+Shift+B` to **Run** code blocks
+9. `Cmd+Shift+R` to **Compile** to PDF
+10. `Cmd+Shift+V` to open the **Preview** panel (live HTML, compiled PDF, and build log)
 
 ## Project structure
 
