@@ -872,9 +872,10 @@ export class InkwellPreviewProvider {
           }
           if (labelEl) labelEl.textContent = msg.label;
           if (metaEl) {
+            var nocache = msg.noCache ? " (no-cache)" : "";
             if (msg.status === "cached") metaEl.textContent = "cached";
-            else if (msg.elapsed) metaEl.textContent = (msg.elapsed / 1000).toFixed(1) + "s";
-            else if (msg.status === "running") metaEl.textContent = "running";
+            else if (msg.elapsed) metaEl.textContent = (msg.elapsed / 1000).toFixed(1) + "s" + nocache;
+            else if (msg.status === "running") metaEl.textContent = msg.noCache ? "running (no-cache)" : "running";
           }
           if (msg.error) {
             var errDiv = document.createElement("div");
