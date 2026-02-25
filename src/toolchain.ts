@@ -15,6 +15,7 @@ const exec = promisify(execFile);
 export interface ToolchainStatus {
   pandoc: { installed: boolean; version?: string; path?: string };
   xelatex: { installed: boolean; version?: string; path?: string };
+  crossref: { installed: boolean; version?: string; path?: string };
   mmdc: { installed: boolean; version?: string; path?: string };
   texDistribution?: "full" | "basic" | "tinytex" | "unknown";
   missingPackages: string[];
@@ -196,9 +197,10 @@ async function checkLatexPackages(kpsewhich: string | undefined): Promise<string
 }
 
 export async function checkToolchain(): Promise<ToolchainStatus> {
-  const [pandoc, xelatex, mmdc] = await Promise.all([
+  const [pandoc, xelatex, crossref, mmdc] = await Promise.all([
     probe("pandoc"),
     probe("xelatex"),
+    probe("pandoc-crossref"),
     probe("mmdc"),
   ]);
 
@@ -210,6 +212,7 @@ export async function checkToolchain(): Promise<ToolchainStatus> {
   return {
     pandoc,
     xelatex,
+    crossref,
     mmdc,
     texDistribution: detectDistribution(xelatex.path),
     missingPackages,
@@ -243,6 +246,12 @@ export async function showToolchainStatus(): Promise<void> {
     lines.push("XeLaTeX: not found");
   }
 
+  if (status.crossref.installed) {
+    lines.push(`pandoc-crossref: ${status.crossref.version || "installed"} (${status.crossref.path})`);
+  } else {
+    lines.push("pandoc-crossref: not found (required for @fig:, @eq:, @tbl: cross-references)");
+  }
+
   if (status.mmdc.installed) {
     lines.push(`mmdc (Mermaid): ${status.mmdc.version || "installed"} (${status.mmdc.path})`);
   } else {
@@ -257,7 +266,7 @@ export async function showToolchainStatus(): Promise<void> {
     lines.push(`LaTeX packages: ${missingCount} missing (${status.missingPackages.slice(0, 5).join(", ")}${missingCount > 5 ? ", ..." : ""})`);
   }
 
-  const coreReady = status.pandoc.installed && status.xelatex.installed;
+  const coreReady = status.pandoc.installed && status.xelatex.installed && status.crossref.installed;
   const allGood = coreReady && missingCount === 0;
 
   if (allGood) {
@@ -276,6 +285,7 @@ export async function showToolchainStatus(): Promise<void> {
     const missing: string[] = [];
     if (!status.pandoc.installed) missing.push("pandoc");
     if (!status.xelatex.installed) missing.push("xelatex (TeX distribution)");
+    if (!status.crossref.installed) missing.push("pandoc-crossref");
 
     const buttons: string[] = [];
     if (isMac) {
@@ -351,6 +361,13 @@ function showPackageDetails(status: ToolchainStatus): void {
   }
   doc.push("");
 
+  if (!status.crossref.installed) {
+    doc.push("## pandoc-crossref (cross-references)\n");
+    doc.push("```bash");
+    doc.push(isMac ? "brew install pandoc-crossref" : "# https://github.com/lierdakil/pandoc-crossref/releases");
+    doc.push("```\n");
+  }
+
   if (!status.mmdc.installed) {
     doc.push("## Mermaid CLI (optional)\n");
     doc.push("```bash");
@@ -379,6 +396,9 @@ async function installWithHomebrew(status: ToolchainStatus): Promise<void> {
   if (!status.pandoc.installed) {
     commands.push("brew install pandoc");
   }
+  if (!status.crossref.installed) {
+    commands.push("brew install pandoc-crossref");
+  }
   if (!status.xelatex.installed) {
     commands.push("brew install --cask basictex");
     commands.push(
@@ -402,12 +422,18 @@ async function installWithPackageManager(status: ToolchainStatus): Promise<void>
     if (!status.pandoc.installed) {
       commands.push("sudo apt-get update && sudo apt-get install -y pandoc");
     }
+    if (!status.crossref.installed) {
+      commands.push("sudo apt-get install -y pandoc-crossref || echo 'pandoc-crossref not in apt; install from https://github.com/lierdakil/pandoc-crossref/releases'");
+    }
     if (!status.xelatex.installed) {
       commands.push("sudo apt-get install -y texlive-xetex texlive-fonts-recommended texlive-fonts-extra");
     }
   } else if (hasDnf) {
     if (!status.pandoc.installed) {
       commands.push("sudo dnf install -y pandoc");
+    }
+    if (!status.crossref.installed) {
+      commands.push("sudo dnf install -y pandoc-crossref || echo 'pandoc-crossref not in dnf; install from https://github.com/lierdakil/pandoc-crossref/releases'");
     }
     if (!status.xelatex.installed) {
       commands.push("sudo dnf install -y texlive-xetex texlive-collection-fontsrecommended");
@@ -441,6 +467,19 @@ async function installTinyTeX(status: ToolchainStatus): Promise<void> {
       } else {
         commands.push('echo "Install pandoc from https://pandoc.org/installing.html"');
       }
+    }
+  }
+
+  if (!status.crossref.installed) {
+    if (isMac) {
+      const hasBrew = fs.existsSync("/opt/homebrew/bin/brew") || fs.existsSync("/usr/local/bin/brew");
+      if (hasBrew) {
+        commands.push("brew install pandoc-crossref");
+      } else {
+        commands.push('echo "Install pandoc-crossref from https://github.com/lierdakil/pandoc-crossref/releases"');
+      }
+    } else {
+      commands.push('echo "Install pandoc-crossref from https://github.com/lierdakil/pandoc-crossref/releases"');
     }
   }
 
@@ -483,6 +522,22 @@ function showInstructions(status: ToolchainStatus): void {
       doc.push("```\n");
     }
     doc.push("Or download from https://pandoc.org/installing.html\n");
+  }
+
+  if (!status.crossref.installed) {
+    doc.push("## pandoc-crossref (for @fig:, @eq:, @tbl: references)\n");
+    if (isMac) {
+      doc.push("```bash");
+      doc.push("brew install pandoc-crossref");
+      doc.push("```\n");
+    } else {
+      doc.push("Download from https://github.com/lierdakil/pandoc-crossref/releases\n");
+      doc.push("Or if available in your package manager:\n");
+      doc.push("```bash");
+      doc.push("sudo apt-get install pandoc-crossref  # Debian/Ubuntu");
+      doc.push("sudo dnf install pandoc-crossref      # Fedora/RHEL");
+      doc.push("```\n");
+    }
   }
 
   if (!status.xelatex.installed) {
