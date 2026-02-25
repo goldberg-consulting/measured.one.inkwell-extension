@@ -291,6 +291,11 @@ export class InkwellPreviewProvider {
         errors: [],
         log: "",
       });
+      const warnings = result.errors.filter(e => e.severity === "warning");
+      for (const w of warnings) {
+        const loc = w.line ? `line ${w.line}: ` : "";
+        this.sendLogEntry("warn", `${loc}${w.message}`);
+      }
     } else if (this.panel) {
       this.panel.webview.postMessage({
         type: "compileDone",
@@ -504,6 +509,7 @@ export class InkwellPreviewProvider {
     .log-tag-compile { background: rgba(74,144,217,0.15); color: #4A90D9; }
     .log-tag-run { background: rgba(74,180,100,0.15); color: #4ab464; }
     .log-tag-error { background: rgba(224,82,82,0.15); color: #e05252; }
+    .log-tag-warn { background: rgba(204,163,0,0.15); color: #CCA300; }
     .log-tag-info { background: rgba(128,128,128,0.1); color: var(--blockquote); }
     .log-entry-body { white-space: pre-wrap; word-wrap: break-word; color: var(--text); }
     .log-entry-body.is-error { color: #e05252; }
@@ -582,6 +588,8 @@ export class InkwellPreviewProvider {
     var vscodeApi = acquireVsCodeApi();
     var currentTab = "${initialTab}";
     var currentPdfData = null;
+    var currentPdfDoc = null;
+    var pdfRenderVersion = 0;
 
     if (typeof pdfjsLib !== "undefined") {
       pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -688,11 +696,19 @@ export class InkwellPreviewProvider {
 
     function renderPdf(base64Data) {
       currentPdfData = base64Data;
+      pdfRenderVersion++;
+      var version = pdfRenderVersion;
+
       pdfPlaceholder.style.display = "none";
       compileErrors.style.display = "none";
 
       var existing = pdfPane.querySelector(".pdf-canvas-container");
       if (existing) existing.remove();
+
+      if (currentPdfDoc) {
+        currentPdfDoc.destroy();
+        currentPdfDoc = null;
+      }
 
       if (typeof pdfjsLib === "undefined") {
         pdfPlaceholder.innerHTML = "<p>PDF compiled but viewer failed to load.</p>";
@@ -711,10 +727,16 @@ export class InkwellPreviewProvider {
       pdfPane.appendChild(container);
 
       pdfjsLib.getDocument({ data: bytes }).promise.then(function(pdf) {
+        if (version !== pdfRenderVersion) {
+          pdf.destroy();
+          return;
+        }
+        currentPdfDoc = pdf;
         var scale = 1.5;
         for (var pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
           (function(num) {
             pdf.getPage(num).then(function(page) {
+              if (version !== pdfRenderVersion) return;
               var viewport = page.getViewport({ scale: scale });
               var canvas = document.createElement("canvas");
               canvas.width = viewport.width;
@@ -727,6 +749,10 @@ export class InkwellPreviewProvider {
             });
           })(pageNum);
         }
+      }).catch(function(err) {
+        if (version !== pdfRenderVersion) return;
+        pdfPlaceholder.innerHTML = "<p>Failed to render PDF: " + esc(String(err)) + "</p>";
+        pdfPlaceholder.style.display = "block";
       });
     }
 
@@ -734,6 +760,8 @@ export class InkwellPreviewProvider {
       pdfPlaceholder.style.display = "none";
       var existing = pdfPane.querySelector("embed");
       if (existing) existing.remove();
+      var existingCanvas = pdfPane.querySelector(".pdf-canvas-container");
+      if (existingCanvas) existingCanvas.remove();
 
       var html = '<div class="compile-errors-header">' +
         errors.length + ' compilation error' + (errors.length === 1 ? '' : 's') + '</div>';
@@ -916,9 +944,11 @@ export class InkwellPreviewProvider {
         if (msg.pdfData) {
           compileStatus.textContent = "Done (" + msg.duration.toFixed(1) + "s)";
           addLogEntry("compile", "log-tag-compile", "PDF compiled successfully (" + msg.duration.toFixed(1) + "s)", "");
-          renderPdf(msg.pdfData);
-          if (currentTab === "preview") {
+          if (currentTab !== "pdf") {
+            currentPdfData = msg.pdfData;
             switchTab("pdf");
+          } else {
+            renderPdf(msg.pdfData);
           }
         } else if (msg.errors && msg.errors.length) {
           compileStatus.textContent = msg.errors.length + " error(s)";
@@ -936,7 +966,7 @@ export class InkwellPreviewProvider {
         }
         setTimeout(function() { compileStatus.textContent = ""; }, 8000);
       } else if (msg.type === "logEntry") {
-        var lTag = msg.tag === "error" ? "log-tag-error" : msg.tag === "run" ? "log-tag-run" : msg.tag === "compile" ? "log-tag-compile" : "log-tag-info";
+        var lTag = msg.tag === "error" ? "log-tag-error" : msg.tag === "warn" ? "log-tag-warn" : msg.tag === "run" ? "log-tag-run" : msg.tag === "compile" ? "log-tag-compile" : "log-tag-info";
         addLogEntry(msg.tag, lTag, msg.message, msg.details);
       }
     });

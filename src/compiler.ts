@@ -12,7 +12,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { findInkwellRoot, findBibFiles, findDefaultsYaml } from "./config";
 import { InkwellDiagnostics, CompileError } from "./diagnostics";
-import { getTemplateForDocument, copySupportingFiles, PdfEngine } from "./templates";
+import { getTemplateForDocument, copySupportingFiles, PdfEngine, ResolvedTemplate, collectAllFeatures } from "./templates";
 import { prepareForCompilation } from "./inject";
 import { writePreambleFile } from "./preamble";
 
@@ -282,6 +282,42 @@ function copyDirFiles(srcDir: string, dstDir: string): void {
   } catch {}
 }
 
+function checkTemplateFeatures(
+  sourceText: string,
+  activeTemplate: ResolvedTemplate,
+  documentUri: vscode.Uri
+): { warnings: CompileError[]; logLines: string[] } {
+  const warnings: CompileError[] = [];
+  const logLines: string[] = [];
+  const allFeatures = collectAllFeatures(documentUri);
+
+  for (const { templateId, templateName, feature } of allFeatures) {
+    let regex: RegExp;
+    try {
+      regex = new RegExp(feature.pattern, "m");
+    } catch {
+      continue;
+    }
+    const match = sourceText.match(regex);
+    if (!match) continue;
+
+    if (templateId === activeTemplate.id) {
+      logLines.push(`[inkwell] feature: ${feature.syntax} (${feature.description})`);
+    } else {
+      const idx = match.index || 0;
+      const line = sourceText.substring(0, idx).split("\n").length;
+      warnings.push({
+        line,
+        message: `${feature.syntax} requires the "${templateName}" template (current: "${activeTemplate.manifest.name}")`,
+        severity: "warning",
+      });
+      logLines.push(`[inkwell] WARNING line ${line}: ${feature.syntax} requires "${templateName}" template`);
+    }
+  }
+
+  return { warnings, logLines };
+}
+
 async function compilePandoc(
   document: vscode.TextDocument,
   outputPath?: string
@@ -318,6 +354,7 @@ async function compilePandoc(
     outputPath || path.join(sourceDir, `${baseName}.pdf`);
 
   const rawText = document.getText();
+  const featureCheck = checkTemplateFeatures(rawText, template, document.uri);
   const { injected } = prepareForCompilation(rawText, sourceFile);
 
   const tmpSource = path.join(cacheDir, path.basename(sourceFile));
@@ -402,6 +439,7 @@ async function compilePandoc(
     `[inkwell] pandoc args: ${args.join(" ")}`,
     `[inkwell] cache bib exists: ${fs.existsSync(cacheBib)}`,
     `[inkwell] cache dir contents: ${(() => { try { return fs.readdirSync(cacheDir).join(", "); } catch { return "error"; } })()}`,
+    ...featureCheck.logLines,
   ].join("\n");
 
   try {
@@ -422,7 +460,7 @@ async function compilePandoc(
     fs.copyFileSync(tmpOutput, pdfOutput);
   }
 
-  const errors = parseErrors(stderr, stdout);
+  const errors = [...featureCheck.warnings, ...parseErrors(stderr, stdout)];
   const duration = (Date.now() - start) / 1000;
 
   return {

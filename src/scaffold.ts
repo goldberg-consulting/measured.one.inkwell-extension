@@ -278,7 +278,7 @@ Write your content here. Cite sources with [@knuth1984] and use inline math like
   if (opts.pythonEnv) {
     const reqPath = path.join(opts.dir, "requirements.txt");
     if (!fs.existsSync(reqPath)) {
-      fs.writeFileSync(reqPath, "# Add Python dependencies here\nnumpy\nmatplotlib\npandas\n");
+      fs.writeFileSync(reqPath, "numpy\nmatplotlib\npandas\npolars\nscikit-learn\numap-learn\nseaborn\n");
     }
   }
 

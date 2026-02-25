@@ -56,7 +56,7 @@ npm install -g @mermaid-js/mermaid-cli
 **Python** (optional, for runnable `{python}` code blocks): set up per-project with `Cmd+Shift+P` > **Inkwell: Setup Python Environment**, or manually:
 
 ```bash
-python3 -m venv venv && source venv/bin/activate && pip install numpy matplotlib
+python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt
 ```
 
 > **Troubleshooting:** If compilation fails with `Missing file: foo.sty`, run `tlmgr install foo`. The build log (`Cmd+Shift+U` > **Inkwell LaTeX**) shows the exact missing filename. Mermaid blocks without `mmdc` installed render in the live preview but appear as code listings in PDFs.

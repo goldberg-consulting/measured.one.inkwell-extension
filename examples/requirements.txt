@@ -1,2 +1,7 @@
 numpy
 matplotlib
+pandas
+polars
+scikit-learn
+umap-learn
+seaborn
