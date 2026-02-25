@@ -95,6 +95,19 @@ function getCacheDir(sourceFile: string): string {
   return dir;
 }
 
+const TEX_ARTIFACT_EXTS = new Set([
+  ".pdf", ".aux", ".log", ".toc", ".lof", ".lot", ".out",
+  ".idx", ".ind", ".ilg", ".bbl", ".blg", ".bcf", ".run.xml",
+  ".nav", ".snm", ".fls", ".fdb_latexmk", ".synctex.gz",
+]);
+
+function purgeCompileArtifacts(cacheDir: string, baseName: string): void {
+  for (const ext of TEX_ARTIFACT_EXTS) {
+    const file = path.join(cacheDir, `${baseName}${ext}`);
+    try { fs.unlinkSync(file); } catch {}
+  }
+}
+
 async function findBinary(name: string): Promise<string | undefined> {
   const common = [`/usr/local/bin/${name}`, `/usr/bin/${name}`];
   const home = os.homedir();
@@ -154,6 +167,9 @@ async function compileTeX(
   }
 
   const cacheDir = getCacheDir(sourceFile);
+  const pdfOutput = outputPath || path.join(sourceDir, `${baseName}.pdf`);
+  purgeCompileArtifacts(cacheDir, baseName);
+  try { fs.unlinkSync(pdfOutput); } catch {}
 
   const tmpSource = path.join(cacheDir, path.basename(sourceFile));
   fs.writeFileSync(tmpSource, document.getText(), "utf-8");
@@ -221,7 +237,6 @@ async function compileTeX(
   }
 
   const tmpOutput = path.join(cacheDir, `${baseName}.pdf`);
-  const pdfOutput = outputPath || path.join(sourceDir, `${baseName}.pdf`);
   const pdfExists = fs.existsSync(tmpOutput);
 
   if (pdfExists) {
@@ -341,6 +356,10 @@ async function compilePandoc(
   }
 
   const cacheDir = getCacheDir(sourceFile);
+  const pdfOutput = outputPath || path.join(sourceDir, `${baseName}.pdf`);
+  purgeCompileArtifacts(cacheDir, baseName);
+  try { fs.unlinkSync(pdfOutput); } catch {}
+
   const template = getTemplateForDocument(document);
   const templateName = path.basename(template.pandocTemplate);
   const templateDst = path.join(cacheDir, templateName);
@@ -349,9 +368,6 @@ async function compilePandoc(
 
   const preferredEngine: PdfEngine = template.manifest.engine || "xelatex";
   const engine = await findBinary(preferredEngine) || await findBinary("xelatex");
-
-  const pdfOutput =
-    outputPath || path.join(sourceDir, `${baseName}.pdf`);
 
   const rawText = document.getText();
   const featureCheck = checkTemplateFeatures(rawText, template, document.uri);
