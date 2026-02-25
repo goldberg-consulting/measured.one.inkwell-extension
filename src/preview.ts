@@ -588,6 +588,8 @@ export class InkwellPreviewProvider {
     var vscodeApi = acquireVsCodeApi();
     var currentTab = "${initialTab}";
     var currentPdfData = null;
+    var currentPdfDoc = null;
+    var pdfRenderVersion = 0;
 
     if (typeof pdfjsLib !== "undefined") {
       pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -694,11 +696,19 @@ export class InkwellPreviewProvider {
 
     function renderPdf(base64Data) {
       currentPdfData = base64Data;
+      pdfRenderVersion++;
+      var version = pdfRenderVersion;
+
       pdfPlaceholder.style.display = "none";
       compileErrors.style.display = "none";
 
       var existing = pdfPane.querySelector(".pdf-canvas-container");
       if (existing) existing.remove();
+
+      if (currentPdfDoc) {
+        currentPdfDoc.destroy();
+        currentPdfDoc = null;
+      }
 
       if (typeof pdfjsLib === "undefined") {
         pdfPlaceholder.innerHTML = "<p>PDF compiled but viewer failed to load.</p>";
@@ -717,10 +727,16 @@ export class InkwellPreviewProvider {
       pdfPane.appendChild(container);
 
       pdfjsLib.getDocument({ data: bytes }).promise.then(function(pdf) {
+        if (version !== pdfRenderVersion) {
+          pdf.destroy();
+          return;
+        }
+        currentPdfDoc = pdf;
         var scale = 1.5;
         for (var pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
           (function(num) {
             pdf.getPage(num).then(function(page) {
+              if (version !== pdfRenderVersion) return;
               var viewport = page.getViewport({ scale: scale });
               var canvas = document.createElement("canvas");
               canvas.width = viewport.width;
@@ -733,6 +749,10 @@ export class InkwellPreviewProvider {
             });
           })(pageNum);
         }
+      }).catch(function(err) {
+        if (version !== pdfRenderVersion) return;
+        pdfPlaceholder.innerHTML = "<p>Failed to render PDF: " + esc(String(err)) + "</p>";
+        pdfPlaceholder.style.display = "block";
       });
     }
 
@@ -740,6 +760,8 @@ export class InkwellPreviewProvider {
       pdfPlaceholder.style.display = "none";
       var existing = pdfPane.querySelector("embed");
       if (existing) existing.remove();
+      var existingCanvas = pdfPane.querySelector(".pdf-canvas-container");
+      if (existingCanvas) existingCanvas.remove();
 
       var html = '<div class="compile-errors-header">' +
         errors.length + ' compilation error' + (errors.length === 1 ? '' : 's') + '</div>';
@@ -922,9 +944,11 @@ export class InkwellPreviewProvider {
         if (msg.pdfData) {
           compileStatus.textContent = "Done (" + msg.duration.toFixed(1) + "s)";
           addLogEntry("compile", "log-tag-compile", "PDF compiled successfully (" + msg.duration.toFixed(1) + "s)", "");
-          renderPdf(msg.pdfData);
-          if (currentTab === "preview") {
+          if (currentTab !== "pdf") {
+            currentPdfData = msg.pdfData;
             switchTab("pdf");
+          } else {
+            renderPdf(msg.pdfData);
           }
         } else if (msg.errors && msg.errors.length) {
           compileStatus.textContent = msg.errors.length + " error(s)";
