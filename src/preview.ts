@@ -291,6 +291,11 @@ export class InkwellPreviewProvider {
         errors: [],
         log: "",
       });
+      const warnings = result.errors.filter(e => e.severity === "warning");
+      for (const w of warnings) {
+        const loc = w.line ? `line ${w.line}: ` : "";
+        this.sendLogEntry("warn", `${loc}${w.message}`);
+      }
     } else if (this.panel) {
       this.panel.webview.postMessage({
         type: "compileDone",
@@ -504,6 +509,7 @@ export class InkwellPreviewProvider {
     .log-tag-compile { background: rgba(74,144,217,0.15); color: #4A90D9; }
     .log-tag-run { background: rgba(74,180,100,0.15); color: #4ab464; }
     .log-tag-error { background: rgba(224,82,82,0.15); color: #e05252; }
+    .log-tag-warn { background: rgba(204,163,0,0.15); color: #CCA300; }
     .log-tag-info { background: rgba(128,128,128,0.1); color: var(--blockquote); }
     .log-entry-body { white-space: pre-wrap; word-wrap: break-word; color: var(--text); }
     .log-entry-body.is-error { color: #e05252; }
@@ -936,7 +942,7 @@ export class InkwellPreviewProvider {
         }
         setTimeout(function() { compileStatus.textContent = ""; }, 8000);
       } else if (msg.type === "logEntry") {
-        var lTag = msg.tag === "error" ? "log-tag-error" : msg.tag === "run" ? "log-tag-run" : msg.tag === "compile" ? "log-tag-compile" : "log-tag-info";
+        var lTag = msg.tag === "error" ? "log-tag-error" : msg.tag === "warn" ? "log-tag-warn" : msg.tag === "run" ? "log-tag-run" : msg.tag === "compile" ? "log-tag-compile" : "log-tag-info";
         addLogEntry(msg.tag, lTag, msg.message, msg.details);
       }
     });

@@ -11,6 +11,12 @@ import { findInkwellRoot } from "./config";
 
 export type PdfEngine = "xelatex" | "pdflatex" | "lualatex";
 
+export interface TemplateFeature {
+  pattern: string;
+  syntax: string;
+  description: string;
+}
+
 export interface TemplateManifest {
   name: string;
   description?: string;
@@ -18,6 +24,7 @@ export interface TemplateManifest {
   documentclass?: string;
   engine?: PdfEngine;
   variables?: Record<string, string>;
+  features?: TemplateFeature[];
 }
 
 export interface ResolvedTemplate {
@@ -258,6 +265,19 @@ export function copySupportingFiles(
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.copyFileSync(file, dest);
   }
+}
+
+export function collectAllFeatures(
+  documentUri?: vscode.Uri
+): { templateId: string; templateName: string; feature: TemplateFeature }[] {
+  const all = listTemplates(documentUri);
+  const results: { templateId: string; templateName: string; feature: TemplateFeature }[] = [];
+  for (const [id, tmpl] of all) {
+    for (const f of tmpl.manifest.features || []) {
+      results.push({ templateId: id, templateName: tmpl.manifest.name, feature: f });
+    }
+  }
+  return results;
 }
 
 export async function selectTemplateCommand(
