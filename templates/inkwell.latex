@@ -23,6 +23,7 @@ $if(linestretch)$\setstretch{$linestretch$}$else$\setstretch{1.4}$endif$
 \declaretheorem[style=inkwell-def,numbered=no]{example}
 \declaretheorem[style=inkwell-def,numbered=no]{remark}
 \usepackage{enumitem}
+\usepackage{array}
 \usepackage{booktabs}
 \usepackage{longtable}
 \usepackage{graphicx}

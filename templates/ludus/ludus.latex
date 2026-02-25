@@ -25,6 +25,7 @@ $endif$
 
 % Packages not already provided by ludusofficial.cls
 \usepackage{amsmath,amssymb}
+\usepackage{array}
 \usepackage{booktabs}
 \usepackage{longtable}
 \usepackage{enumitem}
