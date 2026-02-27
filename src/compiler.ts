@@ -113,7 +113,13 @@ function purgeCompileArtifacts(cacheDir: string, baseName: string): void {
   }
 }
 
+const binaryCache = new Map<string, { result: string | undefined; ts: number }>();
+const BINARY_CACHE_TTL = 60_000;
+
 async function findBinary(name: string): Promise<string | undefined> {
+  const cached = binaryCache.get(name);
+  if (cached && Date.now() - cached.ts < BINARY_CACHE_TTL) return cached.result;
+
   const common = [`/usr/local/bin/${name}`, `/usr/bin/${name}`];
   const home = os.homedir();
   const platformPaths = process.platform === "darwin"
@@ -130,13 +136,20 @@ async function findBinary(name: string): Promise<string | undefined> {
       ];
 
   for (const p of platformPaths) {
-    if (fs.existsSync(p)) return p;
+    if (fs.existsSync(p)) {
+      binaryCache.set(name, { result: p, ts: Date.now() });
+      return p;
+    }
   }
   try {
     const { stdout } = await exec("which", [name]);
     const trimmed = stdout.trim();
-    if (trimmed) return trimmed;
+    if (trimmed) {
+      binaryCache.set(name, { result: trimmed, ts: Date.now() });
+      return trimmed;
+    }
   } catch {}
+  binaryCache.set(name, { result: undefined, ts: Date.now() });
   return undefined;
 }
 

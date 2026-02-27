@@ -28,6 +28,7 @@ export class InkwellPreviewProvider {
   private currentDocument: vscode.TextDocument | undefined;
   private outputChannel: vscode.OutputChannel;
   private initialized = false;
+  private pdfCache: { path: string; mtimeMs: number; base64: string } | undefined;
   onRun?: () => Promise<void>;
 
   constructor(context: vscode.ExtensionContext) {
@@ -212,9 +213,15 @@ export class InkwellPreviewProvider {
     const baseName = path.basename(sourceFile, path.extname(sourceFile));
     const pdfPath = path.join(path.dirname(sourceFile), `${baseName}.pdf`);
     let existingPdfData: string | undefined;
-    if (fs.existsSync(pdfPath)) {
-      existingPdfData = fs.readFileSync(pdfPath).toString("base64");
-    }
+    try {
+      const stat = fs.statSync(pdfPath);
+      if (this.pdfCache && this.pdfCache.path === pdfPath && this.pdfCache.mtimeMs === stat.mtimeMs) {
+        existingPdfData = this.pdfCache.base64;
+      } else {
+        existingPdfData = fs.readFileSync(pdfPath).toString("base64");
+        this.pdfCache = { path: pdfPath, mtimeMs: stat.mtimeMs, base64: existingPdfData };
+      }
+    } catch {}
 
     const blocks = isTeX ? [] : parseCodeBlocks(text);
     const hasCodeBlocks = blocks.length > 0;
@@ -822,20 +829,44 @@ export class InkwellPreviewProvider {
       }
     }
 
+    var mermaidInited = false;
+    var mermaidSvgCache = {};
+
     function renderMermaid() {
       if (!articleEl) return;
+      var needsRun = false;
       articleEl.querySelectorAll("code.language-mermaid").forEach(function(block) {
         var pre = block.parentElement;
         if (!pre) return;
-        var div = document.createElement("div");
-        div.className = "mermaid";
-        div.textContent = block.textContent;
-        pre.parentNode.replaceChild(div, pre);
+        var src = block.textContent || "";
+        var cached = mermaidSvgCache[src];
+        if (cached) {
+          var wrapper = document.createElement("div");
+          wrapper.className = "mermaid";
+          wrapper.innerHTML = cached;
+          pre.parentNode.replaceChild(wrapper, pre);
+        } else {
+          var div = document.createElement("div");
+          div.className = "mermaid";
+          div.textContent = src;
+          pre.parentNode.replaceChild(div, pre);
+          needsRun = true;
+        }
       });
-      if (typeof mermaid !== "undefined") {
+      if (needsRun && typeof mermaid !== "undefined") {
         var isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        mermaid.initialize({ startOnLoad: false, theme: isDark ? "dark" : "default" });
-        mermaid.run();
+        if (!mermaidInited) {
+          mermaid.initialize({ startOnLoad: false, theme: isDark ? "dark" : "default" });
+          mermaidInited = true;
+        }
+        mermaid.run().then(function() {
+          articleEl.querySelectorAll(".mermaid[data-processed] svg").forEach(function(svg) {
+            var parent = svg.parentElement;
+            if (parent && parent.textContent) {
+              mermaidSvgCache[parent.getAttribute("data-original-src") || ""] = parent.innerHTML;
+            }
+          });
+        }).catch(function() {});
       }
     }
 
