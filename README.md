@@ -22,19 +22,19 @@ Inkwell lets you stay in markdown, stay in your editor, and still get publicatio
 **macOS (Homebrew):**
 
 ```bash
-brew install pandoc
+brew install pandoc pandoc-crossref
 brew install --cask mactex
 npm install -g @mermaid-js/mermaid-cli
 ```
 
-That gives you everything: Pandoc, LaTeX (XeLaTeX + pdfLaTeX), and Mermaid diagram support.
+That gives you everything: Pandoc, cross-reference filters, LaTeX (XeLaTeX + pdfLaTeX), and Mermaid diagram support.
 
 **Smaller macOS install (~150 MB instead of ~5 GB):**
 
 Replace `mactex` with TinyTeX if you want a minimal footprint. You will need to install LaTeX packages as Inkwell's templates require them.
 
 ```bash
-brew install pandoc
+brew install pandoc pandoc-crossref
 curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh
 npm install -g @mermaid-js/mermaid-cli
 ```
@@ -52,6 +52,8 @@ sudo apt install pandoc texlive-full                 # Debian/Ubuntu
 sudo dnf install pandoc texlive-scheme-full          # Fedora
 npm install -g @mermaid-js/mermaid-cli
 ```
+
+`pandoc-crossref` is required for `@fig:`, `@eq:`, and `@tbl:` cross-references. On Linux, install from [GitHub releases](https://github.com/lierdakil/pandoc-crossref/releases) or your package manager if available (`sudo apt install pandoc-crossref`).
 
 **Python** (optional, for runnable `{python}` code blocks): set up per-project with `Cmd+Shift+P` > **Inkwell: Setup Python Environment**, or manually:
 
@@ -72,11 +74,21 @@ npm install
 npm run compile
 ```
 
-Then install in your editor:
+**Option A: Install from folder** (development)
+
    - Open VS Code or Cursor
    - `Cmd+Shift+P` > **Developer: Install Extension from Location...**
    - Select the `measured.one.inkwell-extension` folder
    - Reload the window when prompted
+
+**Option B: Package and install as .vsix** (recommended for distribution)
+
+```bash
+npm run package                          # esbuild bundles to a single file
+npx @vscode/vsce package                 # produces inkwell-0.1.0.vsix
+cursor --install-extension inkwell-0.1.0.vsix --force
+# or: code --install-extension inkwell-0.1.0.vsix --force
+```
 
 See the **[Syntax Guide](guide.md)** for the complete reference on YAML frontmatter, code blocks, math, citations, and template-specific fields.
 
@@ -685,7 +697,7 @@ All commands are available from the command palette (`Cmd+Shift+P` / `Ctrl+Shift
 | **Inkwell: Setup Python Environment** | | Create a venv and install from `requirements.txt` |
 | **Inkwell: Check / Install Toolchain** | | Verify Pandoc and XeLaTeX are installed, with guided setup if missing |
 
-**Tip:** If you are developing from source and rebuild the extension (`npm run compile`), reload the editor window with `Cmd+Shift+P` > **Developer: Reload Window** to pick up the changes.
+**Tip:** If you are developing from source and rebuild the extension (`npm run compile`), reload the editor window with `Cmd+Shift+P` > **Developer: Reload Window** to pick up the changes. If you installed via `.vsix`, re-run `npm run package && npx @vscode/vsce package` and reinstall the `.vsix`.
 
 ## Settings
 
