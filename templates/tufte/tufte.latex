@@ -22,9 +22,9 @@
 
 \hypersetup{
   colorlinks=true,
-  linkcolor=$if(linkcolor)$$linkcolor$$else$DarkSlateBlue$endif$,
-  citecolor=$if(citecolor)$$citecolor$$else$DarkSlateBlue$endif$,
-  urlcolor=$if(urlcolor)$$urlcolor$$else$DarkSlateBlue$endif$,
+  linkcolor=$if(linkcolor)$$linkcolor$$else$RoyalBlue$endif$,
+  citecolor=$if(citecolor)$$citecolor$$else$RoyalBlue$endif$,
+  urlcolor=$if(urlcolor)$$urlcolor$$else$RoyalBlue$endif$,
   pdfborder={0 0 0},
 }
 

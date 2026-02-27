@@ -15,6 +15,7 @@ const exec = promisify(execFile);
 export interface ToolchainStatus {
   pandoc: { installed: boolean; version?: string; path?: string };
   xelatex: { installed: boolean; version?: string; path?: string };
+  pdflatex: { installed: boolean; version?: string; path?: string };
   crossref: { installed: boolean; version?: string; path?: string };
   mmdc: { installed: boolean; version?: string; path?: string };
   texDistribution?: "full" | "basic" | "tinytex" | "unknown";
@@ -203,9 +204,10 @@ async function checkLatexPackages(kpsewhich: string | undefined): Promise<string
 }
 
 export async function checkToolchain(): Promise<ToolchainStatus> {
-  const [pandoc, xelatex, crossref, mmdc] = await Promise.all([
+  const [pandoc, xelatex, pdflatex, crossref, mmdc] = await Promise.all([
     probe("pandoc"),
     probe("xelatex"),
+    probe("pdflatex"),
     probe("pandoc-crossref"),
     probe("mmdc"),
   ]);
@@ -218,6 +220,7 @@ export async function checkToolchain(): Promise<ToolchainStatus> {
   return {
     pandoc,
     xelatex,
+    pdflatex,
     crossref,
     mmdc,
     texDistribution: detectDistribution(xelatex.path),
@@ -250,6 +253,12 @@ export async function showToolchainStatus(): Promise<void> {
     lines.push(`XeLaTeX: ${status.xelatex.version || "installed"}${distLabel} (${status.xelatex.path})`);
   } else {
     lines.push("XeLaTeX: not found");
+  }
+
+  if (status.pdflatex.installed) {
+    lines.push(`pdfLaTeX: ${status.pdflatex.version || "installed"} (${status.pdflatex.path})`);
+  } else {
+    lines.push("pdfLaTeX: not found (needed by tufte, tmsce, rho, kth-letter templates)");
   }
 
   if (status.crossref.installed) {
