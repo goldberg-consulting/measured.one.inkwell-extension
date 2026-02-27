@@ -1,6 +1,6 @@
 \PassOptionsToPackage{dvipsnames}{xcolor}
 
-\documentclass{tmsce}
+\documentclass[$for(classoption)$$classoption$$sep$,$endfor$]{tmsce}
 
 % tmsce.cls already loads: geometry, fancyhdr, titlesec, setspace,
 % hyperref, etoolbox. We add only what it does not provide.

@@ -36,7 +36,7 @@ $endif$
 \usepackage{float}
 \usepackage{caption}
 \usepackage[dvipsnames]{xcolor}
-\usepackage[xetex,breaklinks=true]{hyperref}
+\usepackage[breaklinks=true]{hyperref}
 \hypersetup{
   colorlinks=true,
   linkcolor=$if(linkcolor)$$linkcolor$$else$RoyalBlue$endif$,
