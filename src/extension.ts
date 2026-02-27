@@ -4,7 +4,7 @@
 
 import * as vscode from "vscode";
 import { InkwellPreviewProvider } from "./preview";
-import { compile, exportPDF, isCompilable } from "./compiler";
+import { compile, exportPDF, isCompilable, purgeAllCacheDirs } from "./compiler";
 import { InkwellDiagnostics } from "./diagnostics";
 import { selectTemplateCommand } from "./templates";
 import { findInkwellRoot, saveManifestField } from "./config";
@@ -17,7 +17,6 @@ import * as fs from "fs";
 
 let diagnostics: InkwellDiagnostics;
 let autoCompileTimer: ReturnType<typeof setInterval> | undefined;
-let isCompiling = false;
 let activeRunCancel: RunCancellation | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
@@ -159,6 +158,7 @@ export function deactivate() {
     clearInterval(autoCompileTimer);
     autoCompileTimer = undefined;
   }
+  purgeAllCacheDirs();
 }
 
 function setupAutoCompileTimer(): void {
@@ -181,9 +181,6 @@ function setupAutoCompileTimer(): void {
 }
 
 async function runCompile(document: vscode.TextDocument): Promise<void> {
-  if (isCompiling) return;
-  isCompiling = true;
-
   try {
     const result = await compile(document);
     diagnostics.report(document.uri, result.errors);
@@ -198,8 +195,8 @@ async function runCompile(document: vscode.TextDocument): Promise<void> {
         5000
       );
     }
-  } finally {
-    isCompiling = false;
+  } catch (err) {
+    console.error("Inkwell compile error:", err);
   }
 }
 
