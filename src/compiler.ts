@@ -8,6 +8,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
+import * as crypto from "crypto";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { findInkwellRoot, findBibFiles, findDefaultsYaml } from "./config";
@@ -85,11 +86,8 @@ export function isCompilable(document: vscode.TextDocument): boolean {
   return compilableExtensions.includes(ext) || document.languageId === "markdown" || document.languageId === "latex";
 }
 
-// Deterministic per-file cache directory in the OS temp folder.
-// The hex prefix of the absolute path avoids collisions across projects
-// while keeping directory names short enough for TeX path limits.
 function getCacheDir(sourceFile: string): string {
-  const hash = Buffer.from(sourceFile).toString("hex").slice(0, 16);
+  const hash = crypto.createHash("sha256").update(sourceFile).digest("hex").slice(0, 16);
   const dir = path.join(os.tmpdir(), "inkwell-vscode", hash);
   fs.mkdirSync(dir, { recursive: true });
   return dir;
