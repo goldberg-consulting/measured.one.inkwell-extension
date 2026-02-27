@@ -149,7 +149,9 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   setupAutoCompileTimer();
-  activationCheck();
+  activationCheck().catch((err) =>
+    console.error("Inkwell activation check failed:", err)
+  );
 }
 
 export function deactivate() {
