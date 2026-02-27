@@ -99,6 +99,13 @@ const TEX_ARTIFACT_EXTS = new Set([
   ".nav", ".snm", ".fls", ".fdb_latexmk", ".synctex.gz",
 ]);
 
+export function purgeAllCacheDirs(): void {
+  const root = path.join(os.tmpdir(), "inkwell-vscode");
+  try {
+    fs.rmSync(root, { recursive: true, force: true });
+  } catch {}
+}
+
 function purgeCompileArtifacts(cacheDir: string, baseName: string): void {
   for (const ext of TEX_ARTIFACT_EXTS) {
     const file = path.join(cacheDir, `${baseName}${ext}`);
@@ -133,15 +140,26 @@ async function findBinary(name: string): Promise<string | undefined> {
   return undefined;
 }
 
-export async function compile(
+const compileLocks = new Map<string, Promise<CompileResult>>();
+
+export function compile(
   document: vscode.TextDocument,
   outputPath?: string
 ): Promise<CompileResult> {
-  const mode = detectMode(document);
-  if (mode === "xelatex") {
-    return compileTeX(document, outputPath);
-  }
-  return compilePandoc(document, outputPath);
+  const key = document.uri.fsPath;
+  const existing = compileLocks.get(key);
+  if (existing) return existing;
+
+  const run = (async () => {
+    const mode = detectMode(document);
+    return mode === "xelatex"
+      ? compileTeX(document, outputPath)
+      : compilePandoc(document, outputPath);
+  })();
+
+  compileLocks.set(key, run);
+  run.finally(() => compileLocks.delete(key));
+  return run;
 }
 
 async function compileTeX(
@@ -223,14 +241,21 @@ async function compileTeX(
           timeout: 30_000,
           env: texEnv,
         });
-        try {
-          await exec(xelatex, args, {
-            cwd: sourceDir,
-            timeout: 120_000,
-            env: texEnv,
-          });
-        } catch {}
-      } catch {}
+      } catch (err: any) {
+        if (err.stderr) stderr += "\n" + err.stderr;
+      }
+      try {
+        const result = await exec(xelatex, args, {
+          cwd: sourceDir,
+          timeout: 120_000,
+          env: texEnv,
+        });
+        stdout = result.stdout;
+        stderr += "\n" + result.stderr;
+      } catch (err: any) {
+        if (err.stderr) stderr += "\n" + err.stderr;
+        if (err.stdout) stdout = err.stdout;
+      }
     }
   }
 
@@ -281,18 +306,24 @@ function copySiblingFiles(sourceDir: string, cacheDir: string): void {
 }
 
 function copyDirFiles(srcDir: string, dstDir: string): void {
+  let entries: string[];
   try {
-    for (const entry of fs.readdirSync(srcDir)) {
-      const ext = path.extname(entry).toLowerCase();
-      if (COPY_EXTS.has(ext)) {
+    entries = fs.readdirSync(srcDir);
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    const ext = path.extname(entry).toLowerCase();
+    if (COPY_EXTS.has(ext)) {
+      try {
         const src = path.join(srcDir, entry);
         const dst = path.join(dstDir, entry);
         if (!fs.existsSync(dst) || fs.statSync(src).mtimeMs > fs.statSync(dst).mtimeMs) {
           fs.copyFileSync(src, dst);
         }
-      }
+      } catch {}
     }
-  } catch {}
+  }
 }
 
 function checkTemplateFeatures(
