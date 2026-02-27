@@ -115,6 +115,10 @@ export class InkwellPreviewProvider {
     this.initialized = false;
 
     this.panel.onDidDispose(() => {
+      if (this.throttle) {
+        clearTimeout(this.throttle);
+        this.throttle = undefined;
+      }
       this.panel = undefined;
       this.currentDocument = undefined;
       this.initialized = false;
@@ -133,7 +137,9 @@ export class InkwellPreviewProvider {
         await vscode.commands.executeCommand("inkwell.cancelRun");
       } else if (msg.type === "ready") {
         this.initialized = true;
-        this.sendContentUpdate(editor.document);
+        if (this.currentDocument) {
+          this.sendContentUpdate(this.currentDocument);
+        }
       }
     });
 
@@ -253,60 +259,71 @@ export class InkwellPreviewProvider {
   }
 
   private async handleCompile(): Promise<void> {
-    if (!this.panel || !this.currentDocument) return;
+    const doc = this.currentDocument;
+    if (!this.panel || !doc) return;
 
     this.panel.webview.postMessage({ type: "compileStarted" });
 
-    const result = await compile(this.currentDocument);
+    try {
+      const result = await compile(doc);
 
-    this.outputChannel.clear();
-    this.outputChannel.appendLine(
-      `Inkwell compile: ${this.currentDocument.uri.fsPath}`
-    );
-    this.outputChannel.appendLine(
-      `Result: ${result.success ? "success" : "failed"} (${result.duration.toFixed(1)}s)`
-    );
-    if (result.errors.length) {
-      this.outputChannel.appendLine(`\n--- Errors (${result.errors.length}) ---`);
-      for (const err of result.errors) {
-        const loc = err.line ? `line ${err.line}` : "unknown location";
-        this.outputChannel.appendLine(`  [${err.severity}] ${loc}: ${err.message}`);
+      this.outputChannel.clear();
+      this.outputChannel.appendLine(`Inkwell compile: ${doc.uri.fsPath}`);
+      this.outputChannel.appendLine(
+        `Result: ${result.success ? "success" : "failed"} (${result.duration.toFixed(1)}s)`
+      );
+      if (result.errors.length) {
+        this.outputChannel.appendLine(`\n--- Errors (${result.errors.length}) ---`);
+        for (const err of result.errors) {
+          const loc = err.line ? `line ${err.line}` : "unknown location";
+          this.outputChannel.appendLine(`  [${err.severity}] ${loc}: ${err.message}`);
+        }
       }
-    }
-    if (result.log.trim()) {
-      this.outputChannel.appendLine("\n--- Full Log ---");
-      this.outputChannel.appendLine(result.log);
-    }
-
-    if (this.diagnostics) {
-      this.diagnostics.report(this.currentDocument.uri, result.errors);
-    }
-
-    if (result.success && result.pdfPath && this.panel) {
-      const pdfData = fs.readFileSync(result.pdfPath).toString("base64");
-      this.panel.webview.postMessage({
-        type: "compileDone",
-        pdfData,
-        duration: result.duration,
-        errors: [],
-        log: "",
-      });
-      const warnings = result.errors.filter(e => e.severity === "warning");
-      for (const w of warnings) {
-        const loc = w.line ? `line ${w.line}: ` : "";
-        this.sendLogEntry("warn", `${loc}${w.message}`);
+      if (result.log.trim()) {
+        this.outputChannel.appendLine("\n--- Full Log ---");
+        this.outputChannel.appendLine(result.log);
       }
-    } else if (this.panel) {
-      this.panel.webview.postMessage({
-        type: "compileDone",
-        pdfUri: null,
-        duration: result.duration,
-        errors: result.errors.map((e) => {
-          const loc = e.line ? `Line ${e.line}: ` : "";
-          return `${loc}${e.message}`;
-        }),
-        log: result.log,
-      });
+
+      if (this.diagnostics) {
+        this.diagnostics.report(doc.uri, result.errors);
+      }
+
+      if (result.success && result.pdfPath && this.panel) {
+        const pdfData = fs.readFileSync(result.pdfPath).toString("base64");
+        this.panel.webview.postMessage({
+          type: "compileDone",
+          pdfData,
+          duration: result.duration,
+          errors: [],
+          log: "",
+        });
+        const warnings = result.errors.filter(e => e.severity === "warning");
+        for (const w of warnings) {
+          const loc = w.line ? `line ${w.line}: ` : "";
+          this.sendLogEntry("warn", `${loc}${w.message}`);
+        }
+      } else if (this.panel) {
+        this.panel.webview.postMessage({
+          type: "compileDone",
+          pdfUri: null,
+          duration: result.duration,
+          errors: result.errors.map((e) => {
+            const loc = e.line ? `Line ${e.line}: ` : "";
+            return `${loc}${e.message}`;
+          }),
+          log: result.log,
+        });
+      }
+    } catch (err) {
+      if (this.panel) {
+        this.panel.webview.postMessage({
+          type: "compileDone",
+          pdfData: null,
+          duration: 0,
+          errors: [String(err)],
+          log: "",
+        });
+      }
     }
   }
 
