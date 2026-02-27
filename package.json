@@ -118,7 +118,11 @@
       "properties": {
         "inkwell.autoCompile": {
           "type": "string",
-          "enum": ["off", "onSave", "interval"],
+          "enum": [
+            "off",
+            "onSave",
+            "interval"
+          ],
           "default": "off",
           "enumDescriptions": [
             "Manual compilation only (use the toolbar button or keybinding)",
@@ -135,7 +139,12 @@
         },
         "inkwell.defaultCodeDisplay": {
           "type": "string",
-          "enum": ["output", "both", "code", "none"],
+          "enum": [
+            "output",
+            "both",
+            "code",
+            "none"
+          ],
           "default": "output",
           "enumDescriptions": [
             "Show only the output of code blocks",
@@ -158,9 +167,10 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run package",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "package": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node18 --minify",
     "lint": "eslint src --ext ts"
   },
   "dependencies": {
@@ -170,6 +180,7 @@
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
+    "esbuild": "^0.27.3",
     "typescript": "^5.3.0"
   }
 }
