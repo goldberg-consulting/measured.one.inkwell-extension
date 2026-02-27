@@ -366,6 +366,15 @@ async function compilePandoc(
 
   const preferredEngine: PdfEngine = template.manifest.engine || "xelatex";
   const engine = await findBinary(preferredEngine) || await findBinary("xelatex");
+  if (!engine) {
+    return {
+      success: false,
+      pdfPath: undefined,
+      errors: [{ line: undefined, message: `PDF engine not found (tried ${preferredEngine}, xelatex)`, severity: "error" }],
+      log: "",
+      duration: (Date.now() - start) / 1000,
+    };
+  }
 
   const rawText = document.getText();
   const featureCheck = checkTemplateFeatures(rawText, template, document.uri);
@@ -388,7 +397,7 @@ async function compilePandoc(
     tmpSource,
     "-o",
     tmpOutput,
-    `--pdf-engine=${engine || preferredEngine}`,
+    `--pdf-engine=${engine}`,
     "--standalone",
     `--template=${templateDst}`,
     `--from=${fromFormat}`,
@@ -449,7 +458,7 @@ async function compilePandoc(
     `[inkwell] resource-path: ${resourcePath}`,
     `[inkwell] cls in template dir: ${fs.existsSync(clsExpected)}`,
     `[inkwell] cls in cache dir: ${fs.existsSync(clsCached)}`,
-    `[inkwell] engine: ${engine || preferredEngine}`,
+    `[inkwell] engine: ${engine}`,
     `[inkwell] pandoc args: ${args.join(" ")}`,
     `[inkwell] cache bib exists: ${fs.existsSync(cacheBib)}`,
     `[inkwell] cache dir contents: ${(() => { try { return fs.readdirSync(cacheDir).join(", "); } catch { return "error"; } })()}`,

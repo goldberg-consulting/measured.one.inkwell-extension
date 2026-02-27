@@ -78,6 +78,7 @@ oberdiek
 psnfss
 
 # fonts
+fontspec
 mathpazo
 palatino
 bera

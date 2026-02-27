@@ -65,7 +65,13 @@ const isLinux = process.platform === "linux";
 function searchPaths(): string[] {
   const common = ["/usr/local/bin", "/usr/bin"];
   if (isMac) {
-    return ["/opt/homebrew/bin", ...common, "/Library/TeX/texbin"];
+    const home = os.homedir();
+    return [
+      "/opt/homebrew/bin",
+      ...common,
+      "/Library/TeX/texbin",
+      path.join(home, "Library/TinyTeX/bin/universal-darwin"),
+    ];
   }
   const home = os.homedir();
   return [

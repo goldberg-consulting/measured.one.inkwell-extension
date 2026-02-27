@@ -181,7 +181,7 @@
 \def\web{\urldef{\@nadabrev@web}\@nadabrev@url}
 \address[\@nadabrev@loc\\SE-100 44~Stockholm\\Sweden]%
         {\fromlocation\\SE-100 44~Stockholm\\Sweden}
-\location[KTH]{Valhallav�gen 79}
+\location[KTH]{Valhallavägen 79}
 \telephone{+46~8~790~60~00}
 \telefax{+46~8~790~65~00}
 \accounts{Pg:~1~56~53-9. Bg:~895-9223. VAT registration No:~SE202100305401.}
