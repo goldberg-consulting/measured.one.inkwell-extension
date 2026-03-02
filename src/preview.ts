@@ -205,6 +205,16 @@ export class InkwellPreviewProvider {
       body = resolveCitations(body);
       // Strip any remaining Pandoc header attributes not caught above
       body = body.replace(/\s*\{[#.][\w:. -]+\}\s*$/gm, "");
+      // Clean up unresolved inline expression errors for preview
+      body = body.replace(
+        /\?\?\(([^)]+)\)/g,
+        '<span class="eval-error" title="$1">??</span>',
+      );
+      // Style unresolved {{variable}} placeholders (outside math)
+      body = body.replace(
+        /(?<!\$)\{\{(\w+)\}\}(?!\$)/g,
+        '<span class="var-placeholder">$1</span>',
+      );
 
       let rendered = md.render(body);
       rendered = this.convertLocalImages(rendered, document);
@@ -1165,13 +1175,13 @@ function resolveReferences(
     return match;
   });
 
-  // Table caption labels: : caption {#tbl:label}
+  // Table caption labels: : caption {#tbl:label} -> HTML figcaption
   result = result.replace(
     /^:\s+(.*?)\s*\{#(tbl:[\w:.-]+)\}\s*$/gm,
     (_, caption: string, label: string) => {
       tblNum++;
       labels.set(label, `${prefixes.tbl}\u00a0${tblNum}`);
-      return `: ${prefixes.tbl} ${tblNum}: ${caption}`;
+      return `<figcaption class="table-caption"><a id="${label}"></a><strong>${prefixes.tbl}\u00a0${tblNum}:</strong> ${caption}</figcaption>`;
     },
   );
 
