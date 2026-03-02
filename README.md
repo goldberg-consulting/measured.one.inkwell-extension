@@ -117,7 +117,7 @@ my-paper/
 
 Side panel (`Cmd+Shift+V`) with three tabs:
 
-- **Preview**: HTML rendering with KaTeX math and Mermaid diagrams, updates as you type
+- **Preview**: HTML rendering styled to match the PDF output. Supports KaTeX math, Mermaid diagrams, cross-references (`@fig:`, `@sec:`, `@tbl:`, `@eq:`), citation styling, title/abstract blocks, and frontmatter font overrides (`mainfont`, `monofont`). Updates as you type.
 - **PDF**: compiled output rendered in-panel
 - **Log**: compilation output, code block stderr, errors
 
