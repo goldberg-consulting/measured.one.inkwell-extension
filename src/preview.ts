@@ -1185,12 +1185,12 @@ function resolveReferences(
     },
   );
 
-  // Replace @type:label references with clickable links
+  // Replace @type:label references with clickable links (case-insensitive)
   result = result.replace(
-    /@(fig|sec|tbl|eq):([\w:.-]+)/g,
+    /@(fig|sec|tbl|eq):([\w:.-]+)/gi,
     (_, type: string, id: string) => {
-      const label = `${type}:${id}`;
-      const display = labels.get(label) || `${type}:${id}`;
+      const label = `${type.toLowerCase()}:${id}`;
+      const display = labels.get(label) || `${type.toLowerCase()}:${id}`;
       return `<a href="#${label}" class="cross-ref">${display}</a>`;
     },
   );
