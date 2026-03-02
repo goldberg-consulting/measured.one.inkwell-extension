@@ -58,10 +58,7 @@ inkwell:
 data. Every bit of ink on a graphic requires a reason. If the ink
 does not tell the viewer something new, it should be erased.
 
-::: {.aside}
-Edward Tufte introduced the *data-ink ratio* in *The Visual Display
-of Quantitative Information* (1983).
-:::
+\marginnote{Edward Tufte introduced the \emph{data-ink ratio} in \emph{The Visual Display of Quantitative Information} (1983).}
 
 Consider the ratio of data-ink to total ink in a graphic. A chart burdened
 with gridlines, redundant labels, and decorative hatching distracts from
@@ -74,11 +71,7 @@ reason, and the result is a clearer picture.
 datasets that share nearly identical summary statistics yet look
 completely different when plotted.
 
-::: {.aside}
-Anscombe's quartet demonstrates why visualization matters:
-$\bar{x} = 9$, $\bar{y} \approx 7.5$, and $r^2 = 0.67$ for
-all four sets, yet the patterns differ radically.
-:::
+\marginnote{Anscombe's quartet demonstrates why visualization matters: $\bar{x} = 9$, $\bar{y} \approx 7.5$, and $r^2 = 0.67$ for all four sets, yet the patterns differ radically.}
 
 The quartet drives home a simple lesson: always plot your data.
 Summary statistics alone can mislead.
@@ -142,9 +135,9 @@ graphics alongside the narrative.
 
 ## Full-Width Sections {#sec:fullwidth}
 
-::: {.fullwidth}
+\begin{fullwidth}
 
-When a table or figure demands the full page width, the `fullwidth`
+When a table or figure demands the full page width, the \texttt{fullwidth}
 environment extends into the margin area. This is useful for wide tables
 or panoramic figures that lose clarity when constrained.
 
@@ -157,7 +150,7 @@ or panoramic figures that lose clarity when constrained.
 
 : Summary statistics of the Anscombe quartet. {#tbl:anscombe-stats}
 
-:::
+\end{fullwidth}
 
 # Mathematical Notation {#sec:math}
 

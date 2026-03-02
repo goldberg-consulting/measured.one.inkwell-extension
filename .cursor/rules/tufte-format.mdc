@@ -1,0 +1,62 @@
+---
+description: Tufte template formatting conventions for margin notes, sidenotes, full-width sections, and margin figures
+globs: "examples/demo-tufte*,templates/tufte/**"
+alwaysApply: false
+---
+
+# Tufte Template Formatting
+
+The `tufte-handout` class provides margin notes, sidenotes, margin figures, and full-width sections. Some of these require raw LaTeX because Pandoc's fenced div conversion is unreliable for complex content.
+
+## Margin text
+
+Use `\sidenote{text}` (numbered) or `\marginnote{text}` (unnumbered). Keep content to 1-2 sentences.
+
+```markdown
+The data-ink ratio\sidenote{Tufte introduced this concept in 1983.} measures
+the proportion of ink devoted to non-redundant data display.
+```
+
+The `::: {.aside}` fenced div works for short text but breaks with paragraphs or math. Prefer raw LaTeX.
+
+## Full-width sections
+
+Wrap content in raw LaTeX, not fenced divs:
+
+```markdown
+\begin{fullwidth}
+| Col A | Col B | Col C | Col D | Col E |
+|-------|-------|-------|-------|-------|
+| 1     | 2     | 3     | 4     | 5     |
+
+: Wide table caption. {#tbl:wide}
+\end{fullwidth}
+```
+
+`::: {.fullwidth}` can fail silently depending on Pandoc version. Raw LaTeX is reliable.
+
+## Margin figures
+
+Always raw LaTeX:
+
+```markdown
+\begin{marginfigure}
+\centering
+\includegraphics[width=\linewidth]{figures/plot.pdf}
+\caption{Caption in the margin.}
+\end{marginfigure}
+```
+
+## New thought (paragraph opener)
+
+```markdown
+\newthought{The fundamental principle} of analytical design is to show the data.
+```
+
+Renders the opening phrase in small caps. Use at the start of major sections.
+
+## What to avoid
+
+- Multi-paragraph content inside `\sidenote{}` or `\marginnote{}`
+- Fenced divs (`::: {.fullwidth}`, `::: {.aside}`) for anything beyond simple text
+- `\begin{figure*}` (use `\begin{fullwidth}` with a standard figure inside)
