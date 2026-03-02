@@ -24,11 +24,69 @@ The complete syntax reference is in `guide.md` at the repository root. Consult i
 4. Convert the body to Pandoc-flavored markdown following the conversion table in GUIDE.md.
 5. Present the complete converted document. Do not omit sections.
 
+## Tufte template
+
+The `tufte-handout` class has features that require raw LaTeX. Pandoc's fenced div conversion (`::: {.class}`) is unreliable for these; prefer raw LaTeX.
+
+### Margin notes
+
+Use `\sidenote{text}` (numbered, with superscript marker) or `\marginnote{text}` (unnumbered). Keep to 1-2 sentences. Multi-paragraph content breaks margin placement.
+
+```markdown
+The data-ink ratio\sidenote{Tufte introduced this concept in 1983.} measures
+the proportion of ink devoted to non-redundant data display.
+```
+
+Do NOT use `::: {.aside}` for anything beyond a single short paragraph. It depends on the `environ` package capturing `\BODY`, which fails with complex content.
+
+### Full-width sections
+
+Wrap content in raw LaTeX:
+
+```markdown
+\begin{fullwidth}
+| Col A | Col B | Col C | Col D | Col E |
+|-------|-------|-------|-------|-------|
+| 1     | 2     | 3     | 4     | 5     |
+
+: Wide table caption. {#tbl:wide}
+\end{fullwidth}
+```
+
+Do NOT use `::: {.fullwidth}`. It can fail silently depending on the Pandoc version.
+
+### Margin figures
+
+Always raw LaTeX. No Pandoc markdown equivalent exists.
+
+```markdown
+\begin{marginfigure}
+\centering
+\includegraphics[width=\linewidth]{figures/plot.pdf}
+\caption{Caption in the margin.}
+\end{marginfigure}
+```
+
+### New thought
+
+`\newthought{First few words}` renders the opening phrase in small caps. Use at the start of major sections or topic shifts.
+
+### Tufte frontmatter
+
+```yaml
+template: tufte
+classoption:
+  - justified      # justified text (default is ragged-right)
+  - a4paper        # or letterpaper (default)
+  # - sfsidenotes  # sans-serif sidenotes
+```
+
 ## Rules
 
 - The output must be a single `.md` file with valid YAML frontmatter.
 - Preserve the source's intellectual content exactly. Only change formatting.
 - Keep raw LaTeX for equation environments, TikZ, and custom environments.
+- For Tufte documents, use raw LaTeX for margin notes, full-width sections, and margin figures. Do not use fenced divs for these features.
 - Convert all `\cite` variants to Pandoc syntax: `[@key]`, `@key`, `[@a; @b]`.
 - Set `bibliography:` and `link-citations: true` in frontmatter.
 - If parts of the LaTeX cannot be cleanly converted, keep them as raw LaTeX blocks.
