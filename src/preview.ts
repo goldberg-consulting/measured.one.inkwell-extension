@@ -191,17 +191,60 @@ export class InkwellPreviewProvider {
       const titleMatch = text.match(/\\title\{([^}]+)\}/);
       title = titleMatch ? titleMatch[1] : undefined;
     } else {
+      const mermaidLabels = extractMermaidLabels(text);
       const injected = prepareForPreview(text, sourceFile);
       const fm = stripFrontmatter(injected);
-      let rendered = md.render(fm.body);
+
+      const prefixes = {
+        fig: fm.figPrefix || "Figure",
+        tbl: fm.tblPrefix || "Table",
+        eqn: fm.eqnPrefix || "Equation",
+        sec: fm.secPrefix || "Section",
+      };
+      let body = resolveReferences(fm.body, mermaidLabels, prefixes);
+      body = resolveCitations(body);
+      // Strip any remaining Pandoc header attributes not caught above
+      body = body.replace(/\s*\{[#.][\w:. -]+\}\s*$/gm, "");
+
+      let rendered = md.render(body);
       rendered = this.convertLocalImages(rendered, document);
       htmlBody = addDataLineAttrs(rendered);
       title = fm.title;
-    }
 
-    const titleBlock = title
-      ? `<header class="title-block"><h1>${escapeHtml(title)}</h1></header>`
-      : "";
+      const fontStyle = buildFontOverrides(fm);
+      if (fontStyle) {
+        htmlBody = fontStyle + htmlBody;
+      }
+
+      const parts: string[] = [];
+      if (fm.title) {
+        parts.push(`<h1>${escapeHtml(fm.title)}</h1>`);
+      }
+      if (fm.subtitle) {
+        parts.push(`<p class="subtitle">${escapeHtml(fm.subtitle)}</p>`);
+      }
+      if (fm.author) {
+        parts.push(`<p class="author">${escapeHtml(fm.author)}</p>`);
+      }
+      if (fm.date) {
+        parts.push(`<p class="date">${escapeHtml(fm.date)}</p>`);
+      }
+      if (parts.length) {
+        htmlBody = `<header class="title-block">${parts.join("\n")}</header>` + htmlBody;
+      }
+      if (fm.abstract) {
+        const abstractHtml = md.render(fm.abstract);
+        const abstractBlock = `<div class="abstract-block"><p class="abstract-title">Abstract</p>${abstractHtml}</div>`;
+        if (parts.length) {
+          htmlBody = htmlBody.replace(
+            /(<\/header>)/,
+            `$1${abstractBlock}`
+          );
+        } else {
+          htmlBody = abstractBlock + htmlBody;
+        }
+      }
+    }
 
     const baseName = path.basename(sourceFile, path.extname(sourceFile));
     const pdfPath = path.join(path.dirname(sourceFile), `${baseName}.pdf`);
@@ -216,7 +259,7 @@ export class InkwellPreviewProvider {
     this.panel.title = title || path.basename(sourceFile);
     this.panel.webview.postMessage({
       type: "updateContent",
-      html: titleBlock + htmlBody,
+      html: htmlBody,
       pdfData: existingPdfData || null,
       isTeX,
       hasCodeBlocks,
@@ -345,18 +388,16 @@ export class InkwellPreviewProvider {
   <link rel="stylesheet" href="${cssUri}">
   <style>
     :root {
-      --body-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      --body-font: Georgia, 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
       --heading-font: var(--body-font);
+      --mono-font: 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
       --base-size: 16px;
-      --line-height: 1.6;
-      --content-width: 720px;
-      --heading-border: none;
-      --paragraph-spacing: 1em;
+      --line-height: 1.5;
+      --content-width: 680px;
+      --paragraph-spacing: 0.8em;
       --hr-display: block;
     }
     html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
-    .title-block { margin-bottom: 2em; }
-    .title-block h1 { border-bottom: none; }
     .mermaid { text-align: center; margin: 1.5em 0; }
 
     .inkwell-toolbar {
@@ -979,17 +1020,51 @@ export class InkwellPreviewProvider {
   }
 }
 
-function stripFrontmatter(text: string): { body: string; title?: string } {
+interface FrontmatterResult {
+  body: string;
+  title?: string;
+  subtitle?: string;
+  author?: string;
+  date?: string;
+  abstract?: string;
+  mainfont?: string;
+  monofont?: string;
+  figPrefix?: string;
+  tblPrefix?: string;
+  eqnPrefix?: string;
+  secPrefix?: string;
+}
+
+function stripFrontmatter(text: string): FrontmatterResult {
   const match = text.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
   if (!match) return { body: text };
 
-  const frontmatter = match[1];
+  const fm = match[1];
   const body = match[2];
-  const titleMatch = frontmatter.match(/^title:\s*['"]?(.+?)['"]?\s*$/m);
+
+  const scalar = (key: string): string | undefined => {
+    const m = fm.match(new RegExp(`^${key}:\\s*['"]?(.+?)['"]?\\s*$`, "m"));
+    return m ? m[1] : undefined;
+  };
+
+  const block = (key: string): string | undefined => {
+    const m = fm.match(new RegExp(`^${key}:\\s*\\|\\s*\\n((?:[ \\t]+.+\\n?)+)`, "m"));
+    return m ? m[1].replace(/^[ \t]+/gm, "").trim() : undefined;
+  };
 
   return {
     body,
-    title: titleMatch ? titleMatch[1] : undefined,
+    title: scalar("title"),
+    subtitle: scalar("subtitle"),
+    author: scalar("author"),
+    date: scalar("date"),
+    abstract: block("abstract") || scalar("abstract"),
+    mainfont: scalar("mainfont"),
+    monofont: scalar("monofont"),
+    figPrefix: scalar("figPrefix"),
+    tblPrefix: scalar("tblPrefix"),
+    eqnPrefix: scalar("eqnPrefix"),
+    secPrefix: scalar("secPrefix"),
   };
 }
 
@@ -1016,4 +1091,139 @@ function getNonce(): string {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return result;
+}
+
+// ── Cross-references and citations ────────────────────────────────────
+
+function extractMermaidLabels(text: string): Map<string, string> {
+  const labels = new Map<string, string>();
+  const re = /^```\{mermaid([^}]*)\}/gm;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const attrs = m[1];
+    const labelMatch = attrs.match(/label="([^"]+)"/);
+    const captionMatch = attrs.match(/caption="([^"]+)"/);
+    if (labelMatch) {
+      labels.set(labelMatch[1], captionMatch?.[1] || "Diagram");
+    }
+  }
+  return labels;
+}
+
+function resolveReferences(
+  body: string,
+  mermaidLabels: Map<string, string>,
+  prefixes: { fig: string; tbl: string; eqn: string; sec: string },
+): string {
+  const labels = new Map<string, string>();
+  const secNums = [0, 0, 0, 0, 0, 0];
+  let figNum = 0;
+  let tblNum = 0;
+  let eqNum = 0;
+
+  // Headers: # Title {#sec:label} -> numbered anchor + clean heading
+  let result = body.replace(
+    /^(#{1,6})\s+(.*?)\s*\{#([\w:.-]+)\}\s*$/gm,
+    (_, hashes: string, title: string, label: string) => {
+      if (label.startsWith("sec:")) {
+        const level = hashes.length - 1;
+        secNums[level]++;
+        for (let i = level + 1; i < secNums.length; i++) secNums[i] = 0;
+        const num = secNums
+          .slice(0, level + 1)
+          .filter((n) => n > 0)
+          .join(".");
+        labels.set(label, `${prefixes.sec}\u00a0${num}`);
+      }
+      return `${hashes} <a id="${label}"></a>${title}`;
+    },
+  );
+
+  // Image figure labels: ![cap](src){#fig:label}
+  result = result.replace(
+    /!\[([^\]]*)\]\(([^)]+)\)\{#(fig:[\w:.-]+)\}/g,
+    (_, caption: string, src: string, label: string) => {
+      figNum++;
+      labels.set(label, `${prefixes.fig}\u00a0${figNum}`);
+      return `<a id="${label}"></a>\n\n![${prefixes.fig} ${figNum}: ${caption}](${src})`;
+    },
+  );
+
+  // Mermaid diagram labels (extracted from original text before normalization)
+  const mermaidList = [...mermaidLabels.entries()];
+  let mermaidIdx = 0;
+  result = result.replace(/^```mermaid\s*$/gm, (match) => {
+    if (mermaidIdx < mermaidList.length) {
+      const [id] = mermaidList[mermaidIdx++];
+      const label = `fig:${id}`;
+      if (!labels.has(label)) {
+        figNum++;
+        labels.set(label, `${prefixes.fig}\u00a0${figNum}`);
+      }
+      return `<a id="${label}"></a>\n\n${match}`;
+    }
+    return match;
+  });
+
+  // Table caption labels: : caption {#tbl:label}
+  result = result.replace(
+    /^:\s+(.*?)\s*\{#(tbl:[\w:.-]+)\}\s*$/gm,
+    (_, caption: string, label: string) => {
+      tblNum++;
+      labels.set(label, `${prefixes.tbl}\u00a0${tblNum}`);
+      return `: ${prefixes.tbl} ${tblNum}: ${caption}`;
+    },
+  );
+
+  // Equation labels: $$ ... $$ {#eq:label}
+  result = result.replace(
+    /(\$\$[\s\S]*?\$\$)\s*\{#(eq:[\w:.-]+)\}/g,
+    (_, equation: string, label: string) => {
+      eqNum++;
+      labels.set(label, `${prefixes.eqn}\u00a0(${eqNum})`);
+      return `<a id="${label}"></a>\n\n${equation}`;
+    },
+  );
+
+  // Replace @type:label references with clickable links
+  result = result.replace(
+    /@(fig|sec|tbl|eq):([\w:.-]+)/g,
+    (_, type: string, id: string) => {
+      const label = `${type}:${id}`;
+      const display = labels.get(label) || `${type}:${id}`;
+      return `<a href="#${label}" class="cross-ref">${display}</a>`;
+    },
+  );
+
+  return result;
+}
+
+function resolveCitations(body: string): string {
+  // Pandoc citation syntax: [@key], [@k1; @k2], [-@key], [@key, p. 23]
+  // Lookahead ensures at least one @ inside the brackets.
+  return body.replace(
+    /\[(?=[^\[\]]*@)((?:[^\[\]])*)\]/g,
+    (_, inner: string) => {
+      const parts = inner.split(";").map((s) => {
+        const m = s.trim().match(/-?@([\w:./-]+)/);
+        return m ? m[1] : s.trim();
+      });
+      return `<span class="citation">[${parts.join("; ")}]</span>`;
+    },
+  );
+}
+
+function buildFontOverrides(fm: FrontmatterResult): string {
+  const rules: string[] = [];
+  if (fm.mainfont) {
+    const safe = fm.mainfont.replace(/'/g, "\\'");
+    rules.push(`--body-font: '${safe}', Georgia, 'Palatino Linotype', serif`);
+    rules.push(`--heading-font: '${safe}', Georgia, 'Palatino Linotype', serif`);
+  }
+  if (fm.monofont) {
+    const safe = fm.monofont.replace(/'/g, "\\'");
+    rules.push(`--mono-font: '${safe}', 'SF Mono', Menlo, Consolas, monospace`);
+  }
+  if (!rules.length) return "";
+  return `<style>:root { ${rules.join("; ")}; }</style>`;
 }

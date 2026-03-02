@@ -2,10 +2,14 @@
     color-scheme: light dark;
     --text: #1d1d1f;
     --bg: #ffffff;
-    --code-bg: #f5f5f7;
+    --code-bg: #f8f8f8;
     --border: #d2d2d7;
-    --accent: #0071e3;
+    --accent: #4169E1;
+    --cite-color: #6B8E23;
     --blockquote: #6e6e73;
+    --rule-color: #333;
+    --rule-color-light: #999;
+    --quote-bg: rgba(65, 105, 225, 0.04);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -14,8 +18,12 @@
         --bg: #1c1c1e;
         --code-bg: #2c2c2e;
         --border: #48484a;
-        --accent: #2997ff;
+        --accent: #6d9cf7;
+        --cite-color: #a8c97a;
         --blockquote: #98989d;
+        --rule-color: #ccc;
+        --rule-color-light: #666;
+        --quote-bg: rgba(109, 156, 247, 0.06);
     }
 }
 
@@ -31,21 +39,23 @@ body {
     margin: 0 auto;
     padding: 32px 24px;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "liga", "kern";
 }
 
 h1, h2, h3, h4, h5, h6 {
     font-family: var(--heading-font);
     font-weight: 700;
     margin-top: 1.8em;
-    margin-bottom: 0.5em;
-    line-height: 1.3;
+    margin-bottom: 0.6em;
+    line-height: 1.25;
     scroll-margin-top: 16px;
 }
 
-h1 { font-size: 2em; border-bottom: var(--heading-border); padding-bottom: 0.3em; }
-h2 { font-size: 1.5em; border-bottom: var(--heading-border); padding-bottom: 0.2em; }
-h3 { font-size: 1.25em; }
-h4 { font-size: 1.1em; }
+h1 { font-size: 1.6em; }
+h2 { font-size: 1.3em; }
+h3 { font-size: 1.1em; }
+h4 { font-size: 1em; font-style: italic; font-weight: 600; }
 
 p { margin: var(--paragraph-spacing) 0; }
 
@@ -53,45 +63,77 @@ a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 code {
-    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-family: var(--mono-font);
     font-size: 0.88em;
     background: var(--code-bg);
-    padding: 2px 6px;
-    border-radius: 4px;
+    padding: 2px 5px;
+    border-radius: 2px;
 }
 
 pre {
     background: var(--code-bg);
-    padding: 16px 20px;
-    border-radius: 8px;
+    padding: 12px 16px;
+    border-radius: 2px;
     overflow-x: auto;
-    line-height: 1.5;
-    margin: 1.5em 0;
+    line-height: 1.45;
+    margin: 1.2em 0;
+    border: 1px solid var(--border);
 }
 
-pre code { background: none; padding: 0; font-size: 0.85em; }
+pre code { background: none; padding: 0; font-size: 0.85em; border-radius: 0; }
 
 blockquote {
-    border-left: 3px solid var(--border);
-    margin: 1em 0;
+    border-left: 3px solid var(--accent);
+    margin: 1.2em 0;
     margin-left: 0;
-    padding: 0.5em 0 0.5em 16px;
-    color: var(--blockquote);
+    padding: 0.6em 1em;
+    background: var(--quote-bg);
+    border-radius: 0 2px 2px 0;
+    color: var(--text);
+    font-size: 0.95em;
 }
 
-table { border-collapse: collapse; width: 100%; margin: 1.5em 0; }
-th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
-th { font-weight: 600; background: var(--code-bg); }
+/* Booktabs-style tables: horizontal rules only, no vertical borders */
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1.5em 0;
+    font-size: 0.95em;
+}
+thead {
+    border-top: 2px solid var(--rule-color);
+    border-bottom: 1px solid var(--rule-color);
+}
+thead th {
+    font-weight: 600;
+    padding: 8px 12px;
+    text-align: left;
+    border: none;
+    background: transparent;
+}
+tbody td {
+    padding: 6px 12px;
+    text-align: left;
+    border: none;
+    border-bottom: none;
+}
+tbody tr:last-child { border-bottom: 2px solid var(--rule-color); }
+/* Subtle alternating row shading */
+tbody tr:nth-child(even) { background: var(--code-bg); }
 
 img {
     max-width: 100%;
-    border-radius: 8px;
     margin: 1em 0;
     display: block;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
 }
 figure { margin: 1.5em 0; text-align: center; }
-figcaption { font-size: 0.9em; color: var(--blockquote); margin-top: 0.5em; font-style: italic; }
+figcaption {
+    font-size: 0.9em;
+    color: var(--blockquote);
+    margin-top: 0.5em;
+    font-style: italic;
+    text-align: center;
+}
 
 pre + p > img,
 pre + img {
@@ -113,6 +155,53 @@ del { text-decoration: line-through; opacity: 0.6; }
 strong { font-weight: 700; }
 em { font-style: italic; }
 
+/* Title block: mirrors the LaTeX \begin{titlepage} centered layout */
+.title-block {
+    text-align: center;
+    padding: 2em 0 1.5em;
+    margin-bottom: 1.5em;
+    border-bottom: 1px solid var(--border);
+}
+.title-block h1 {
+    font-size: 2em;
+    margin-top: 0;
+    margin-bottom: 0.3em;
+    line-height: 1.2;
+}
+.title-block .subtitle {
+    font-size: 1.25em;
+    font-weight: 400;
+    margin: 0.3em 0 1em;
+    color: var(--text);
+}
+.title-block .author {
+    font-size: 1.05em;
+    margin: 0.2em 0;
+}
+.title-block .date {
+    font-size: 1.05em;
+    margin: 0.2em 0;
+    color: var(--blockquote);
+}
+
+/* Abstract block: styled like LaTeX abstract environment */
+.abstract-block {
+    max-width: 85%;
+    margin: 0 auto 2em;
+    font-size: 0.95em;
+    line-height: 1.5;
+    text-align: justify;
+}
+.abstract-block .abstract-title {
+    text-align: center;
+    font-weight: 700;
+    font-size: 1em;
+    margin-bottom: 0.5em;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+/* Footnotes */
 .footnote-ref a {
     color: var(--accent);
     text-decoration: none;
@@ -130,7 +219,12 @@ em { font-style: italic; }
 .footnotes li { margin-bottom: 0.5em; }
 .footnotes a { text-decoration: none; margin-left: 0.25em; }
 
-.citation { color: var(--accent); text-decoration: none; font-weight: 500; }
+/* Cross-references (matches LaTeX hyperref internal links) */
+.cross-ref { color: var(--accent); text-decoration: none; }
+.cross-ref:hover { text-decoration: underline; }
+
+/* Citations (matches LaTeX hyperref citecolor) */
+.citation { color: var(--cite-color); text-decoration: none; }
 .citation-missing { color: #cc4444; font-style: italic; }
 
 .references {
@@ -145,12 +239,25 @@ em { font-style: italic; }
 .references li { margin-bottom: 0.75em; line-height: 1.5; }
 .references a { color: var(--accent); text-decoration: none; }
 
+/* Theorem-like environments (matches LaTeX amsthm styling) */
+.theorem-env {
+    margin: 1.2em 0;
+    padding: 0;
+}
+.theorem-env .theorem-head {
+    font-weight: 700;
+    margin-right: 0.5em;
+}
+.theorem-env.plain-style .theorem-body { font-style: italic; }
+.theorem-env.def-style .theorem-body { font-style: normal; }
+
 @media print {
     body {
         background: white;
         color: black;
         max-width: none;
         padding: 0;
+        font-family: Georgia, 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
     }
 
     @page {
