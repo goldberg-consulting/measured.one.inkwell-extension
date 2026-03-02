@@ -405,7 +405,7 @@ export class InkwellPreviewProvider {
       --mono-font: 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
       --base-size: 16px;
       --line-height: 1.5;
-      --content-width: 680px;
+      --content-width: 100%;
       --paragraph-spacing: 0.8em;
       --hr-display: block;
     }
