@@ -52,7 +52,9 @@ const PANDOC_LANG_MAP: Record<string, string> = {
 const INKWELL_VAR_RE = /^::inkwell\s+(\w+)=(.+)$/;
 
 function resolveDisplay(block: CodeBlock, defaultDisplay: DisplayMode): DisplayMode {
-  return block.display || defaultDisplay;
+  if (block.display) return block.display;
+  if (block.file) return "output";
+  return defaultDisplay;
 }
 
 // ── Layer 1: Variable store ───────────────────────────────────────────
@@ -655,7 +657,7 @@ export function prepareForPreview(
 
   const workDir = path.dirname(sourceFile);
   const runConfig = parseRunConfig(processed);
-  const defaultDisplay = runConfig.defaultDisplay || "both";
+  const defaultDisplay = runConfig.defaultDisplay || "output";
   const results = gatherCachedResults(processed, sourceFile);
   const vars = collectVariables(results);
 
