@@ -35,12 +35,16 @@ body {
     line-height: var(--line-height);
     color: var(--text);
     background: var(--bg);
-    max-width: var(--content-width);
-    margin: 0 auto;
-    padding: 32px 24px;
+    margin: 0;
+    padding: 0;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     font-feature-settings: "liga", "kern";
+}
+
+#preview-content {
+    max-width: var(--content-width);
+    margin: 0 auto;
 }
 
 h1, h2, h3, h4, h5, h6 {
