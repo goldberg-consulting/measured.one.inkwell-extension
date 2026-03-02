@@ -121,6 +121,35 @@ tbody tr:last-child { border-bottom: 2px solid var(--rule-color); }
 /* Subtle alternating row shading */
 tbody tr:nth-child(even) { background: var(--code-bg); }
 
+/* Table captions (below tables, matching LaTeX \caption style) */
+.table-caption {
+    font-size: 0.9em;
+    color: var(--blockquote);
+    margin-top: 0.4em;
+    margin-bottom: 1.5em;
+    text-align: left;
+}
+.table-caption strong { color: var(--text); }
+
+/* Unresolved variable placeholders */
+.var-placeholder {
+    font-family: var(--mono-font);
+    font-size: 0.85em;
+    color: var(--blockquote);
+    background: var(--code-bg);
+    padding: 1px 4px;
+    border-radius: 2px;
+    border: 1px dashed var(--border);
+}
+
+/* Inline expression evaluation errors */
+.eval-error {
+    font-family: var(--mono-font);
+    font-size: 0.85em;
+    color: #cc4444;
+    cursor: help;
+}
+
 img {
     max-width: 100%;
     margin: 1em 0;
