@@ -215,6 +215,8 @@ export class InkwellPreviewProvider {
         /(?<!\$)\{\{(\w+)\}\}(?!\$)/g,
         '<span class="var-placeholder">$1</span>',
       );
+      // Convert raw LaTeX table environments to HTML for preview
+      body = convertLatexTables(body);
 
       let rendered = md.render(body);
       rendered = this.convertLocalImages(rendered, document);
@@ -1221,6 +1223,68 @@ function resolveCitations(body: string): string {
       return `<span class="citation">[${parts.join("; ")}]</span>`;
     },
   );
+}
+
+function convertLatexTables(body: string): string {
+  return body.replace(
+    /\\begin\{table\*?\}[\s\S]*?\\end\{table\*?\}/g,
+    (env) => {
+      const captionMatch = env.match(/\\caption\{([^}]+)\}/);
+      const labelMatch = env.match(/\\label\{([^}]+)\}/);
+
+      const tabularMatch = env.match(
+        /\\begin\{tabular\}(?:\{[^}]*\})?\s*([\s\S]*?)\\end\{tabular\}/,
+      );
+      if (!tabularMatch) {
+        return '<div class="latex-env-placeholder"><em>LaTeX table (renders in PDF)</em></div>';
+      }
+
+      let content = tabularMatch[1];
+      content = content.replace(/\\(?:toprule|midrule|bottomrule|hline)\s*/g, "");
+      content = content.replace(/\\(?:centering|small|normalsize|footnotesize|scriptsize|tiny|large|Large)\s*/g, "");
+
+      const rows = content
+        .split(/\\\\\s*/)
+        .map((r) => r.trim())
+        .filter((r) => r);
+
+      const htmlRows = rows.map((row, i) => {
+        const cells = row.split("&").map((cell) => cleanLatexCell(cell.trim()));
+        const tag = i === 0 ? "th" : "td";
+        return "<tr>" + cells.map((c) => `<${tag}>${c}</${tag}>`).join("") + "</tr>";
+      });
+
+      let html = "<table>\n";
+      if (htmlRows.length > 0) {
+        html += `<thead>${htmlRows[0]}</thead>\n`;
+        html += `<tbody>${htmlRows.slice(1).join("\n")}</tbody>\n`;
+      }
+      html += "</table>";
+
+      if (captionMatch) {
+        const anchor = labelMatch ? `<a id="${labelMatch[1]}"></a>` : "";
+        html += `\n<figcaption class="table-caption">${anchor}<strong>${captionMatch[1]}</strong></figcaption>`;
+      }
+
+      return html;
+    },
+  );
+}
+
+function cleanLatexCell(cell: string): string {
+  let c = cell;
+  c = c.replace(/\\textbf\{([^}]+)\}/g, "<strong>$1</strong>");
+  c = c.replace(/\\textit\{([^}]+)\}/g, "<em>$1</em>");
+  c = c.replace(/\\emph\{([^}]+)\}/g, "<em>$1</em>");
+  c = c.replace(/\{\\o\}/g, "\u00f8");
+  c = c.replace(/\\o(?=\b)/g, "\u00f8");
+  c = c.replace(/\$([^$]+)\$/g, "$$$1$$");
+  c = c.replace(/\\&/g, "&amp;");
+  c = c.replace(/\\%/g, "%");
+  c = c.replace(/\\\$/g, "$");
+  c = c.replace(/\\[a-zA-Z]+\{([^}]*)\}/g, "$1");
+  c = c.replace(/[{}]/g, "");
+  return c;
 }
 
 function buildFontOverrides(fm: FrontmatterResult): string {
