@@ -451,7 +451,7 @@ classoption:
 bibliography: references/refs.bib
 ```
 
-Features: margin notes via `::: {.aside}` divs, margin figures via raw `\begin{marginfigure}`, full-width sections via `::: {.fullwidth}`, `\newthought` for paragraph openers, Palatino typography.
+Features: margin notes via `\marginnote{}` or `\sidenote{}`, margin figures via `\begin{marginfigure}`, full-width sections via `\begin{fullwidth}`, `\newthought` for paragraph openers, Palatino typography. Use raw LaTeX for these; fenced divs (`::: {.aside}`, `::: {.fullwidth}`) are unreliable.
 
 [Source](examples/demo-tufte.md) | [PDF](examples/demo-tufte.pdf)
 
