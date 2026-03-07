@@ -281,7 +281,11 @@ export async function showToolchainStatus(): Promise<void> {
     lines.push(`LaTeX packages: ${missingCount} missing (${status.missingPackages.slice(0, 5).join(", ")}${missingCount > 5 ? ", ..." : ""})`);
   }
 
-  const coreReady = status.pandoc.installed && status.xelatex.installed && status.crossref.installed;
+  const coreReady =
+    status.pandoc.installed &&
+    status.xelatex.installed &&
+    status.pdflatex.installed &&
+    status.crossref.installed;
   const allGood = coreReady && missingCount === 0;
 
   if (allGood) {
@@ -300,6 +304,9 @@ export async function showToolchainStatus(): Promise<void> {
     const missing: string[] = [];
     if (!status.pandoc.installed) missing.push("pandoc");
     if (!status.xelatex.installed) missing.push("xelatex (TeX distribution)");
+    if (!status.pdflatex.installed) {
+      missing.push("pdflatex (required by tufte, rho, tmsce, kth-letter, rmxaa)");
+    }
     if (!status.crossref.installed) missing.push("pandoc-crossref");
 
     const buttons: string[] = [];
@@ -414,7 +421,7 @@ async function installWithHomebrew(status: ToolchainStatus): Promise<void> {
   if (!status.crossref.installed) {
     commands.push("brew install pandoc-crossref");
   }
-  if (!status.xelatex.installed) {
+  if (!status.xelatex.installed || !status.pdflatex.installed) {
     commands.push("brew install --cask basictex");
     commands.push(
       'eval "$(/usr/libexec/path_helper)" && sudo tlmgr update --self && sudo tlmgr install collection-fontsrecommended xetex'
@@ -440,8 +447,8 @@ async function installWithPackageManager(status: ToolchainStatus): Promise<void>
     if (!status.crossref.installed) {
       commands.push("sudo apt-get install -y pandoc-crossref || echo 'pandoc-crossref not in apt; install from https://github.com/lierdakil/pandoc-crossref/releases'");
     }
-    if (!status.xelatex.installed) {
-      commands.push("sudo apt-get install -y texlive-xetex texlive-fonts-recommended texlive-fonts-extra");
+    if (!status.xelatex.installed || !status.pdflatex.installed) {
+      commands.push("sudo apt-get install -y texlive-xetex texlive-latex-base texlive-fonts-recommended texlive-fonts-extra");
     }
   } else if (hasDnf) {
     if (!status.pandoc.installed) {
@@ -450,8 +457,8 @@ async function installWithPackageManager(status: ToolchainStatus): Promise<void>
     if (!status.crossref.installed) {
       commands.push("sudo dnf install -y pandoc-crossref || echo 'pandoc-crossref not in dnf; install from https://github.com/lierdakil/pandoc-crossref/releases'");
     }
-    if (!status.xelatex.installed) {
-      commands.push("sudo dnf install -y texlive-xetex texlive-collection-fontsrecommended");
+    if (!status.xelatex.installed || !status.pdflatex.installed) {
+      commands.push("sudo dnf install -y texlive-xetex texlive texlive-collection-fontsrecommended");
     }
   } else {
     terminal.sendText('echo "Neither apt nor dnf found. See TinyTeX or manual install options."');
@@ -498,7 +505,7 @@ async function installTinyTeX(status: ToolchainStatus): Promise<void> {
     }
   }
 
-  if (!status.xelatex.installed) {
+  if (!status.xelatex.installed || !status.pdflatex.installed) {
     commands.push(
       'curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh'
     );
@@ -555,8 +562,8 @@ function showInstructions(status: ToolchainStatus): void {
     }
   }
 
-  if (!status.xelatex.installed) {
-    doc.push("## TeX Distribution (XeLaTeX)\n");
+  if (!status.xelatex.installed || !status.pdflatex.installed) {
+    doc.push("## TeX Distribution (XeLaTeX + pdfLaTeX)\n");
     if (isMac) {
       doc.push("**Option A: BasicTeX (recommended, ~300MB)**\n");
       doc.push("```bash");
