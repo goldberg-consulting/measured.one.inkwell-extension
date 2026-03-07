@@ -55,6 +55,7 @@ $endif$
 $if(keywords)$\keywords{$keywords$}$endif$
 
 % Pandoc longtable in twocolumn: redirect to table float + tabular.
+\usepackage{array}
 \usepackage{longtable}
 \makeatletter
 \newcommand{\rho@colspec}{}
