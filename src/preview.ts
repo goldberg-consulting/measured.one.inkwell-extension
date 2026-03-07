@@ -8,7 +8,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 import MarkdownIt from "markdown-it";
-import { compile, CompileResult, detectMode, isCompilable } from "./compiler";
+import { compile, detectMode, isCompilable } from "./compiler";
 import { InkwellDiagnostics } from "./diagnostics";
 import { parseCodeBlocks, BlockProgress } from "./runner";
 import { prepareForPreview } from "./inject";
@@ -398,7 +398,6 @@ export class InkwellPreviewProvider {
       );
 
     const cssUri = mediaUri("preview.css");
-    const jsUri = mediaUri("preview.js");
     const nonce = getNonce();
 
     const previewLabel = defaultToPdf ? "Source" : "Preview";
@@ -1262,7 +1261,7 @@ function resolveCitations(body: string): string {
   // Pandoc citation syntax: [@key], [@k1; @k2], [-@key], [@key, p. 23]
   // Lookahead ensures at least one @ inside the brackets.
   return body.replace(
-    /\[(?=[^\[\]]*@)((?:[^\[\]])*)\]/g,
+    /\[(?=[^[\]]*@)((?:[^[\]])*)\]/g,
     (_, inner: string) => {
       const parts = inner.split(";").map((s) => {
         const m = s.trim().match(/-?@([\w:./-]+)/);
