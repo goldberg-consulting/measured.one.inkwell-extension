@@ -149,7 +149,6 @@ async function findBinary(name: string): Promise<string | undefined> {
       return trimmed;
     }
   } catch {}
-  binaryCache.set(name, { result: undefined, ts: Date.now() });
   return undefined;
 }
 
@@ -159,7 +158,7 @@ export function compile(
   document: vscode.TextDocument,
   outputPath?: string
 ): Promise<CompileResult> {
-  const key = document.uri.fsPath;
+  const key = `${document.uri.fsPath}::${outputPath || ""}`;
   const existing = compileLocks.get(key);
   if (existing) return existing;
 

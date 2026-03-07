@@ -4,7 +4,7 @@
 
 import * as vscode from "vscode";
 import { InkwellPreviewProvider } from "./preview";
-import { compile, exportPDF, isCompilable, purgeAllCacheDirs } from "./compiler";
+import { compile, exportPDF, isCompilable } from "./compiler";
 import { InkwellDiagnostics } from "./diagnostics";
 import { selectTemplateCommand } from "./templates";
 import { findInkwellRoot, saveManifestField } from "./config";
@@ -158,7 +158,6 @@ export function deactivate() {
     clearInterval(autoCompileTimer);
     autoCompileTimer = undefined;
   }
-  purgeAllCacheDirs();
 }
 
 function setupAutoCompileTimer(): void {
