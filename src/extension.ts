@@ -17,7 +17,6 @@ import * as fs from "fs";
 
 let diagnostics: InkwellDiagnostics;
 let autoCompileTimer: ReturnType<typeof setInterval> | undefined;
-let isCompiling = false;
 let activeRunCancel: RunCancellation | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
@@ -149,7 +148,9 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   setupAutoCompileTimer();
-  activationCheck();
+  activationCheck().catch((err) =>
+    console.error("Inkwell activation check failed:", err)
+  );
 }
 
 export function deactivate() {
@@ -179,9 +180,6 @@ function setupAutoCompileTimer(): void {
 }
 
 async function runCompile(document: vscode.TextDocument): Promise<void> {
-  if (isCompiling) return;
-  isCompiling = true;
-
   try {
     const result = await compile(document);
     diagnostics.report(document.uri, result.errors);
@@ -196,8 +194,8 @@ async function runCompile(document: vscode.TextDocument): Promise<void> {
         5000
       );
     }
-  } finally {
-    isCompiling = false;
+  } catch (err) {
+    console.error("Inkwell compile error:", err);
   }
 }
 

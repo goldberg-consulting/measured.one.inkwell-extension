@@ -4,6 +4,12 @@
 # Install all at once:
 #   sed 's/#.*//' requirements-latex.txt | xargs tlmgr install && texhash
 
+# core (usually present but TinyTeX minimal installs may lack them)
+geometry
+hyperref
+babel
+iftex
+
 # layout and formatting
 fancyhdr
 titlesec
@@ -78,6 +84,7 @@ oberdiek
 psnfss
 
 # fonts
+fontspec
 mathpazo
 palatino
 bera
