@@ -8,6 +8,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
+import * as crypto from "crypto";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { findInkwellRoot, findBibFiles, findDefaultsYaml } from "./config";
@@ -85,11 +86,8 @@ export function isCompilable(document: vscode.TextDocument): boolean {
   return compilableExtensions.includes(ext) || document.languageId === "markdown" || document.languageId === "latex";
 }
 
-// Deterministic per-file cache directory in the OS temp folder.
-// The hex prefix of the absolute path avoids collisions across projects
-// while keeping directory names short enough for TeX path limits.
 function getCacheDir(sourceFile: string): string {
-  const hash = Buffer.from(sourceFile).toString("hex").slice(0, 16);
+  const hash = crypto.createHash("sha256").update(sourceFile).digest("hex").slice(0, 16);
   const dir = path.join(os.tmpdir(), "inkwell-vscode", hash);
   fs.mkdirSync(dir, { recursive: true });
   return dir;
@@ -101,6 +99,13 @@ const TEX_ARTIFACT_EXTS = new Set([
   ".nav", ".snm", ".fls", ".fdb_latexmk", ".synctex.gz",
 ]);
 
+export function purgeAllCacheDirs(): void {
+  const root = path.join(os.tmpdir(), "inkwell-vscode");
+  try {
+    fs.rmSync(root, { recursive: true, force: true });
+  } catch {}
+}
+
 function purgeCompileArtifacts(cacheDir: string, baseName: string): void {
   for (const ext of TEX_ARTIFACT_EXTS) {
     const file = path.join(cacheDir, `${baseName}${ext}`);
@@ -108,7 +113,13 @@ function purgeCompileArtifacts(cacheDir: string, baseName: string): void {
   }
 }
 
+const binaryCache = new Map<string, { result: string | undefined; ts: number }>();
+const BINARY_CACHE_TTL = 60_000;
+
 async function findBinary(name: string): Promise<string | undefined> {
+  const cached = binaryCache.get(name);
+  if (cached && Date.now() - cached.ts < BINARY_CACHE_TTL) return cached.result;
+
   const common = [`/usr/local/bin/${name}`, `/usr/bin/${name}`];
   const home = os.homedir();
   const platformPaths = process.platform === "darwin"
@@ -125,25 +136,42 @@ async function findBinary(name: string): Promise<string | undefined> {
       ];
 
   for (const p of platformPaths) {
-    if (fs.existsSync(p)) return p;
+    if (fs.existsSync(p)) {
+      binaryCache.set(name, { result: p, ts: Date.now() });
+      return p;
+    }
   }
   try {
     const { stdout } = await exec("which", [name]);
     const trimmed = stdout.trim();
-    if (trimmed) return trimmed;
+    if (trimmed) {
+      binaryCache.set(name, { result: trimmed, ts: Date.now() });
+      return trimmed;
+    }
   } catch {}
   return undefined;
 }
 
-export async function compile(
+const compileLocks = new Map<string, Promise<CompileResult>>();
+
+export function compile(
   document: vscode.TextDocument,
   outputPath?: string
 ): Promise<CompileResult> {
-  const mode = detectMode(document);
-  if (mode === "xelatex") {
-    return compileTeX(document, outputPath);
-  }
-  return compilePandoc(document, outputPath);
+  const key = `${document.uri.fsPath}::${outputPath || ""}`;
+  const existing = compileLocks.get(key);
+  if (existing) return existing;
+
+  const run = (async () => {
+    const mode = detectMode(document);
+    return mode === "xelatex"
+      ? compileTeX(document, outputPath)
+      : compilePandoc(document, outputPath);
+  })();
+
+  compileLocks.set(key, run);
+  run.finally(() => compileLocks.delete(key));
+  return run;
 }
 
 async function compileTeX(
@@ -225,14 +253,21 @@ async function compileTeX(
           timeout: 30_000,
           env: texEnv,
         });
-        try {
-          await exec(xelatex, args, {
-            cwd: sourceDir,
-            timeout: 120_000,
-            env: texEnv,
-          });
-        } catch {}
-      } catch {}
+      } catch (err: any) {
+        if (err.stderr) stderr += "\n" + err.stderr;
+      }
+      try {
+        const result = await exec(xelatex, args, {
+          cwd: sourceDir,
+          timeout: 120_000,
+          env: texEnv,
+        });
+        stdout = result.stdout;
+        stderr += "\n" + result.stderr;
+      } catch (err: any) {
+        if (err.stderr) stderr += "\n" + err.stderr;
+        if (err.stdout) stdout = err.stdout;
+      }
     }
   }
 
@@ -283,18 +318,24 @@ function copySiblingFiles(sourceDir: string, cacheDir: string): void {
 }
 
 function copyDirFiles(srcDir: string, dstDir: string): void {
+  let entries: string[];
   try {
-    for (const entry of fs.readdirSync(srcDir)) {
-      const ext = path.extname(entry).toLowerCase();
-      if (COPY_EXTS.has(ext)) {
+    entries = fs.readdirSync(srcDir);
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    const ext = path.extname(entry).toLowerCase();
+    if (COPY_EXTS.has(ext)) {
+      try {
         const src = path.join(srcDir, entry);
         const dst = path.join(dstDir, entry);
         if (!fs.existsSync(dst) || fs.statSync(src).mtimeMs > fs.statSync(dst).mtimeMs) {
           fs.copyFileSync(src, dst);
         }
-      }
+      } catch {}
     }
-  } catch {}
+  }
 }
 
 function checkTemplateFeatures(
@@ -368,6 +409,15 @@ async function compilePandoc(
 
   const preferredEngine: PdfEngine = template.manifest.engine || "xelatex";
   const engine = await findBinary(preferredEngine) || await findBinary("xelatex");
+  if (!engine) {
+    return {
+      success: false,
+      pdfPath: undefined,
+      errors: [{ line: undefined, message: `PDF engine not found (tried ${preferredEngine}, xelatex)`, severity: "error" }],
+      log: "",
+      duration: (Date.now() - start) / 1000,
+    };
+  }
 
   const rawText = document.getText();
   const featureCheck = checkTemplateFeatures(rawText, template, document.uri);
@@ -390,7 +440,7 @@ async function compilePandoc(
     tmpSource,
     "-o",
     tmpOutput,
-    `--pdf-engine=${engine || preferredEngine}`,
+    `--pdf-engine=${engine}`,
     "--standalone",
     `--template=${templateDst}`,
     `--from=${fromFormat}`,
@@ -451,7 +501,7 @@ async function compilePandoc(
     `[inkwell] resource-path: ${resourcePath}`,
     `[inkwell] cls in template dir: ${fs.existsSync(clsExpected)}`,
     `[inkwell] cls in cache dir: ${fs.existsSync(clsCached)}`,
-    `[inkwell] engine: ${engine || preferredEngine}`,
+    `[inkwell] engine: ${engine}`,
     `[inkwell] pandoc args: ${args.join(" ")}`,
     `[inkwell] cache bib exists: ${fs.existsSync(cacheBib)}`,
     `[inkwell] cache dir contents: ${(() => { try { return fs.readdirSync(cacheDir).join(", "); } catch { return "error"; } })()}`,

@@ -139,7 +139,7 @@ export function listTemplates(
   if (fs.existsSync(defaultTemplate)) {
     result.set("inkwell", {
       id: "inkwell",
-      manifest: { name: "Inkwell Default", description: "Built-in template with theorem environments, code highlighting, and title page" },
+      manifest: { name: "Inkwell Default", description: "Built-in template with theorem environments, code highlighting, and title page", engine: "xelatex" },
       dir: builtinDir,
       pandocTemplate: defaultTemplate,
       supportingFiles: [],
@@ -245,7 +245,13 @@ export function getTemplateForDocument(
   outputChannel.appendLine(
     `[template] ${path.basename(document.fileName)}: using built-in default`
   );
-  return resolveTemplate("inkwell", document.uri)!;
+  const fallback = resolveTemplate("inkwell", document.uri);
+  if (!fallback) {
+    throw new Error(
+      "Inkwell built-in template not found. The extension may be corrupted; try reinstalling."
+    );
+  }
+  return fallback;
 }
 
 function extractFrontmatterTemplate(text: string): string | undefined {
