@@ -699,6 +699,8 @@ All commands are available from the command palette (`Cmd+Shift+P` / `Ctrl+Shift
 
 **Tip:** If you are developing from source and rebuild the extension (`npm run compile`), reload the editor window with `Cmd+Shift+P` > **Developer: Reload Window** to pick up the changes. If you installed via `.vsix`, re-run `npm run package && npx @vscode/vsce package` and reinstall the `.vsix`.
 
+**Contributor workflow:** Run `npm run verify` before opening a PR. The same check runs in GitHub Actions and in the local pre-commit hook, so commits and merges are gated on a passing typecheck + lint run.
+
 ## Settings
 
 | Setting | Default | Description |

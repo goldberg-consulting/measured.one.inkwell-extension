@@ -4,14 +4,10 @@
 // Python, R, Node, and shell; other languages fall through with a clear
 // error rather than silent failure.
 
-import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 import { execFile, ChildProcess } from "child_process";
-import { promisify } from "util";
-import { getBlockHash, loadCache, saveCache, BlockCache } from "./cache";
-
-const exec = promisify(execFile);
+import { getBlockHash, loadCache, saveCache } from "./cache";
 
 export class RunCancellation {
   private _cancelled = false;
@@ -323,8 +319,8 @@ export async function runBlock(
   const cmd = interp.cmd;
   const args = [...interp.args, scriptPath];
 
-  let stdout = "";
-  let stderr = "";
+  let stdout: string;
+  let stderr: string;
   let exitCode = 0;
 
   try {
