@@ -174,7 +174,8 @@
     "watch": "tsc -watch -p ./",
     "package": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node18 --minify",
     "lint": "eslint src --ext ts",
-    "verify": "npm run typecheck && npm run lint"
+    "test:regressions": "node scripts/check-template-regressions.mjs",
+    "verify": "npm run typecheck && npm run lint && npm run test:regressions"
   },
   "dependencies": {
     "markdown-it": "^14.1.0"
