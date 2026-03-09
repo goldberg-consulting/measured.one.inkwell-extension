@@ -721,6 +721,26 @@ Inkwell includes a Cursor agent at `.cursor/agents/inkwell-guide.md`. When worki
 
 The agent references the full [Syntax Guide](guide.md) for field names, attribute tables, and conversion rules.
 
+## Releases
+
+### [v0.1.0](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.1.0) (March 9, 2026)
+
+First release.
+
+**Templates**: Default (single-column article), Tufte Handout, Rho (two-column academic), TMSCE, Ludus Academik, RMxAA (astronomy journal), KTH Letter.
+
+**Live preview**: HTML preview with KaTeX math, Mermaid diagrams, cross-references, citations, font matching, and LaTeX table rendering. PDF tab and build log tab.
+
+**Runnable code blocks**: Python, R, Shell, Node. Content-hash caching, inline data binding (`{{key}}` and `` `{python} expr` ``), Mermaid diagram compilation.
+
+**Compilation**: Pandoc + XeLaTeX/pdfLaTeX with per-template engine selection, pandoc-crossref support, bibliography processing, and toolchain detection with guided install.
+
+**Project scaffolding**: `Inkwell: New Project` and `Inkwell: Update Project` commands with starter files, bibliography, example scripts, and syntax guide.
+
+**Quality gates**: CI verify workflow (typecheck + lint + template regression tests), pre-commit hook.
+
+**Bug fixes**: Pandoc 3.x table compatibility (`\usepackage{array}`), Tufte feature detection with build log warnings, bibliography resolution in subdirectories, PDF cache collision and compile deadlock fixes, stale TeX artifact purging.
+
 ## License
 
 [Inkwell Source License v1.0](LICENSE). Use it freely, give credit, and if you build something better, contribute it back or share it under the same terms.
