@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.1 (2026-03-10)
+
+Release refresh with packaging and reliability fixes.
+
+- Fixed RMxAA compilation when `logo` is omitted by only defining `\logofile` when provided
+- Improved missing Python env guidance for code block runs; warning now points to `requirements.txt`-based recovery path
+- Switched to an explicit VSIX file whitelist in `package.json` for reproducible release contents
+- Kept scaffold assets in shipped package (`examples/*.md`, `guide.md`, `.cursor/agents/inkwell-guide.md`)
+
 ## 0.1.0 (2026-02-22)
 
 Initial release.
