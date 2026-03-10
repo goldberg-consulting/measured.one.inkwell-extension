@@ -19,7 +19,7 @@
 \AtEndPreamble{\def\NAT@force@numbers{}}
 \makeatother
 \RMxAAtemplatetype{\RMxAA}
-$if(logo)$\def\logofile{$logo$}$else$\def\logofile{}$endif$
+$if(logo)$\def\logofile{$logo$}$endif$
 
 % Provide defaults for fields the cls uses unconditionally in \maketitle.
 \vol{$if(vol)$$vol$$else$0$endif$}
