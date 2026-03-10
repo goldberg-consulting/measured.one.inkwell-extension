@@ -2,7 +2,7 @@
   "name": "inkwell",
   "displayName": "Inkwell",
   "description": "Markdown to publication-quality PDF. Live preview, Pandoc + XeLaTeX compilation, runnable code blocks, and LaTeX template management.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "measure-one",
   "icon": "media/icon.png",
   "license": "SEE LICENSE IN LICENSE",
@@ -32,6 +32,17 @@
     "onLanguage:markdown",
     "onLanguage:latex",
     "workspaceContains:.inkwell"
+  ],
+  "files": [
+    "LICENSE",
+    "CHANGELOG.md",
+    "out/**",
+    "templates/**",
+    "media/**",
+    "examples/*.md",
+    "guide.md",
+    "requirements-latex.txt",
+    ".cursor/agents/inkwell-guide.md"
   ],
   "main": "./out/extension.js",
   "contributes": {
