@@ -256,10 +256,18 @@ function resolveInterpreter(
     return { cmd: resolved, args: defaultArgs, envVars: {}, label: resolved };
   }
 
+  let warning = `Environment "${envSpec}" not found at ${resolved}. Using system ${defaultCmd}. Run "Inkwell: Setup Python Env" to create it.`;
+  if (langKey.startsWith("python")) {
+    const reqFile = path.join(workDir, "requirements.txt");
+    if (fs.existsSync(reqFile)) {
+      warning += ` Found requirements.txt at ${reqFile}; run setup from this document folder and choose "${envSpec}" to auto-install dependencies.`;
+    }
+  }
+
   return {
     cmd: defaultCmd, args: defaultArgs, envVars: {},
     label: defaultCmd,
-    warning: `Environment "${envSpec}" not found at ${resolved}. Using system ${defaultCmd}. Run "Inkwell: Setup Python Env" to create it.`,
+    warning,
   };
 }
 
