@@ -11,7 +11,7 @@ import { findInkwellRoot, saveManifestField } from "./config";
 import { checkToolchain, showToolchainStatus, setExtensionPath } from "./toolchain";
 import { runAllBlocks, parseCodeBlocks, RunCancellation } from "./runner";
 import { clearCache } from "./cache";
-import { initProject, updateProject } from "./scaffold";
+import { bootstrapWorkspaceInkwell, initProject, updateProject } from "./scaffold";
 import * as path from "path";
 import * as fs from "fs";
 
@@ -124,6 +124,10 @@ export function activate(context: vscode.ExtensionContext) {
       initProject();
     }),
 
+    vscode.commands.registerCommand("inkwell.bootstrapWorkspaceInkwell", () => {
+      bootstrapWorkspaceInkwell();
+    }),
+
     vscode.commands.registerCommand("inkwell.updateProject", () => {
       updateProject();
     }),
@@ -145,6 +149,19 @@ export function activate(context: vscode.ExtensionContext) {
     }),
 
     diagnostics
+  );
+
+  refreshProjectContextKey();
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor(() => {
+      refreshProjectContextKey();
+    }),
+    vscode.workspace.onDidOpenTextDocument(() => {
+      refreshProjectContextKey();
+    }),
+    vscode.workspace.onDidCloseTextDocument(() => {
+      refreshProjectContextKey();
+    }),
   );
 
   setupAutoCompileTimer();
@@ -337,4 +354,18 @@ async function activationCheck() {
   if (choice === "Setup now") {
     showToolchainStatus();
   }
+}
+
+function refreshProjectContextKey(): void {
+  const editor = vscode.window.activeTextEditor;
+  let hasInkwellProject = false;
+
+  if (editor) {
+    hasInkwellProject = Boolean(findInkwellRoot(editor.document.uri));
+  } else if (vscode.workspace.workspaceFolders?.length) {
+    const base = vscode.workspace.workspaceFolders[0].uri.fsPath;
+    hasInkwellProject = fs.existsSync(path.join(base, ".inkwell"));
+  }
+
+  void vscode.commands.executeCommand("setContext", "inkwell.hasProject", hasInkwellProject);
 }

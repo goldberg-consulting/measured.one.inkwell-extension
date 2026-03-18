@@ -157,22 +157,70 @@ const MANIFEST_TEMPLATE = (template?: string) =>
     2
   ) + "\n";
 
-export async function initProject(): Promise<void> {
+async function pickWorkspaceRoot(
+  openLabel: string
+): Promise<string | undefined> {
   const workspaceFolders = vscode.workspace.workspaceFolders;
-  let baseDir: string;
-
-  if (workspaceFolders?.length) {
-    baseDir = workspaceFolders[0].uri.fsPath;
-  } else {
-    const picked = await vscode.window.showOpenDialog({
-      canSelectFolders: true,
-      canSelectFiles: false,
-      canSelectMany: false,
-      openLabel: "Select project folder",
-    });
-    if (!picked?.[0]) return;
-    baseDir = picked[0].fsPath;
+  if (workspaceFolders?.length === 1) {
+    return workspaceFolders[0].uri.fsPath;
   }
+  if (workspaceFolders && workspaceFolders.length > 1) {
+    const items = workspaceFolders.map((wf) => ({
+      label: wf.name,
+      detail: wf.uri.fsPath,
+      path: wf.uri.fsPath,
+    }));
+    const picked = await vscode.window.showQuickPick(items, {
+      placeHolder: "Choose a workspace folder for Inkwell setup",
+    });
+    return picked?.path;
+  }
+
+  const picked = await vscode.window.showOpenDialog({
+    canSelectFolders: true,
+    canSelectFiles: false,
+    canSelectMany: false,
+    openLabel,
+  });
+  return picked?.[0]?.fsPath;
+}
+
+function copyMissingDirectory(src: string, dest: string): void {
+  if (!fs.existsSync(src)) return;
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.cpSync(src, dest, {
+    recursive: true,
+    force: false,
+    errorOnExist: false,
+  });
+}
+
+function seedProjectTemplates(projectRoot: string): string[] {
+  const bundledTemplatesDir = path.join(__dirname, "..", "templates");
+  const projectTemplatesDir = path.join(projectRoot, ".inkwell", "templates");
+  const copied: string[] = [];
+
+  if (!fs.existsSync(bundledTemplatesDir)) return copied;
+  fs.mkdirSync(projectTemplatesDir, { recursive: true });
+
+  for (const entry of fs.readdirSync(bundledTemplatesDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    if (entry.name.startsWith(".")) continue;
+
+    const src = path.join(bundledTemplatesDir, entry.name);
+    const dest = path.join(projectTemplatesDir, entry.name);
+    if (!fs.existsSync(dest)) {
+      copyMissingDirectory(src, dest);
+      copied.push(entry.name);
+    }
+  }
+
+  return copied;
+}
+
+export async function initProject(): Promise<void> {
+  const baseDir = await pickWorkspaceRoot("Select project folder");
+  if (!baseDir) return;
 
   const name = await vscode.window.showInputBox({
     prompt: "Project name (used for the main document filename)",
@@ -215,6 +263,67 @@ export async function initProject(): Promise<void> {
   await vscode.window.showTextDocument(doc);
 
   vscode.window.showInformationMessage(`Inkwell project "${options.name}" initialized.`);
+}
+
+export async function bootstrapWorkspaceInkwell(): Promise<void> {
+  const baseDir = await pickWorkspaceRoot("Select workspace root");
+  if (!baseDir) return;
+
+  const report: string[] = [];
+  const inkwellDir = path.join(baseDir, ".inkwell");
+  const outputsDir = path.join(inkwellDir, "outputs");
+  const templatesDir = path.join(inkwellDir, "templates");
+  const manifestPath = path.join(inkwellDir, "manifest.json");
+
+  if (!fs.existsSync(inkwellDir)) {
+    fs.mkdirSync(inkwellDir, { recursive: true });
+    report.push("created .inkwell/");
+  }
+  if (!fs.existsSync(outputsDir)) {
+    fs.mkdirSync(outputsDir, { recursive: true });
+    report.push("created .inkwell/outputs/");
+  }
+  if (!fs.existsSync(templatesDir)) {
+    fs.mkdirSync(templatesDir, { recursive: true });
+    report.push("created .inkwell/templates/");
+  }
+  if (!fs.existsSync(manifestPath)) {
+    fs.writeFileSync(manifestPath, MANIFEST_TEMPLATE("inkwell"), "utf-8");
+    report.push("created .inkwell/manifest.json");
+  }
+
+  const copyTemplates = await vscode.window.showQuickPick(
+    [
+      { label: "Yes", detail: "Copy built-in template folders into .inkwell/templates" },
+      { label: "No", detail: "Keep templates built-in (extension/global only)" },
+    ],
+    {
+      placeHolder: "Seed this workspace with bundled Inkwell templates?",
+    }
+  );
+
+  if (copyTemplates?.label === "Yes") {
+    const copiedTemplates = seedProjectTemplates(baseDir);
+    if (copiedTemplates.length) {
+      report.push(`copied templates: ${copiedTemplates.join(", ")}`);
+    } else {
+      report.push("template folders already present");
+    }
+  }
+
+  const gi = updateGitignore(baseDir);
+  if (gi.length) report.push(`updated .gitignore (${gi.length} entries)`);
+  if (copyGuide(baseDir)) report.push("updated .inkwell/guide.md");
+
+  if (report.length) {
+    vscode.window.showInformationMessage(
+      `Workspace bootstrap complete: ${report.join("; ")}.`
+    );
+  } else {
+    vscode.window.showInformationMessage(
+      "Workspace already contains a usable .inkwell setup."
+    );
+  }
 }
 
 function createStructure(opts: ScaffoldOptions): void {
@@ -447,7 +556,7 @@ export async function updateProject(): Promise<void> {
   const projectRoot = findInkwellRoot(editor.document.uri);
   if (!projectRoot) {
     vscode.window.showWarningMessage(
-      "No Inkwell project found. Run \"Inkwell: New Project\" first."
+      "No Inkwell project found. Run \"Inkwell: Bootstrap Workspace (.inkwell Folder)\" or \"Inkwell: New Project\" first."
     );
     return;
   }
