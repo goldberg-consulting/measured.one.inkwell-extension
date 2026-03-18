@@ -40,6 +40,10 @@ function loadRequiredPackages(): string[] {
   return FALLBACK_PACKAGES;
 }
 
+function uniquePackages(pkgs: string[]): string[] {
+  return Array.from(new Set(pkgs.map((p) => p.trim()).filter(Boolean)));
+}
+
 const FALLBACK_PACKAGES = [
   "fancyhdr", "titlesec", "setspace", "etoolbox", "enumitem", "float",
   "xcolor", "xurl", "parskip", "framed", "fancyvrb", "fvextra",
@@ -54,6 +58,7 @@ const FALLBACK_PACKAGES = [
   "chemfig", "circuitikz",
   "supertabular", "matlab-prettifier", "lipsum", "hardwrap",
   "units", "silence",
+  "pbalance", "extsizes",
   "amsfonts", "amscls", "tools", "preprint", "sttools",
   "graphics", "oberdiek", "psnfss",
   "mathpazo", "palatino", "bera", "soul", "stix2-type1", "tex-gyre",
@@ -151,6 +156,34 @@ async function findKpsewhich(): Promise<string | undefined> {
     if (p) return p;
   } catch {}
   return undefined;
+}
+
+async function findBinary(name: string): Promise<string | undefined> {
+  for (const dir of searchPaths()) {
+    const candidate = `${dir}/${name}`;
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  try {
+    const { stdout } = await exec("which", [name]);
+    const p = stdout.trim();
+    if (p) return p;
+  } catch {}
+  return undefined;
+}
+
+async function findTexhash(): Promise<string | undefined> {
+  return (await findBinary("texhash")) || (await findBinary("mktexlsr"));
+}
+
+function buildTlmgrInstallCommand(
+  packages: string[],
+  opts?: { useSudo?: boolean; tlmgr?: string; texhash?: string }
+): string {
+  const pkgList = uniquePackages(packages).join(" ");
+  const sudo = opts?.useSudo ? "sudo " : "";
+  const tlmgr = opts?.tlmgr || "tlmgr";
+  const texhash = opts?.texhash || "texhash";
+  return `${sudo}${tlmgr} install ${pkgList} && (${sudo}${texhash} || ${sudo}mktexlsr)`;
 }
 
 async function checkLatexPackages(kpsewhich: string | undefined): Promise<string[]> {
@@ -353,7 +386,18 @@ export async function showToolchainStatus(): Promise<void> {
 async function installMissingPackages(packages: string[]): Promise<void> {
   const terminal = vscode.window.createTerminal("Inkwell Setup");
   terminal.show();
-  const cmd = `tlmgr install ${packages.join(" ")} && texhash`;
+  const tlmgr = await findBinary("tlmgr");
+  const texhash = await findTexhash();
+
+  if (!tlmgr) {
+    terminal.sendText('echo "tlmgr not found on PATH. Install a TeX distribution first, then rerun Inkwell toolchain setup."');
+    return;
+  }
+
+  const cmd = buildTlmgrInstallCommand(packages, {
+    tlmgr,
+    texhash,
+  });
   terminal.sendText(cmd);
 }
 
@@ -415,6 +459,7 @@ async function installWithHomebrew(status: ToolchainStatus): Promise<void> {
   }
 
   const commands: string[] = [];
+  const requiredPackages = uniquePackages(loadRequiredPackages());
   if (!status.pandoc.installed) {
     commands.push("brew install pandoc");
   }
@@ -423,10 +468,12 @@ async function installWithHomebrew(status: ToolchainStatus): Promise<void> {
   }
   if (!status.xelatex.installed || !status.pdflatex.installed) {
     commands.push("brew install --cask basictex");
-    commands.push(
-      'eval "$(/usr/libexec/path_helper)" && sudo tlmgr update --self && sudo tlmgr install collection-fontsrecommended xetex'
-    );
   }
+  commands.push(
+    'eval "$(/usr/libexec/path_helper)" && if command -v tlmgr >/dev/null 2>&1; then sudo tlmgr update --self && ' +
+      buildTlmgrInstallCommand(requiredPackages, { useSudo: true }) +
+      '; else echo "tlmgr not found after install; restart terminal and run Inkwell setup again."; fi'
+  );
 
   terminal.sendText(commands.join(" && "));
 }
@@ -473,6 +520,7 @@ async function installTinyTeX(status: ToolchainStatus): Promise<void> {
   terminal.show();
 
   const commands: string[] = [];
+  const requiredPackages = uniquePackages(loadRequiredPackages());
 
   if (!status.pandoc.installed) {
     if (isMac) {
@@ -509,16 +557,19 @@ async function installTinyTeX(status: ToolchainStatus): Promise<void> {
     commands.push(
       'curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh'
     );
-    const home = os.homedir();
-    if (isMac) {
-      commands.push(
-        `${home}/Library/TinyTeX/bin/universal-darwin/tlmgr install collection-fontsrecommended xetex fontspec`
-      );
-    } else {
-      commands.push(
-        "tlmgr install collection-fontsrecommended xetex fontspec"
-      );
-    }
+  }
+
+  const home = os.homedir();
+  if (isMac) {
+    const tinyTlmgr = `${home}/Library/TinyTeX/bin/universal-darwin/tlmgr`;
+    const tinyTexhash = `${home}/Library/TinyTeX/bin/universal-darwin/texhash`;
+    commands.push(
+      `if [ -x "${tinyTlmgr}" ]; then ${tinyTlmgr} update --self && ${buildTlmgrInstallCommand(requiredPackages, { tlmgr: tinyTlmgr, texhash: tinyTexhash })}; else echo "TinyTeX tlmgr not found at ${tinyTlmgr}"; fi`
+    );
+  } else {
+    commands.push(
+      `if command -v tlmgr >/dev/null 2>&1; then ${buildTlmgrInstallCommand(requiredPackages)}; else echo "tlmgr not found after TinyTeX install; restart terminal and rerun setup."; fi`
+    );
   }
 
   terminal.sendText(commands.join(" && "));

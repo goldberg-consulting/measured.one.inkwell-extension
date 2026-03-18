@@ -64,6 +64,8 @@ lipsum
 hardwrap
 units
 silence
+pbalance
+extsizes
 
 # bundles (provide multiple .sty files each)
 # amsfonts -> amssymb.sty, amsfonts.sty
