@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.4 (2026-03-18)
+
+Installer guidance and docs now consistently point to full LaTeX dependency provisioning.
+
+- Updated toolchain setup instructions to include full `requirements-latex.txt` install commands
+- Extended Linux apt/dnf setup flow to attempt full `tlmgr` requirements install when available
+- Updated README install steps to recommend `Inkwell: Check / Install Toolchain` and include full package install snippets
+- Added `fixtounicode` to required LaTeX packages and corrected `extsizes` detection to check `extarticle.cls`
+
 ## 0.1.3 (2026-03-18)
 
 Toolchain setup now installs full LaTeX template dependencies more reliably.
