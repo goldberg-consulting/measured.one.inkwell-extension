@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.2 (2026-03-18)
+
+Workspace bootstrap improvements for non-Inkwell repositories.
+
+- Added `Inkwell: Bootstrap Workspace (.inkwell Folder)` to initialize a top-level `.inkwell` in existing repos
+- Added conditional command visibility (command palette + editor title) when no Inkwell project root is detected
+- Added optional seeding of bundled templates into `.inkwell/templates` during workspace bootstrap
+- Updated non-project guidance in `Inkwell: Update Project` to point users to bootstrap flow
+
 ## 0.1.1 (2026-03-10)
 
 Release refresh with packaging and reliability fixes.
