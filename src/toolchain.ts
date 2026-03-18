@@ -486,6 +486,7 @@ async function installWithPackageManager(status: ToolchainStatus): Promise<void>
   const hasDnf = fs.existsSync("/usr/bin/dnf");
 
   const commands: string[] = [];
+  const requiredPackages = uniquePackages(loadRequiredPackages());
 
   if (hasApt) {
     if (!status.pandoc.installed) {
@@ -511,6 +512,12 @@ async function installWithPackageManager(status: ToolchainStatus): Promise<void>
     terminal.sendText('echo "Neither apt nor dnf found. See TinyTeX or manual install options."');
     return;
   }
+
+  commands.push(
+    'if command -v tlmgr >/dev/null 2>&1; then sudo tlmgr update --self && ' +
+      buildTlmgrInstallCommand(requiredPackages, { useSudo: true }) +
+      '; else echo "tlmgr not found; distro TeX packages may be incomplete. Consider Inkwell: Install TinyTeX or install TeX Live full."; fi'
+  );
 
   terminal.sendText(commands.join(" && "));
 }
@@ -577,6 +584,7 @@ async function installTinyTeX(status: ToolchainStatus): Promise<void> {
 
 function showInstructions(status: ToolchainStatus): void {
   const doc: string[] = ["# Inkwell: Toolchain Setup\n"];
+  const reqFile = path.join(_extensionPath, "requirements-latex.txt");
 
   if (!status.pandoc.installed) {
     doc.push("## Pandoc\n");
@@ -635,7 +643,10 @@ function showInstructions(status: ToolchainStatus): void {
     doc.push("**Option B: TinyTeX (~100MB)**\n");
     doc.push("```bash");
     doc.push('curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh');
-    doc.push("tlmgr install collection-fontsrecommended xetex fontspec");
+    doc.push("tlmgr update --self");
+    doc.push('REQ="/path/to/requirements-latex.txt"');
+    doc.push('sed \'s/#.*//\' "$REQ" | awk \'NF\' | xargs tlmgr install');
+    doc.push("texhash || mktexlsr");
     doc.push("```\n");
     if (isMac) {
       doc.push("**Option C: Full MacTeX (~5GB)**\n");
@@ -656,6 +667,13 @@ function showInstructions(status: ToolchainStatus): void {
     doc.push(`tlmgr install ${status.missingPackages.join(" ")} && texhash`);
     doc.push("```\n");
   }
+
+  doc.push("## Install full Inkwell LaTeX requirements\n");
+  doc.push("```bash");
+  doc.push(`REQ="${reqFile}"`);
+  doc.push('sed \'s/#.*//\' "$REQ" | awk \'NF\' | xargs tlmgr install');
+  doc.push("texhash || mktexlsr");
+  doc.push("```\n");
 
   if (!status.mmdc.installed) {
     doc.push("## Mermaid CLI (optional, for diagrams in PDF)\n");
