@@ -19,6 +19,10 @@ Inkwell lets you stay in markdown, stay in your editor, and still get publicatio
 
 ### 1. Install dependencies
 
+**Recommended (all platforms):**
+
+Run `Cmd+Shift+P` → **Inkwell: Check / Install Toolchain**. The guided installer now installs core tools plus the full LaTeX package set from `requirements-latex.txt` for Homebrew/TinyTeX flows.
+
 **macOS (Homebrew):**
 
 ```bash
@@ -42,7 +46,9 @@ npm install -g @mermaid-js/mermaid-cli
 Then install the LaTeX packages Inkwell's templates need (listed in [`requirements-latex.txt`](requirements-latex.txt)):
 
 ```bash
-sed 's/#.*//' requirements-latex.txt | xargs tlmgr install && texhash
+tlmgr update --self
+sed 's/#.*//' requirements-latex.txt | awk 'NF' | xargs tlmgr install
+texhash || mktexlsr
 ```
 
 **Linux:**
@@ -54,6 +60,14 @@ npm install -g @mermaid-js/mermaid-cli
 ```
 
 `pandoc-crossref` is required for `@fig:`, `@eq:`, and `@tbl:` cross-references. On Linux, install from [GitHub releases](https://github.com/lierdakil/pandoc-crossref/releases) or your package manager if available (`sudo apt install pandoc-crossref`).
+
+If `tlmgr` is available on your Linux TeX install, run the same full requirements pass:
+
+```bash
+sudo tlmgr update --self
+sed 's/#.*//' requirements-latex.txt | awk 'NF' | xargs sudo tlmgr install
+sudo texhash || sudo mktexlsr
+```
 
 **Python** (optional, for runnable `{python}` code blocks): set up per-project with `Cmd+Shift+P` > **Inkwell: Setup Python Environment**, or manually:
 
