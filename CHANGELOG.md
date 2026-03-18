@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.3 (2026-03-18)
+
+Toolchain setup now installs full LaTeX template dependencies more reliably.
+
+- Updated setup installers to install the complete `requirements-latex.txt` package set for Homebrew + TinyTeX flows
+- Added more robust `tlmgr` and `texhash`/`mktexlsr` command resolution in package install path
+- Added `pbalance` and `extsizes` to tracked LaTeX requirements to cover known template dependencies
+
 ## 0.1.2 (2026-03-18)
 
 Workspace bootstrap improvements for non-Inkwell repositories.
