@@ -99,6 +99,11 @@
         "category": "Inkwell"
       },
       {
+        "command": "inkwell.bootstrapWorkspaceInkwell",
+        "title": "Inkwell: Bootstrap Workspace (.inkwell Folder)",
+        "category": "Inkwell"
+      },
+      {
         "command": "inkwell.updateProject",
         "title": "Inkwell: Update Project",
         "category": "Inkwell"
@@ -168,11 +173,22 @@
       }
     },
     "menus": {
+      "commandPalette": [
+        {
+          "command": "inkwell.bootstrapWorkspaceInkwell",
+          "when": "!inkwell.hasProject"
+        }
+      ],
       "editor/title": [
         {
           "command": "inkwell.preview",
           "when": "editorLangId == markdown || editorLangId == latex",
           "group": "navigation"
+        },
+        {
+          "command": "inkwell.bootstrapWorkspaceInkwell",
+          "when": "(editorLangId == markdown || editorLangId == latex) && !inkwell.hasProject",
+          "group": "navigation@1"
         }
       ]
     }
