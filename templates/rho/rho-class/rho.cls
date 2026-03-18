@@ -245,7 +245,7 @@
             {\ifx\@accepted\undefined\else\textcolor{rhocolor}{\bfseries\ignorespaces\acceptedlanguage}\@accepted\hspace{10pt}\fi}
             {\ifx\@published\undefined\else\textcolor{rhocolor}{\bfseries\ignorespaces\publishedlanguage}\@published\fi\par}
                 \vskip3pt
-            {\@license\par}
+            {\ifx\@license\undefined\else\@license\fi\par}
          \vskip1pt
         \rule{\textwidth}{0.3pt}
 }

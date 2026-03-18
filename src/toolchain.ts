@@ -58,7 +58,7 @@ const FALLBACK_PACKAGES = [
   "chemfig", "circuitikz",
   "supertabular", "matlab-prettifier", "lipsum", "hardwrap",
   "units", "silence",
-  "pbalance", "extsizes",
+  "pbalance", "extsizes", "fixtounicode",
   "amsfonts", "amscls", "tools", "preprint", "sttools",
   "graphics", "oberdiek", "psnfss",
   "mathpazo", "palatino", "bera", "soul", "stix2-type1", "tex-gyre",
@@ -212,6 +212,7 @@ async function checkLatexPackages(kpsewhich: string | undefined): Promise<string
     "graphics": "rotating.sty",
     "oberdiek": "iflang.sty",
     "psnfss": "helvet.sty",
+    "extsizes": "extarticle.cls",
   };
 
   const missing: string[] = [];
@@ -344,7 +345,7 @@ export async function showToolchainStatus(): Promise<void> {
 
     const buttons: string[] = [];
     if (isMac) {
-      buttons.push("Install with Homebrew");
+      buttons.push("Install Full MacTeX (recommended)", "Install with Homebrew");
     } else if (isLinux) {
       buttons.push("Install with apt/dnf");
     }
@@ -355,7 +356,9 @@ export async function showToolchainStatus(): Promise<void> {
       ...buttons
     );
 
-    if (choice === "Install with Homebrew") {
+    if (choice === "Install Full MacTeX (recommended)") {
+      await installFullMacTeX(status);
+    } else if (choice === "Install with Homebrew") {
       await installWithHomebrew(status);
     } else if (choice === "Install with apt/dnf") {
       await installWithPackageManager(status);
@@ -369,13 +372,17 @@ export async function showToolchainStatus(): Promise<void> {
 
   // Core tools present but packages missing
   if (missingCount > 0) {
+    const message = isMac
+      ? `${missingCount} LaTeX package${missingCount > 1 ? "s" : ""} missing: ${status.missingPackages.join(", ")}. Seeing errors like "File 'fixtounicode.sty' not found"? Install Full MacTeX for the most reliable setup.`
+      : `${missingCount} LaTeX package${missingCount > 1 ? "s" : ""} missing: ${status.missingPackages.join(", ")}`;
     const choice = await vscode.window.showWarningMessage(
-      `${missingCount} LaTeX package${missingCount > 1 ? "s" : ""} missing: ${status.missingPackages.join(", ")}`,
-      "Install now",
-      "Show details"
+      message,
+      ...(isMac ? ["Install Full MacTeX (recommended)", "Install now", "Show details"] : ["Install now", "Show details"])
     );
 
-    if (choice === "Install now") {
+    if (choice === "Install Full MacTeX (recommended)") {
+      await installFullMacTeX(status);
+    } else if (choice === "Install now") {
       await installMissingPackages(status.missingPackages);
     } else if (choice === "Show details") {
       showPackageDetails(status);
@@ -475,6 +482,33 @@ async function installWithHomebrew(status: ToolchainStatus): Promise<void> {
       '; else echo "tlmgr not found after install; restart terminal and run Inkwell setup again."; fi'
   );
 
+  terminal.sendText(commands.join(" && "));
+}
+
+async function installFullMacTeX(status: ToolchainStatus): Promise<void> {
+  const terminal = vscode.window.createTerminal("Inkwell Setup");
+  terminal.show();
+
+  const hasBrew = fs.existsSync("/opt/homebrew/bin/brew") ||
+    fs.existsSync("/usr/local/bin/brew");
+  if (!hasBrew) {
+    terminal.sendText('echo "Homebrew not found. Install from https://brew.sh first."');
+    return;
+  }
+
+  const commands: string[] = [];
+  const requiredPackages = uniquePackages(loadRequiredPackages());
+  if (!status.pandoc.installed) {
+    commands.push("brew install pandoc");
+  }
+  if (!status.crossref.installed) {
+    commands.push("brew install pandoc-crossref");
+  }
+  commands.push("brew install --cask mactex");
+  commands.push(
+    'eval "$(/usr/libexec/path_helper)" && sudo tlmgr update --self && ' +
+      buildTlmgrInstallCommand(requiredPackages, { useSudo: true })
+  );
   terminal.sendText(commands.join(" && "));
 }
 
@@ -585,6 +619,19 @@ async function installTinyTeX(status: ToolchainStatus): Promise<void> {
 function showInstructions(status: ToolchainStatus): void {
   const doc: string[] = ["# Inkwell: Toolchain Setup\n"];
   const reqFile = path.join(_extensionPath, "requirements-latex.txt");
+
+  if (isMac) {
+    doc.push("## Recommended for macOS (fewest package errors)\n");
+    doc.push("If you are seeing errors like \"File `fixtounicode.sty` not found\", install full MacTeX and then apply Inkwell's requirements list.\n");
+    doc.push("```bash");
+    doc.push("brew install pandoc pandoc-crossref");
+    doc.push("brew install --cask mactex");
+    doc.push("sudo tlmgr update --self");
+    doc.push(`REQ="${reqFile}"`);
+    doc.push("sed 's/#.*//' \"$REQ\" | awk 'NF' | xargs sudo tlmgr install");
+    doc.push("sudo texhash || sudo mktexlsr");
+    doc.push("```\n");
+  }
 
   if (!status.pandoc.installed) {
     doc.push("## Pandoc\n");
