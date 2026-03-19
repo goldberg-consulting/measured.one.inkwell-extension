@@ -12,6 +12,7 @@ import { compile, detectMode, isCompilable } from "./compiler";
 import { InkwellDiagnostics } from "./diagnostics";
 import { parseCodeBlocks, BlockProgress } from "./runner";
 import { prepareForPreview } from "./inject";
+import { getInkwellOutputChannel } from "./inkwell-output";
 
 const md = new MarkdownIt({
   html: true,
@@ -26,14 +27,13 @@ export class InkwellPreviewProvider {
   private disposables: vscode.Disposable[] = [];
   private diagnostics: InkwellDiagnostics | undefined;
   private currentDocument: vscode.TextDocument | undefined;
-  private outputChannel: vscode.OutputChannel;
+  private outputChannel: vscode.OutputChannel = getInkwellOutputChannel();
   private initialized = false;
   private pdfCache: { path: string; mtimeMs: number; base64: string } | undefined;
   onRun?: () => Promise<void>;
 
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
-    this.outputChannel = vscode.window.createOutputChannel("Inkwell LaTeX");
   }
 
   setDiagnostics(diagnostics: InkwellDiagnostics): void {
