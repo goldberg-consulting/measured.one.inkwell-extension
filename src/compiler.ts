@@ -314,6 +314,12 @@ function copySiblingFiles(sourceDir: string, cacheDir: string): void {
       fs.mkdirSync(subDst, { recursive: true });
       copyDirFiles(subSrc, subDst);
     }
+    const inkwellSub = path.join(sourceDir, ".inkwell", sub);
+    if (fs.existsSync(inkwellSub) && fs.statSync(inkwellSub).isDirectory()) {
+      const subDst = path.join(cacheDir, ".inkwell", sub);
+      fs.mkdirSync(subDst, { recursive: true });
+      copyDirFiles(inkwellSub, subDst);
+    }
   }
 }
 

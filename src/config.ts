@@ -60,7 +60,11 @@ export function loadManifest(projectRoot: string): InkwellManifest {
 
 export function findBibFiles(projectRoot: string): string[] {
   const results: string[] = [];
-  const bibDirs = [projectRoot, path.join(projectRoot, "references")];
+  const bibDirs = [
+    projectRoot,
+    path.join(projectRoot, "references"),
+    path.join(projectRoot, ".inkwell", "references"),
+  ];
   for (const dir of bibDirs) {
     try {
       for (const f of fs.readdirSync(dir)) {

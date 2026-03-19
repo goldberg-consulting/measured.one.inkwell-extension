@@ -7,7 +7,7 @@ import * as path from "path";
 import * as fs from "fs";
 import { selectTemplateCommand } from "./templates";
 
-const SCAFFOLD_VERSION = 2;
+const SCAFFOLD_VERSION = 3;
 
 interface ScaffoldOptions {
   name: string;
@@ -22,7 +22,7 @@ author: ""
 date: "\\\\today"
 geometry: "margin=1in"
 linestretch: 1.4
-bibliography: references/refs.bib
+bibliography: .inkwell/references/refs.bib
 link-citations: true
 inkwell:
   code-bg: "#f5f5f5"
@@ -38,6 +38,7 @@ inkwell:
 
 const GITIGNORE = `.inkwell/outputs/
 .inkwell/compiled.*
+.inkwell/mermaid/
 *.aux
 *.log
 *.out
@@ -271,21 +272,21 @@ export async function bootstrapWorkspaceInkwell(): Promise<void> {
 
   const report: string[] = [];
   const inkwellDir = path.join(baseDir, ".inkwell");
-  const outputsDir = path.join(inkwellDir, "outputs");
-  const templatesDir = path.join(inkwellDir, "templates");
+  const bootstrapDirs = [
+    "outputs", "templates", "scripts", "figures", "references", "examples",
+  ];
   const manifestPath = path.join(inkwellDir, "manifest.json");
 
   if (!fs.existsSync(inkwellDir)) {
     fs.mkdirSync(inkwellDir, { recursive: true });
     report.push("created .inkwell/");
   }
-  if (!fs.existsSync(outputsDir)) {
-    fs.mkdirSync(outputsDir, { recursive: true });
-    report.push("created .inkwell/outputs/");
-  }
-  if (!fs.existsSync(templatesDir)) {
-    fs.mkdirSync(templatesDir, { recursive: true });
-    report.push("created .inkwell/templates/");
+  for (const sub of bootstrapDirs) {
+    const dir = path.join(inkwellDir, sub);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+      report.push(`created .inkwell/${sub}/`);
+    }
   }
   if (!fs.existsSync(manifestPath)) {
     fs.writeFileSync(manifestPath, MANIFEST_TEMPLATE("inkwell"), "utf-8");
@@ -330,9 +331,9 @@ function createStructure(opts: ScaffoldOptions): void {
   const dirs = [
     ".inkwell",
     ".inkwell/outputs",
-    "scripts",
-    "figures",
-    "references",
+    ".inkwell/scripts",
+    ".inkwell/figures",
+    ".inkwell/references",
   ];
 
   for (const d of dirs) {
@@ -368,10 +369,10 @@ Write your content here. Cite sources with [@knuth1984] and use inline math like
 
 ## Example Figures
 
-\`\`\`{python file="scripts/sine_plot.py" output="sine_plot" caption="Fourier partial sums of a square wave." label="fourier"}
+\`\`\`{python file=".inkwell/scripts/sine_plot.py" output="sine_plot" caption="Fourier partial sums of a square wave." label="fourier"}
 \`\`\`
 
-\`\`\`{python file="scripts/scatter.py" output="scatter" caption="Scatter plot with linear regression." label="scatter"}
+\`\`\`{python file=".inkwell/scripts/scatter.py" output="scatter" caption="Scatter plot with linear regression." label="scatter"}
 \`\`\`
 
 ## References
@@ -391,22 +392,22 @@ Write your content here. Cite sources with [@knuth1984] and use inline math like
     }
   }
 
-  const sinePlot = path.join(opts.dir, "scripts", "sine_plot.py");
+  const sinePlot = path.join(opts.dir, ".inkwell", "scripts", "sine_plot.py");
   if (!fs.existsSync(sinePlot)) {
     fs.writeFileSync(sinePlot, SINE_PLOT_PY);
   }
 
-  const scatterPlot = path.join(opts.dir, "scripts", "scatter.py");
+  const scatterPlot = path.join(opts.dir, ".inkwell", "scripts", "scatter.py");
   if (!fs.existsSync(scatterPlot)) {
     fs.writeFileSync(scatterPlot, SCATTER_PY);
   }
 
-  const figuresKeep = path.join(opts.dir, "figures", ".gitkeep");
+  const figuresKeep = path.join(opts.dir, ".inkwell", "figures", ".gitkeep");
   if (!fs.existsSync(figuresKeep)) {
     fs.writeFileSync(figuresKeep, "");
   }
 
-  const refsBib = path.join(opts.dir, "references", "refs.bib");
+  const refsBib = path.join(opts.dir, ".inkwell", "references", "refs.bib");
   if (!fs.existsSync(refsBib)) {
     fs.writeFileSync(refsBib, STARTER_BIB);
   }
@@ -420,13 +421,13 @@ Write your content here. Cite sources with [@knuth1984] and use inline math like
 
 const GITIGNORE_LINES = GITIGNORE.split("\n").map((l) => l.trim()).filter(Boolean);
 
-const REQUIRED_DIRS = [".inkwell", ".inkwell/outputs", "scripts", "figures", "references", "examples"];
+const REQUIRED_DIRS = [".inkwell", ".inkwell/outputs", ".inkwell/scripts", ".inkwell/figures", ".inkwell/references", ".inkwell/examples"];
 
 const STARTER_FILES: Array<{ rel: string; content: string }> = [
-  { rel: "scripts/sine_plot.py", content: SINE_PLOT_PY },
-  { rel: "scripts/scatter.py", content: SCATTER_PY },
-  { rel: "references/refs.bib", content: STARTER_BIB },
-  { rel: "figures/.gitkeep", content: "" },
+  { rel: ".inkwell/scripts/sine_plot.py", content: SINE_PLOT_PY },
+  { rel: ".inkwell/scripts/scatter.py", content: SCATTER_PY },
+  { rel: ".inkwell/references/refs.bib", content: STARTER_BIB },
+  { rel: ".inkwell/figures/.gitkeep", content: "" },
 ];
 
 function copyGuide(projectRoot: string): boolean {
@@ -449,7 +450,7 @@ function copyAgent(projectRoot: string): boolean {
 
 function copyDemoFiles(projectRoot: string): string[] {
   const extensionExamples = path.join(__dirname, "..", "examples");
-  const destDir = path.join(projectRoot, "examples");
+  const destDir = path.join(projectRoot, ".inkwell", "examples");
   const copied: string[] = [];
 
   if (!fs.existsSync(extensionExamples)) return copied;
@@ -461,7 +462,7 @@ function copyDemoFiles(projectRoot: string): string[] {
     const dest = path.join(destDir, entry);
     if (!fs.existsSync(dest)) {
       fs.copyFileSync(src, dest);
-      copied.push(`examples/${entry}`);
+      copied.push(`.inkwell/examples/${entry}`);
     }
   }
   return copied;

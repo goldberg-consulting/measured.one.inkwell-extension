@@ -62,7 +62,7 @@ Always raw LaTeX. No Pandoc markdown equivalent exists.
 ```markdown
 \begin{marginfigure}
 \centering
-\includegraphics[width=\linewidth]{figures/plot.pdf}
+\includegraphics[width=\linewidth]{.inkwell/figures/plot.pdf}
 \caption{Caption in the margin.}
 \end{marginfigure}
 ```
