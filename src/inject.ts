@@ -480,8 +480,13 @@ function applyInlineResults(
 const MERMAID_BLOCK_RE = /^```(?:\{mermaid([^}]*)\}|mermaid)\s*\n([\s\S]*?)^```/gm;
 
 let _mmdcAvailable: boolean | undefined;
+let _mmdcCheckTime = 0;
+const MMDC_CACHE_TTL = 30_000;
+
 function mmdcAvailable(): boolean {
-  if (_mmdcAvailable !== undefined) return _mmdcAvailable;
+  if (_mmdcAvailable !== undefined && Date.now() - _mmdcCheckTime < MMDC_CACHE_TTL) {
+    return _mmdcAvailable;
+  }
   try {
     execFileSync("mmdc", ["--version"], {
       encoding: "utf-8", timeout: 5000, stdio: "pipe", env: INJECT_ENV,
@@ -490,6 +495,7 @@ function mmdcAvailable(): boolean {
   } catch {
     _mmdcAvailable = false;
   }
+  _mmdcCheckTime = Date.now();
   return _mmdcAvailable;
 }
 
@@ -544,7 +550,6 @@ export function renderMermaidBlocks(markdown: string, workDir: string): string {
       const inputPath = path.join(mermaidDir, `${hash}.mmd`);
       fs.writeFileSync(inputPath, match.source, "utf-8");
       try {
-        // Render SVG for HTML preview (browser handles foreignObject text)
         execFileSync("mmdc", ["-i", inputPath, "-o", svgPath], {
           cwd: workDir,
           timeout: 30_000,
@@ -555,7 +560,6 @@ export function renderMermaidBlocks(markdown: string, workDir: string): string {
           const alt = svgPath.replace(".svg", "-1.svg");
           if (fs.existsSync(alt)) fs.renameSync(alt, svgPath);
         }
-        // Render PNG at 4x for PDF compilation (rsvg-convert can't render foreignObject text)
         execFileSync("mmdc", ["-i", inputPath, "-o", pngPath, "-s", "4"], {
           cwd: workDir,
           timeout: 30_000,
@@ -569,7 +573,9 @@ export function renderMermaidBlocks(markdown: string, workDir: string): string {
         if (fs.existsSync(svgPath) || fs.existsSync(pngPath)) {
           fs.writeFileSync(metaPath, JSON.stringify({ hash }), "utf-8");
         }
-      } catch {
+      } catch (err: any) {
+        const msg = err?.stderr?.toString() || err?.message || "unknown error";
+        console.error(`[inkwell] mermaid render failed for block: ${msg}`);
         continue;
       }
     }

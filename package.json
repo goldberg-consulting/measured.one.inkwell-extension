@@ -180,6 +180,11 @@
           "group": "navigation"
         },
         {
+          "command": "inkwell.runCodeBlocks",
+          "when": "editorLangId == markdown && inkwell.hasProject",
+          "group": "navigation@2"
+        },
+        {
           "command": "inkwell.bootstrapWorkspaceInkwell",
           "when": "(editorLangId == markdown || editorLangId == latex) && !inkwell.hasProject",
           "group": "navigation@1"
