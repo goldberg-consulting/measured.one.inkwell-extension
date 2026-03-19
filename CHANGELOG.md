@@ -11,6 +11,7 @@ Scaffold resources consolidated into `.inkwell/` for a cleaner project layout.
 - Bumped scaffold version to 3
 - Fixed Bootstrap Workspace command being hidden when any `.inkwell/` directory existed in the workspace
 - Restructured README install flow: extension first, toolchain second, workspace bootstrap third
+- Fixed toolchain setup re-downloading MacTeX (~5 GB) when a TeX distribution is already installed
 
 ## 0.1.4 (2026-03-18)
 
