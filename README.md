@@ -24,8 +24,8 @@ Inkwell lets you stay in markdown, stay in your editor, and still get publicatio
 Download the latest `.vsix` from [Releases](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases), then:
 
 ```bash
-cursor --install-extension inkwell-0.1.8.vsix --force
-# or: code --install-extension inkwell-0.1.8.vsix --force
+cursor --install-extension inkwell-0.1.9.vsix --force
+# or: code --install-extension inkwell-0.1.9.vsix --force
 ```
 
 Or in the editor: `Cmd+Shift+P` > **Extensions: Install from VSIX...** and select the file.
@@ -756,6 +756,10 @@ Inkwell includes a Cursor agent at `.cursor/agents/inkwell-guide.md`. When worki
 The agent references the full [Syntax Guide](guide.md) for field names, attribute tables, and conversion rules.
 
 ## Releases
+
+### [v0.1.9](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.1.9) (March 19, 2026)
+
+Bootstrap seeds **`.inkwell/scripts/`** (including `convergence_table.py`) and references like New Project / Update Project.
 
 ### [v0.1.8](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.1.8) (March 19, 2026)
 

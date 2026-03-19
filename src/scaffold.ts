@@ -147,6 +147,31 @@ r = np.corrcoef(x, y)[0, 1]
 print(f"n = {len(x)}, r = {r:.3f}, slope = {m:.3f}")
 `;
 
+const CONVERGENCE_TABLE_PY = `import os
+import csv
+import numpy as np
+
+x_jump = np.pi / 2
+true_val = 1.0
+
+rows = []
+for n in [1, 3, 5, 9, 25, 50]:
+    partial = sum(np.sin((2*k-1)*x_jump) / (2*k-1) for k in range(1, n+1)) * 4 / np.pi
+    error = abs(partial - true_val)
+    overshoot_x = np.linspace(0, np.pi, 5000)
+    overshoot_y = sum(np.sin((2*k-1)*overshoot_x) / (2*k-1) for k in range(1, n+1)) * 4 / np.pi
+    peak = np.max(overshoot_y)
+    rows.append([n, f"{partial:.4f}", f"{error:.4f}", f"{peak:.4f}"])
+
+out = os.environ.get("INKWELL_OUTPUT_DIR", ".")
+with open(os.path.join(out, "convergence.csv"), "w", newline="") as f:
+    w = csv.writer(f)
+    w.writerow(["Terms (n)", "Value at x=pi/2", "Abs. Error", "Peak Overshoot"])
+    w.writerows(rows)
+
+print("Convergence table generated.")
+`;
+
 const TEMPLATE_FRONTMATTER: Record<string, string> = {
   ludus: `template: ludus
 classoption:
@@ -453,6 +478,11 @@ export async function bootstrapWorkspaceInkwell(): Promise<void> {
   if (gi.length) report.push(`updated .gitignore (${gi.length} entries)`);
   if (copyGuide(baseDir)) report.push("updated .inkwell/guide.md");
 
+  const seedFiles = ensureStarterFiles(baseDir);
+  if (seedFiles.length) {
+    report.push(`added starter files: ${seedFiles.join(", ")}`);
+  }
+
   if (report.length) {
     vscode.window.showInformationMessage(
       `Workspace bootstrap complete: ${report.join("; ")}.`
@@ -533,25 +563,7 @@ Write your content here. Cite sources with [@knuth1984] and use inline math like
     }
   }
 
-  const sinePlot = path.join(opts.dir, ".inkwell", "scripts", "sine_plot.py");
-  if (!fs.existsSync(sinePlot)) {
-    fs.writeFileSync(sinePlot, SINE_PLOT_PY);
-  }
-
-  const scatterPlot = path.join(opts.dir, ".inkwell", "scripts", "scatter.py");
-  if (!fs.existsSync(scatterPlot)) {
-    fs.writeFileSync(scatterPlot, SCATTER_PY);
-  }
-
-  const figuresKeep = path.join(opts.dir, ".inkwell", "figures", ".gitkeep");
-  if (!fs.existsSync(figuresKeep)) {
-    fs.writeFileSync(figuresKeep, "");
-  }
-
-  const refsBib = path.join(opts.dir, ".inkwell", "references", "refs.bib");
-  if (!fs.existsSync(refsBib)) {
-    fs.writeFileSync(refsBib, STARTER_BIB);
-  }
+  ensureStarterFiles(opts.dir);
 
   copyDemoFiles(opts.dir);
   copyGuide(opts.dir);
@@ -575,6 +587,7 @@ const REQUIRED_DIRS = [
 const STARTER_FILES: Array<{ rel: string; content: string }> = [
   { rel: ".inkwell/scripts/sine_plot.py", content: SINE_PLOT_PY },
   { rel: ".inkwell/scripts/scatter.py", content: SCATTER_PY },
+  { rel: ".inkwell/scripts/convergence_table.py", content: CONVERGENCE_TABLE_PY },
   { rel: ".inkwell/references/refs.bib", content: STARTER_BIB },
   { rel: ".inkwell/figures/.gitkeep", content: "" },
 ];
