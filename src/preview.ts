@@ -13,6 +13,7 @@ import { InkwellDiagnostics } from "./diagnostics";
 import { parseCodeBlocks, BlockProgress } from "./runner";
 import { prepareForPreview } from "./inject";
 import { getInkwellOutputChannel } from "./inkwell-output";
+import { getInkwellOutputsDir, getInkwellProjectRoot } from "./config";
 
 const md = new MarkdownIt({
   html: true,
@@ -95,8 +96,9 @@ export class InkwellPreviewProvider {
     }
 
     const docDir = path.dirname(editor.document.uri.fsPath);
-
-    const inkwellOutputDir = path.join(docDir, ".inkwell", "outputs");
+    const sourceFile = editor.document.uri.fsPath;
+    const projectRoot = getInkwellProjectRoot(sourceFile);
+    const inkwellOutputDir = getInkwellOutputsDir(sourceFile);
 
     this.panel = vscode.window.createWebviewPanel(
       "inkwellPreview",
@@ -107,6 +109,7 @@ export class InkwellPreviewProvider {
         localResourceRoots: [
           vscode.Uri.file(path.join(this.context.extensionPath, "media")),
           vscode.Uri.file(docDir),
+          vscode.Uri.file(projectRoot),
           vscode.Uri.file(inkwellOutputDir),
         ],
         retainContextWhenHidden: true,
@@ -172,12 +175,16 @@ export class InkwellPreviewProvider {
   private updateResourceRoots(document: vscode.TextDocument): void {
     if (!this.panel) return;
     const docDir = path.dirname(document.uri.fsPath);
+    const sourceFile = document.uri.fsPath;
+    const projectRoot = getInkwellProjectRoot(sourceFile);
+    const outputsDir = getInkwellOutputsDir(sourceFile);
     (this.panel as any).webview.options = {
       ...this.panel.webview.options,
       localResourceRoots: [
         vscode.Uri.file(path.join(this.context.extensionPath, "media")),
         vscode.Uri.file(docDir),
-        vscode.Uri.file(path.join(docDir, ".inkwell", "outputs")),
+        vscode.Uri.file(projectRoot),
+        vscode.Uri.file(outputsDir),
       ],
     };
   }

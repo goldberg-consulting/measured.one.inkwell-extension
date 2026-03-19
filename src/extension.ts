@@ -7,7 +7,7 @@ import { InkwellPreviewProvider } from "./preview";
 import { compile, exportPDF, isCompilable } from "./compiler";
 import { InkwellDiagnostics } from "./diagnostics";
 import { selectTemplateCommand } from "./templates";
-import { findInkwellRoot, saveManifestField } from "./config";
+import { findInkwellRoot, getInkwellOutputsDir, getInkwellProjectRoot, saveManifestField } from "./config";
 import { checkToolchain, showToolchainStatus, setExtensionPath } from "./toolchain";
 import { runAllBlocks, parseCodeBlocks, RunCancellation } from "./runner";
 import { clearCache } from "./cache";
@@ -107,8 +107,7 @@ export function activate(context: vscode.ExtensionContext) {
       const doc =
         vscode.window.activeTextEditor?.document ?? previewProvider.getDocument();
       if (!doc) return;
-      const sourceDir = path.dirname(doc.uri.fsPath);
-      const cacheDir = path.join(sourceDir, ".inkwell", "outputs");
+      const cacheDir = getInkwellOutputsDir(doc.uri.fsPath);
       clearCache(cacheDir);
       vscode.window.showInformationMessage("Inkwell: Code block cache cleared.");
     }),
@@ -277,10 +276,11 @@ async function runCodeBlocksWithProgress(
 
 async function setupPythonEnv(document: vscode.TextDocument): Promise<void> {
   const docDir = path.dirname(document.uri.fsPath);
+  const projectRoot = getInkwellProjectRoot(document.uri.fsPath);
 
   const envOptions = [
     { label: "./venv", detail: "Create venv in document directory" },
-    { label: "./.inkwell/venv", detail: "Create venv in .inkwell project directory" },
+    { label: "./.inkwell/venv", detail: "Create venv under project .inkwell/ (workspace root)" },
     { label: "Custom path...", detail: "Specify a custom venv location" },
   ];
 
@@ -301,9 +301,22 @@ async function setupPythonEnv(document: vscode.TextDocument): Promise<void> {
     envPath = pick.label;
   }
 
-  const resolved = path.resolve(docDir, envPath);
-  const reqFile = path.join(docDir, "requirements.txt");
-  const hasReqs = fs.existsSync(reqFile);
+  let resolved: string;
+  if (path.isAbsolute(envPath)) {
+    resolved = envPath;
+  } else {
+    const rel = envPath.replace(/\\/g, "/").replace(/^\.\//, "");
+    if (rel.startsWith(".inkwell/")) {
+      resolved = path.normalize(path.join(projectRoot, rel));
+    } else {
+      resolved = path.resolve(docDir, envPath);
+    }
+  }
+
+  const reqFile = [path.join(docDir, "requirements.txt"), path.join(projectRoot, "requirements.txt")].find((p) =>
+    fs.existsSync(p)
+  );
+  const hasReqs = Boolean(reqFile);
 
   const terminal = vscode.window.createTerminal("Inkwell Python Env");
   terminal.show();
@@ -318,7 +331,7 @@ async function setupPythonEnv(document: vscode.TextDocument): Promise<void> {
 
   commands.push(`source "${resolved}/bin/activate"`);
 
-  if (hasReqs) {
+  if (hasReqs && reqFile) {
     commands.push(`pip install -r "${reqFile}"`);
   } else {
     const installPick = await vscode.window.showInputBox({

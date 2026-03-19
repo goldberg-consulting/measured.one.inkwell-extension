@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.7 (2026-03-19)
+
+**Project root for all `.inkwell` artifacts** (fixes nested `.inkwell/` beside deep `.md` files).
+
+- Code block cache, Mermaid PNG/SVG, and injected `compiled` markdown now live under the **Inkwell project root** (first ancestor containing `.inkwell/`), not next to the source file.
+- Per-document paths: `.inkwell/outputs/<doc-key>/` and `.inkwell/compiled/<doc-key>.<ext>` where `<doc-key>` is the source path relative to the project (e.g. `examples--demo-default`).
+- Block `file="..."` resolution: try **document folder** first, then **project root** (so `.inkwell/scripts/…` works from nested markdown).
+- Code block **cwd** and Python env resolution prefer the project root; **Setup Python Env** `./.inkwell/venv` resolves to the project `.inkwell/`, not the document directory.
+- Preview webview **localResourceRoots** include the project root for mermaid/output assets.
+- Scaffold / gitignore: `.inkwell/compiled/` directory (replaces flat `compiled.*` ignore).
+
 ## 0.1.6 (2026-03-19)
 
 PATH construction for subprocesses (Mermaid CLI, Pandoc/TeX) so **GUI-launched** VS Code/Cursor finds **`mmdc`** when Node tools live under **nvm**, **fnm**, or **Volta**.

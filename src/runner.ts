@@ -8,6 +8,7 @@ import * as path from "path";
 import * as fs from "fs";
 import { execFile, ChildProcess } from "child_process";
 import { getBlockHash, loadCache, saveCache } from "./cache";
+import { getInkwellOutputsDir, getInkwellProjectRoot, resolveBlockFilePath } from "./config";
 
 export class RunCancellation {
   private _cancelled = false;
@@ -195,7 +196,8 @@ function resolveInterpreter(
   langKey: string,
   envPath: string | undefined,
   runConfig: RunConfig,
-  workDir: string,
+  projectRoot: string,
+  docDir: string,
 ): ResolvedInterpreter {
   const defaults = LANG_COMMANDS[langKey];
   if (!defaults) return { cmd: langKey, args: [], envVars: {}, label: langKey };
@@ -211,7 +213,17 @@ function resolveInterpreter(
     return { cmd: defaultCmd, args: defaultArgs, envVars: {}, label: defaultCmd };
   }
 
-  const resolved = path.resolve(workDir, envSpec.replace(/^~/, process.env.HOME || "~"));
+  const home = process.env.HOME || "~";
+  const spec = envSpec.replace(/^~/, home);
+  let resolved: string | undefined;
+  for (const base of [projectRoot, docDir]) {
+    const r = path.resolve(base, spec);
+    if (fs.existsSync(r)) {
+      resolved = r;
+      break;
+    }
+  }
+  if (!resolved) resolved = path.resolve(projectRoot, spec);
 
   if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
     const isPython = langKey.startsWith("python") || langKey === "python3";
@@ -258,8 +270,10 @@ function resolveInterpreter(
 
   let warning = `Environment "${envSpec}" not found at ${resolved}. Using system ${defaultCmd}. Run "Inkwell: Setup Python Env" to create it.`;
   if (langKey.startsWith("python")) {
-    const reqFile = path.join(workDir, "requirements.txt");
-    if (fs.existsSync(reqFile)) {
+    const reqFile = [path.join(docDir, "requirements.txt"), path.join(projectRoot, "requirements.txt")].find((p) =>
+      fs.existsSync(p)
+    );
+    if (reqFile) {
       warning += ` Found requirements.txt at ${reqFile}; run setup from this document folder and choose "${envSpec}" to auto-install dependencies.`;
     }
   }
@@ -273,7 +287,8 @@ function resolveInterpreter(
 
 export async function runBlock(
   block: CodeBlock,
-  workDir: string,
+  projectRoot: string,
+  docDir: string,
   outputDir: string,
   cancel?: RunCancellation,
   runConfig?: RunConfig,
@@ -299,7 +314,7 @@ export async function runBlock(
   let scriptPath: string;
 
   if (block.file) {
-    scriptPath = path.resolve(workDir, block.file);
+    scriptPath = resolveBlockFilePath(block.file, docDir, projectRoot);
     if (!fs.existsSync(scriptPath)) {
       return {
         block, stdout: "", stderr: `File not found: ${block.file}`,
@@ -315,7 +330,7 @@ export async function runBlock(
     fs.writeFileSync(scriptPath, block.source, "utf-8");
   }
 
-  const interp = resolveInterpreter(langKey, block.env, runConfig || {}, workDir);
+  const interp = resolveInterpreter(langKey, block.env, runConfig || {}, projectRoot, docDir);
 
   const env = {
     ...process.env,
@@ -333,7 +348,7 @@ export async function runBlock(
 
   try {
     const proc = execFile(cmd, args, {
-      cwd: workDir,
+      cwd: projectRoot,
       timeout: 300_000,
       env,
       maxBuffer: 10 * 1024 * 1024,
@@ -424,8 +439,9 @@ export async function runAllBlocks(
   const blocks = parseCodeBlocks(markdown);
   if (!blocks.length) return [];
 
-  const workDir = path.dirname(sourceFile);
-  const cacheDir = path.join(workDir, ".inkwell", "outputs");
+  const docDir = path.dirname(sourceFile);
+  const projectRoot = getInkwellProjectRoot(sourceFile);
+  const cacheDir = getInkwellOutputsDir(sourceFile);
   fs.mkdirSync(cacheDir, { recursive: true });
 
   const runConfig = parseRunConfig(markdown);
@@ -446,7 +462,7 @@ export async function runAllBlocks(
       continue;
     }
 
-    const hash = getBlockHash(block, workDir);
+    const hash = getBlockHash(block, docDir, projectRoot);
     const blockDir = path.join(cacheDir, `block_${block.index}`);
     const cached = cache.blocks[block.index];
 
@@ -477,7 +493,7 @@ export async function runAllBlocks(
 
     const t0 = Date.now();
     fs.mkdirSync(blockDir, { recursive: true });
-    const result = await runBlock(block, workDir, blockDir, cancel, runConfig);
+    const result = await runBlock(block, projectRoot, docDir, blockDir, cancel, runConfig);
     const elapsed = Date.now() - t0;
 
     const status: BlockStatus = cancel?.cancelled ? "cancelled"

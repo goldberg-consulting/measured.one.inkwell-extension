@@ -7,6 +7,7 @@ import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 import { CodeBlock } from "./runner";
+import { resolveBlockFilePath } from "./config";
 
 export interface BlockCacheEntry {
   hash: string;
@@ -36,11 +37,11 @@ export function saveCache(cacheDir: string, cache: BlockCache): void {
   fs.writeFileSync(file, JSON.stringify(cache, null, 2), "utf-8");
 }
 
-export function getBlockHash(block: CodeBlock, workDir: string): string {
+export function getBlockHash(block: CodeBlock, docDir: string, projectRoot: string): string {
   const h = crypto.createHash("sha256");
 
   if (block.file) {
-    const resolved = path.resolve(workDir, block.file);
+    const resolved = resolveBlockFilePath(block.file, docDir, projectRoot);
     try {
       h.update(fs.readFileSync(resolved));
     } catch {

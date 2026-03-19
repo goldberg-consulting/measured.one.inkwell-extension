@@ -37,7 +37,7 @@ inkwell:
 `;
 
 const GITIGNORE = `.inkwell/outputs/
-.inkwell/compiled.*
+.inkwell/compiled/
 .inkwell/mermaid/
 *.aux
 *.log
@@ -410,7 +410,7 @@ export async function bootstrapWorkspaceInkwell(): Promise<void> {
   const report: string[] = [];
   const inkwellDir = path.join(baseDir, ".inkwell");
   const bootstrapDirs = [
-    "outputs", "templates", "scripts", "figures", "references", "examples",
+    "outputs", "compiled", "templates", "scripts", "figures", "references", "examples",
   ];
   const manifestPath = path.join(inkwellDir, "manifest.json");
 
@@ -468,6 +468,7 @@ function createStructure(opts: ScaffoldOptions): void {
   const dirs = [
     ".inkwell",
     ".inkwell/outputs",
+    ".inkwell/compiled",
     ".inkwell/scripts",
     ".inkwell/figures",
     ".inkwell/references",
@@ -561,7 +562,15 @@ Write your content here. Cite sources with [@knuth1984] and use inline math like
 
 const GITIGNORE_LINES = GITIGNORE.split("\n").map((l) => l.trim()).filter(Boolean);
 
-const REQUIRED_DIRS = [".inkwell", ".inkwell/outputs", ".inkwell/scripts", ".inkwell/figures", ".inkwell/references", ".inkwell/examples"];
+const REQUIRED_DIRS = [
+  ".inkwell",
+  ".inkwell/outputs",
+  ".inkwell/compiled",
+  ".inkwell/scripts",
+  ".inkwell/figures",
+  ".inkwell/references",
+  ".inkwell/examples",
+];
 
 const STARTER_FILES: Array<{ rel: string; content: string }> = [
   { rel: ".inkwell/scripts/sine_plot.py", content: SINE_PLOT_PY },
