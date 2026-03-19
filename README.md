@@ -427,7 +427,7 @@ Most journal submission packages ship a `.cls` file and a sample `.tex` document
 
 ## Examples
 
-The [`examples/`](examples/) directory in this repo contains working demo documents for each template. Each compiles from markdown with YAML frontmatter to a publication-ready PDF. When you scaffold a project, these are copied to `.inkwell/examples/` for reference.
+The [`examples/`](examples/) directory in this repo contains working demo documents for each template. Each compiles from markdown with YAML frontmatter to a publication-ready PDF. When you scaffold a project, copies live under `.inkwell/examples/` and use paths like `.inkwell/scripts/…` and `.inkwell/references/refs.bib`. **In this repository**, demos use **`examples/scripts/`** and **`references/refs.bib`** relative to the `examples/` folder so **Run** and **Compile** work without a root `.inkwell/` when you open the extension project.
 
 To try the bundled examples:
 
