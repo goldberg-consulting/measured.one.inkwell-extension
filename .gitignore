@@ -6,11 +6,16 @@ examples/venv/
 # Stray nested .inkwell only (workspace root .inkwell/ is the real project)
 examples/.inkwell/
 examples/*.pdf
-# Tracked under root .inkwell/: manifest.json, scripts/, references/
+# Tracked under root .inkwell/: manifest.json, scripts/, references/, figures/.gitkeep
+# Everything else under .inkwell/ is generated at runtime
 .inkwell/outputs/
 .inkwell/compiled/
 .inkwell/mermaid/
 .inkwell/figures/*.pdf
+.inkwell/guide.md
+.inkwell/examples/
+.inkwell/templates/
+demo-project/
 *.aux
 *.log
 *.out
@@ -21,3 +26,4 @@ __pycache__/
 *.pyc
 venv/
 .venv/
+.inkwell/compiled.*
