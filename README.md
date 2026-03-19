@@ -17,13 +17,40 @@ Inkwell lets you stay in markdown, stay in your editor, and still get publicatio
 
 ## Installation
 
-### 1. Install dependencies
+### 1. Install the extension
 
-**Recommended (all platforms):**
+**Option A: Install a pre-built .vsix** (recommended)
 
-Run `Cmd+Shift+P` → **Inkwell: Check / Install Toolchain**. The guided installer now installs core tools plus the full LaTeX package set from `requirements-latex.txt` for Homebrew/TinyTeX flows.
+Download the latest `.vsix` from [Releases](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases), then:
 
-**macOS (Homebrew):**
+```bash
+cursor --install-extension inkwell-0.1.5.vsix --force
+# or: code --install-extension inkwell-0.1.5.vsix --force
+```
+
+Or in the editor: `Cmd+Shift+P` > **Extensions: Install from VSIX...** and select the file.
+
+**Option B: Build from source**
+
+```bash
+git clone https://github.com/goldberg-consulting/measured.one.inkwell-extension.git
+cd measured.one.inkwell-extension
+npm install
+npm run compile
+```
+
+Then either:
+
+- **Install from folder** (development): `Cmd+Shift+P` > **Developer: Install Extension from Location...** > select the repo folder > reload the window.
+- **Package as .vsix**: `npm run package && npx @vscode/vsce package` > install the resulting `.vsix` as above.
+
+### 2. Install the toolchain (Pandoc + LaTeX)
+
+After the extension is active, run `Cmd+Shift+P` → **Inkwell: Check / Install Toolchain**. The guided installer detects what you have and walks you through installing the rest, including the full LaTeX package set from `requirements-latex.txt`.
+
+Or install manually:
+
+**macOS (Homebrew + MacTeX — full install):**
 
 ```bash
 brew install pandoc pandoc-crossref
@@ -33,9 +60,7 @@ npm install -g @mermaid-js/mermaid-cli
 
 That gives you everything: Pandoc, cross-reference filters, LaTeX (XeLaTeX + pdfLaTeX), and Mermaid diagram support.
 
-**Smaller macOS install (~150 MB instead of ~5 GB):**
-
-Replace `mactex` with TinyTeX if you want a minimal footprint. You will need to install LaTeX packages as Inkwell's templates require them.
+**macOS (Homebrew + TinyTeX — ~150 MB instead of ~5 GB):**
 
 ```bash
 brew install pandoc pandoc-crossref
@@ -77,32 +102,11 @@ python3 -m venv venv && source venv/bin/activate && pip install -r requirements.
 
 > **Troubleshooting:** If compilation fails with `Missing file: foo.sty`, run `tlmgr install foo`. The build log (`Cmd+Shift+U` > **Inkwell LaTeX**) shows the exact missing filename. Mermaid blocks without `mmdc` installed render in the live preview but appear as code listings in PDFs.
 
-### 2. Install the extension
+### 3. Bootstrap your workspace
 
-Clone and build from source:
+For a **new project**: `Cmd+Shift+P` > **Inkwell: New Project** — scaffolds a complete project with starter document, scripts, bibliography, example files, and a syntax guide, all organized under `.inkwell/`.
 
-```bash
-git clone https://github.com/goldberg-consulting/measured.one.inkwell-extension.git
-cd measured.one.inkwell-extension
-npm install
-npm run compile
-```
-
-**Option A: Install from folder** (development)
-
-   - Open VS Code or Cursor
-   - `Cmd+Shift+P` > **Developer: Install Extension from Location...**
-   - Select the `measured.one.inkwell-extension` folder
-   - Reload the window when prompted
-
-**Option B: Package and install as .vsix** (recommended for distribution)
-
-```bash
-npm run package                          # esbuild bundles to a single file
-npx @vscode/vsce package                 # produces inkwell-0.1.0.vsix
-cursor --install-extension inkwell-0.1.0.vsix --force
-# or: code --install-extension inkwell-0.1.0.vsix --force
-```
+For an **existing repo**: `Cmd+Shift+P` > **Inkwell: Bootstrap Workspace (.inkwell Folder)** — adds a `.inkwell/` directory with the standard subdirectory structure, manifest, templates, and guide without touching your existing files.
 
 See the **[Syntax Guide](guide.md)** for the complete reference on YAML frontmatter, code blocks, math, citations, and template-specific fields.
 
@@ -121,19 +125,23 @@ See the **[Syntax Guide](guide.md)** for the complete reference on YAML frontmat
 
 ## Project structure
 
+Everything Inkwell manages lives under `.inkwell/`, keeping your working tree clean:
+
 ```
 my-paper/
   my-paper.md              # your document
-  scripts/                 # analysis code
-  figures/                 # static images, diagrams
-  references/              # .bib files
-  examples/                # demo .md files for each template
   requirements.txt         # Python dependencies (if enabled)
   venv/                    # Python environment (if enabled)
   .inkwell/
     manifest.json          # project config (template, settings)
-    guide.md               # syntax reference (frontmatter, code blocks, data binding)
+    guide.md               # syntax reference
+    scripts/               # analysis code (sine_plot.py, scatter.py, ...)
+    figures/               # static images, diagrams
+    references/            # .bib files
+    examples/              # demo .md files for each template
     outputs/               # cached code block results (gitignored)
+    mermaid/               # cached mermaid renders (gitignored)
+    templates/             # project-local template overrides (optional)
   .gitignore
 ```
 
@@ -162,7 +170,7 @@ Detailed build logs are available in the **Output** panel (`Cmd+Shift+U`). Selec
 Embed scripts directly or reference external files. Python, R, Shell, Node.
 
 ````markdown
-```{python file="scripts/analysis.py" output="results" caption="My figure" label="analysis"}
+```{python file=".inkwell/scripts/analysis.py" output="results" caption="My figure" label="analysis"}
 ```
 
 ```{python display="both" output="scatter" caption="Scatter plot with regression."}
@@ -264,7 +272,7 @@ Rendered artifacts are cached in `.inkwell/mermaid/` by content hash. A diagram 
 Add a `.bib` file and reference it in your frontmatter:
 
 ```yaml
-bibliography: references/refs.bib
+bibliography: .inkwell/references/refs.bib
 link-citations: true
 ```
 
@@ -297,6 +305,10 @@ inkwell:
   columns: 2
 ```
 
+### Self-contained `.inkwell/` workspace
+
+All extension-managed resources live under a single `.inkwell/` directory: scripts, figures, references, examples, cached outputs, mermaid renders, and templates. Your project root stays clean — just your `.md` document files, a `.gitignore`, and optionally a Python venv. The scaffold creates the full structure automatically via **New Project** or **Bootstrap Workspace**, and the **Update Project** command backfills any missing directories or starter files.
+
 ## Templates
 
 Inkwell ships with seven templates. Each template includes a Pandoc `.latex` wrapper that compiles with the template's native document class. Templates declare their preferred PDF engine (`xelatex` or `pdflatex`) in `template.json`; Inkwell selects the right one automatically.
@@ -313,7 +325,7 @@ Inkwell ships with seven templates. Each template includes a Pandoc `.latex` wra
 
 Select a template with `template: tufte` in your YAML frontmatter, or use `Cmd+Shift+P` > **Inkwell: Select LaTeX Template**.
 
-Journal-specific metadata (DOI, volume, issue, author affiliations, received/accepted dates) is set through YAML frontmatter. See the example files in [`examples/`](examples/) for complete working documents with each template.
+Journal-specific metadata (DOI, volume, issue, author affiliations, received/accepted dates) is set through YAML frontmatter. See the example files in [`examples/`](examples/) for complete working documents with each template. When you scaffold a project, these are copied to `.inkwell/examples/` for reference.
 
 ### Custom templates
 
@@ -407,9 +419,9 @@ Most journal submission packages ship a `.cls` file and a sample `.tex` document
 
 ## Examples
 
-The [`examples/`](examples/) directory contains working demo documents for each template. Each compiles from markdown with YAML frontmatter to a publication-ready PDF.
+The [`examples/`](examples/) directory in this repo contains working demo documents for each template. Each compiles from markdown with YAML frontmatter to a publication-ready PDF. When you scaffold a project, these are copied to `.inkwell/examples/` for reference.
 
-To try them yourself:
+To try the bundled examples:
 
 ```bash
 cd examples
@@ -435,7 +447,7 @@ author: "Inkwell"
 date: "February 2026"
 toc: true
 lof: true
-bibliography: references/refs.bib
+bibliography: .inkwell/references/refs.bib
 inkwell:
   code-bg: "#f5f5f5"
   code-border: true
@@ -474,7 +486,7 @@ abstract: |
 classoption:
   - justified
   - a4paper
-bibliography: references/refs.bib
+bibliography: .inkwell/references/refs.bib
 ```
 
 Features: margin notes via `\marginnote{}` or `\sidenote{}`, margin figures via `\begin{marginfigure}`, full-width sections via `\begin{fullwidth}`, `\newthought` for paragraph openers, Palatino typography. Use raw LaTeX for these; fenced divs (`::: {.aside}`, `::: {.fullwidth}`) are unreliable.
@@ -699,8 +711,9 @@ All commands are available from the command palette (`Cmd+Shift+P` / `Ctrl+Shift
 
 | Command | Shortcut | Description |
 |---------|----------|-------------|
-| **Inkwell: New Project** | | Scaffold a project with starter files, bibliography, and example scripts |
-| **Inkwell: Update Project** | | Add missing `.gitignore` entries, migrate manifest, create new starter files. Never overwrites your existing files |
+| **Inkwell: New Project** | | Scaffold a project with starter files, bibliography, and example scripts under `.inkwell/` |
+| **Inkwell: Bootstrap Workspace** | | Add `.inkwell/` with standard subdirectories to an existing repo |
+| **Inkwell: Update Project** | | Backfill missing directories, `.gitignore` entries, manifest fields, and starter files |
 | **Inkwell: Open Preview** | `Cmd+Shift+V` | Side panel with live HTML, compiled PDF, and build log tabs |
 | **Inkwell: Compile PDF** | `Cmd+Shift+R` | Compile through Pandoc + XeLaTeX/pdfLaTeX (engine selected per template) |
 | **Inkwell: Run Code Blocks** | `Cmd+Shift+B` | Execute all code blocks, cache results in `.inkwell/outputs/` |
@@ -736,6 +749,10 @@ Inkwell includes a Cursor agent at `.cursor/agents/inkwell-guide.md`. When worki
 The agent references the full [Syntax Guide](guide.md) for field names, attribute tables, and conversion rules.
 
 ## Releases
+
+### [v0.1.5](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.1.5) (March 19, 2026)
+
+Scaffold resources consolidated into `.inkwell/` for a cleaner project layout. Scripts, figures, references, and examples now live under `.inkwell/` instead of cluttering the project root. Updated bibliography discovery and compilation to search the new paths. See the [CHANGELOG](CHANGELOG.md) for the full list.
 
 ### [v0.1.0](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.1.0) (March 9, 2026)
 
