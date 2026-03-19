@@ -137,13 +137,15 @@ export function listTemplates(
   const builtinDir = builtinTemplatesDir();
   const defaultTemplate = path.join(builtinDir, "inkwell.latex");
   if (fs.existsSync(defaultTemplate)) {
-    result.set("inkwell", {
+    const defaultEntry: ResolvedTemplate = {
       id: "inkwell",
-      manifest: { name: "Inkwell Default", description: "Built-in template with theorem environments, code highlighting, and title page", engine: "xelatex" },
+      manifest: { name: "Inkwell Default", description: "Clean single-column article with theorem environments, code highlighting, and title page", engine: "xelatex" },
       dir: builtinDir,
       pandocTemplate: defaultTemplate,
       supportingFiles: [],
-    });
+    };
+    result.set("inkwell", defaultEntry);
+    result.set("default", { ...defaultEntry, id: "default" });
   }
 
   for (const [id, dir] of scanDir(builtinDir)) {
@@ -292,7 +294,11 @@ export async function selectTemplateCommand(
   const templates = listTemplates(documentUri);
 
   const items: vscode.QuickPickItem[] = [];
+  const seen = new Set<string>();
   for (const [id, tmpl] of templates) {
+    if (id === "default") continue;
+    if (seen.has(tmpl.manifest.name)) continue;
+    seen.add(tmpl.manifest.name);
     items.push({
       label: tmpl.manifest.name,
       description: id,
