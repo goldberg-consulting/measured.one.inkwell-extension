@@ -3,7 +3,7 @@ node_modules/
 *.vsix
 .vscode-test/
 examples/venv/
-examples/.inkwell/outputs/
-examples/.inkwell/mermaid/
+# Local Inkwell artifacts when opening examples/ alone (real root should use repo .inkwell/)
+examples/.inkwell/
 examples/figures/
 examples/*.pdf
