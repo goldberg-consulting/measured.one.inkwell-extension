@@ -16,6 +16,7 @@ import { InkwellDiagnostics, CompileError } from "./diagnostics";
 import { getTemplateForDocument, copySupportingFiles, PdfEngine, ResolvedTemplate, collectAllFeatures } from "./templates";
 import { prepareForCompilation } from "./inject";
 import { writePreambleFile } from "./preamble";
+import { buildTexInvocationPath } from "./shell-env";
 
 const exec = promisify(execFile);
 
@@ -34,34 +35,9 @@ const PANDOC_EXTENSIONS = [
   "smart",
 ].join("+");
 
-// VS Code child processes do not inherit the user's shell PATH, so TeX
-// binaries are invisible unless we reconstruct the search path ourselves.
-function buildTexPath(): string {
-  const base = ["/usr/local/bin", "/usr/bin"];
-  const home = os.homedir();
-  if (process.platform === "darwin") {
-    return [
-      "/Library/TeX/texbin",
-      "/opt/homebrew/bin",
-      `${home}/Library/TinyTeX/bin/universal-darwin`,
-      ...base,
-      process.env.PATH,
-    ].join(":");
-  }
-  return [
-    ...base,
-    `${home}/.TinyTeX/bin/x86_64-linux`,
-    `${home}/.TinyTeX/bin/aarch64-linux`,
-    "/usr/local/texlive/2024/bin/x86_64-linux",
-    "/usr/local/texlive/2025/bin/x86_64-linux",
-    "/usr/local/texlive/2026/bin/x86_64-linux",
-    process.env.PATH,
-  ].join(":");
-}
-
 const TEX_ENV = {
   ...process.env,
-  PATH: buildTexPath(),
+  PATH: buildTexInvocationPath(),
 };
 
 export interface CompileResult {

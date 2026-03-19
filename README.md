@@ -24,11 +24,13 @@ Inkwell lets you stay in markdown, stay in your editor, and still get publicatio
 Download the latest `.vsix` from [Releases](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases), then:
 
 ```bash
-cursor --install-extension inkwell-0.1.5.vsix --force
-# or: code --install-extension inkwell-0.1.5.vsix --force
+cursor --install-extension inkwell-0.1.6.vsix --force
+# or: code --install-extension inkwell-0.1.6.vsix --force
 ```
 
 Or in the editor: `Cmd+Shift+P` > **Extensions: Install from VSIX...** and select the file.
+
+**Verify a `.vsix` install (recommended):** `Cmd+Shift+P` > **Developer: Reload Window**. Then run **Inkwell: Check / Install Toolchain**, open a markdown file with `{mermaid}` blocks (e.g. `examples/demo-default.md`), run **Inkwell: Compile PDF**, and confirm `.inkwell/mermaid/` contains rendered images and the PDF shows diagrams—not raw mermaid source as code listings. That matches what end users get (a bundled extension with no dev-folder fallback).
 
 **Option B: Build from source**
 
@@ -42,7 +44,7 @@ npm run compile
 Then either:
 
 - **Install from folder** (development): `Cmd+Shift+P` > **Developer: Install Extension from Location...** > select the repo folder > reload the window.
-- **Package as .vsix**: `npm run package && npx @vscode/vsce package` > install the resulting `.vsix` as above.
+- **Package as .vsix**: `npm run package && npx @vscode/vsce package` > install the resulting `.vsix` as above. (`vscode:prepublish` runs `package` before publish, but run it locally too before `vsce package` so `out/extension.js` includes the latest bundle.)
 
 ### 2. Install the toolchain (Pandoc + LaTeX)
 
@@ -100,7 +102,11 @@ sudo texhash || sudo mktexlsr
 python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt
 ```
 
-> **Troubleshooting:** If compilation fails with `Missing file: foo.sty`, run `tlmgr install foo`. The build log (`Cmd+Shift+U` > **Inkwell LaTeX**) shows the exact missing filename. Mermaid blocks without `mmdc` installed render in the live preview but appear as code listings in PDFs.
+**Troubleshooting**
+
+- **Missing LaTeX packages:** If compilation fails with `Missing file: foo.sty`, run `tlmgr install foo`. The build log (`Cmd+Shift+U` > **Inkwell LaTeX**) shows the exact missing filename.
+- **Mermaid in PDF:** Diagram blocks need `mmdc` from `@mermaid-js/mermaid-cli` (e.g. `npm install -g @mermaid-js/mermaid-cli`). Without it, live preview may still show something useful, but **compiled PDFs** often leave mermaid as code listings and **`.inkwell/mermaid/`** stays empty.
+- **Cursor/VS Code launched from the Dock (Node managers):** GUI apps do not inherit your shell `PATH`. Inkwell augments `PATH` for subprocesses (Mermaid, Pandoc/TeX) with **`~/.npm-global/bin`**, **`nvm`** (`NVM_BIN`, **`~/.nvm/alias/default`**, and every **`~/.nvm/versions/node/<version>/bin`**), **`fnm`** (`FNM_MULTISHELL_PATH`), and **Volta** (`VOLTA_HOME` or **`~/.volta/bin`**). If `mmdc` is still missing, it runs a one-time **`SHELL -ilc`** resolution and prepends that directory for the session. Check **View → Output → Inkwell LaTeX** for a PATH diagnostic if **`mmdc --version`** fails. You can still install **`mmdc`** via **Homebrew** or symlink it into **`/opt/homebrew/bin`** if you prefer.
 
 ### 3. Bootstrap your workspace
 
@@ -725,9 +731,9 @@ All commands are available from the command palette (`Cmd+Shift+P` / `Ctrl+Shift
 | **Inkwell: Setup Python Environment** | | Create a venv and install from `requirements.txt` |
 | **Inkwell: Check / Install Toolchain** | | Verify Pandoc and XeLaTeX are installed, with guided setup if missing |
 
-**Tip:** If you are developing from source and rebuild the extension (`npm run compile`), reload the editor window with `Cmd+Shift+P` > **Developer: Reload Window** to pick up the changes. If you installed via `.vsix`, re-run `npm run package && npx @vscode/vsce package` and reinstall the `.vsix`.
+**Tip:** If you are developing from **folder** (`npm run compile` / watch), reload with `Cmd+Shift+P` > **Developer: Reload Window**. If you ship a **`.vsix`**, always **`npm run package`** (bundled `out/extension.js`) before `npx @vscode/vsce package`, then reinstall the `.vsix` and reload.
 
-**Contributor workflow:** Run `npm run verify` before opening a PR. The same check runs in GitHub Actions and in the local pre-commit hook, so commits and merges are gated on a passing typecheck + lint run.
+**Contributor workflow:** Run `npm run verify` before opening a PR (typecheck, ESLint, and template regressions via `scripts/check-template-regressions.mjs`). The same `verify` job runs in GitHub Actions on pushes and PRs to `main`, and the Husky **pre-commit** hook runs `npm run verify` after `npm install`.
 
 ## Settings
 
@@ -750,6 +756,12 @@ Inkwell includes a Cursor agent at `.cursor/agents/inkwell-guide.md`. When worki
 The agent references the full [Syntax Guide](guide.md) for field names, attribute tables, and conversion rules.
 
 ## Releases
+
+### [v0.1.6](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.1.6) (March 19, 2026)
+
+PATH augmentation for **Mermaid (`mmdc`)** and TeX subprocesses when the editor is **GUI-launched** (no shell `PATH`): **nvm**, **fnm**, **Volta**, `~/.npm-global/bin`, plus a one-time login-shell fallback. Toolchain **mmdc** probe matches. README VSIX verification and troubleshooting updated.
+
+See the [CHANGELOG](CHANGELOG.md).
 
 ### [v0.1.5](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.1.5) (March 19, 2026)
 
