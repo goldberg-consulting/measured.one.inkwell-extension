@@ -372,17 +372,20 @@ export async function showToolchainStatus(): Promise<void> {
 
   // Core tools present but packages missing
   if (missingCount > 0) {
-    const message = isMac
-      ? `${missingCount} LaTeX package${missingCount > 1 ? "s" : ""} missing: ${status.missingPackages.join(", ")}. Seeing errors like "File 'fixtounicode.sty' not found"? Install Full MacTeX for the most reliable setup.`
-      : `${missingCount} LaTeX package${missingCount > 1 ? "s" : ""} missing: ${status.missingPackages.join(", ")}`;
-    const choice = await vscode.window.showWarningMessage(
-      message,
-      ...(isMac ? ["Install Full MacTeX (recommended)", "Install now", "Show details"] : ["Install now", "Show details"])
-    );
+    const texAlreadyInstalled = status.xelatex.installed && status.pdflatex.installed;
+    const buttons: string[] = [];
+    let message = `${missingCount} LaTeX package${missingCount > 1 ? "s" : ""} missing: ${status.missingPackages.join(", ")}`;
+    if (isMac && !texAlreadyInstalled) {
+      message += '. Install Full MacTeX for the most reliable setup.';
+      buttons.push("Install Full MacTeX (recommended)");
+    }
+    buttons.push("Install packages with tlmgr", "Show details");
+
+    const choice = await vscode.window.showWarningMessage(message, ...buttons);
 
     if (choice === "Install Full MacTeX (recommended)") {
       await installFullMacTeX(status);
-    } else if (choice === "Install now") {
+    } else if (choice === "Install packages with tlmgr") {
       await installMissingPackages(status.missingPackages);
     } else if (choice === "Show details") {
       showPackageDetails(status);
@@ -504,7 +507,9 @@ async function installFullMacTeX(status: ToolchainStatus): Promise<void> {
   if (!status.crossref.installed) {
     commands.push("brew install pandoc-crossref");
   }
-  commands.push("brew install --cask mactex");
+  if (!status.xelatex.installed || !status.pdflatex.installed) {
+    commands.push("brew install --cask mactex");
+  }
   commands.push(
     'eval "$(/usr/libexec/path_helper)" && sudo tlmgr update --self && ' +
       buildTlmgrInstallCommand(requiredPackages, { useSudo: true })
