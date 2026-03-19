@@ -311,7 +311,7 @@ All extension-managed resources live under a single `.inkwell/` directory: scrip
 
 ## Templates
 
-Inkwell ships with seven templates. Each template includes a Pandoc `.latex` wrapper that compiles with the template's native document class. Templates declare their preferred PDF engine (`xelatex` or `pdflatex`) in `template.json`; Inkwell selects the right one automatically.
+Inkwell ships with eight templates. Each template includes a Pandoc `.latex` wrapper that compiles with the template's native document class. Templates declare their preferred PDF engine (`xelatex` or `pdflatex`) in `template.json`; Inkwell selects the right one automatically.
 
 | Template | Class | Engine | Description |
 |----------|-------|--------|-------------|
@@ -322,6 +322,7 @@ Inkwell ships with seven templates. Each template includes a Pandoc `.latex` wra
 | **Ludus Academik** | `ludusofficial` | xelatex | Ludus Academik Journal (themed, two-column) |
 | **RMxAA** | `rmaa-rho` | pdflatex | Revista Mexicana de Astronomia y Astrofisica (v4.6, two-column) |
 | **KTH Letter** | `kth-letter` | pdflatex | Official KTH (Royal Institute of Technology) letterhead |
+| **ETH Report** | `standard` (KOMA) | pdflatex | ETH Zürich IVT working paper with title page, abstract, keywords |
 
 Select a template with `template: tufte` in your YAML frontmatter, or use `Cmd+Shift+P` > **Inkwell: Select LaTeX Template**.
 
@@ -752,7 +753,17 @@ The agent references the full [Syntax Guide](guide.md) for field names, attribut
 
 ### [v0.1.5](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.1.5) (March 19, 2026)
 
-Scaffold resources consolidated into `.inkwell/` for a cleaner project layout. Scripts, figures, references, and examples now live under `.inkwell/` instead of cluttering the project root. Updated bibliography discovery and compilation to search the new paths. See the [CHANGELOG](CHANGELOG.md) for the full list.
+Consolidated `.inkwell/` workspace, new ETH Report template, and quality-of-life improvements.
+
+- All scaffold resources (scripts, figures, references, examples) moved under `.inkwell/` for a clean project root
+- New **ETH Report** template (ETH Zürich IVT working paper, KOMA-Script, pdfLaTeX)
+- New Project now generates template-specific YAML frontmatter (authors, affiliations, journal metadata)
+- Run Code Blocks button added to editor title bar
+- Fixed toolchain setup re-downloading MacTeX when already installed
+- Fixed mermaid rendering cache and silent error handling
+- Added "default" as template alias for Inkwell Default
+
+See the [CHANGELOG](CHANGELOG.md) for the full list.
 
 ### [v0.1.0](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.1.0) (March 9, 2026)
 
