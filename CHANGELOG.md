@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.9 (2026-03-19)
+
+- **Bootstrap Workspace** now runs the same **starter file** seeding as New Project / Update Project: `sine_plot.py`, `scatter.py`, **`convergence_table.py`**, `refs.bib`, `figures/.gitkeep`.
+- New Project (`createStructure`) uses shared **`ensureStarterFiles`** instead of duplicating writes.
+
 ## 0.1.8 (2026-03-19)
 
 **Extension repository layout:** demo assets (Python scripts, `refs.bib`) now live under **workspace root** `.inkwell/scripts/` and `.inkwell/references/`, not `examples/scripts/` or `examples/references/`. Example markdown again uses `.inkwell/…` paths. VSIX packaging includes those tracked `.inkwell/` files; build artifacts stay gitignored.
