@@ -3,7 +3,21 @@ node_modules/
 *.vsix
 .vscode-test/
 examples/venv/
-# Local Inkwell artifacts when opening examples/ alone (real root should use repo .inkwell/)
+# Stray nested .inkwell only (workspace root .inkwell/ is the real project)
 examples/.inkwell/
-examples/figures/
 examples/*.pdf
+# Tracked under root .inkwell/: manifest.json, scripts/, references/
+.inkwell/outputs/
+.inkwell/compiled/
+.inkwell/mermaid/
+.inkwell/figures/*.pdf
+*.aux
+*.log
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+__pycache__/
+*.pyc
+venv/
+.venv/

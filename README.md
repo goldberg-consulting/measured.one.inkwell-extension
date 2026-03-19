@@ -24,8 +24,8 @@ Inkwell lets you stay in markdown, stay in your editor, and still get publicatio
 Download the latest `.vsix` from [Releases](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases), then:
 
 ```bash
-cursor --install-extension inkwell-0.1.7.vsix --force
-# or: code --install-extension inkwell-0.1.7.vsix --force
+cursor --install-extension inkwell-0.1.8.vsix --force
+# or: code --install-extension inkwell-0.1.8.vsix --force
 ```
 
 Or in the editor: `Cmd+Shift+P` > **Extensions: Install from VSIX...** and select the file.
@@ -427,18 +427,17 @@ Most journal submission packages ship a `.cls` file and a sample `.tex` document
 
 ## Examples
 
-The [`examples/`](examples/) directory in this repo contains working demo documents for each template. Each compiles from markdown with YAML frontmatter to a publication-ready PDF. When you scaffold a project, copies live under `.inkwell/examples/` and use paths like `.inkwell/scripts/…` and `.inkwell/references/refs.bib`. **In this repository**, demos use **`examples/scripts/`** and **`references/refs.bib`** relative to the `examples/` folder so **Run** and **Compile** work without a root `.inkwell/` when you open the extension project.
+The [`examples/`](examples/) directory holds demo `.md` files for each template. Shared assets for those demos live in the **workspace root** [`.inkwell/`](.inkwell/)—**`scripts/`**, **`references/refs.bib`**, and generated figures under **`figures/`**—the same layout as **New Project / Bootstrap**. Open this repository as the workspace folder so Inkwell resolves `.inkwell/…` from the root.
 
-To try the bundled examples:
+To try the bundled examples (from the **repository root**):
 
 ```bash
-cd examples
 python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+pip install -r examples/requirements.txt
 ```
 
-Then open any `.md` file, hit **Run**, then **Compile**.
+Then open any `examples/*.md` file, hit **Run**, then **Compile**.
 
 ---
 
@@ -757,6 +756,10 @@ Inkwell includes a Cursor agent at `.cursor/agents/inkwell-guide.md`. When worki
 The agent references the full [Syntax Guide](guide.md) for field names, attribute tables, and conversion rules.
 
 ## Releases
+
+### [v0.1.8](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.1.8) (March 19, 2026)
+
+Bundled **`.inkwell/`** at repo root for demo scripts and bibliography; example `.md` files use `.inkwell/…` paths consistently.
 
 ### [v0.1.7](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.1.7) (March 19, 2026)
 

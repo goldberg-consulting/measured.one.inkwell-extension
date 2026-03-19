@@ -51,7 +51,7 @@ linenumbers: false                    # line numbers in the margin
 # lot: true                           # list of tables
 
 # --- Bibliography ---
-bibliography: references/refs.bib
+bibliography: .inkwell/references/refs.bib
 link-citations: true
 
 # --- Cross-reference prefixes ---
@@ -89,21 +89,21 @@ $$f_n(x) = \sum_{k=1}^{n} \frac{4}{(2k-1)\pi}\sin\bigl((2k-1)x\bigr)$$ {#eq:four
 
 @Fig:fourier shows the partial sums converging to the square wave as $n$ increases. The overshoot at the discontinuity is the Gibbs phenomenon.
 
-```{python file="scripts/sine_plot.py" output="sine_plot" caption="Fourier partial sums converging to a square wave." label="fourier"}
+```{python file=".inkwell/scripts/sine_plot.py" output="sine_plot" caption="Fourier partial sums converging to a square wave." label="fourier"}
 ```
 
 # Data Visualization {#sec:dataviz}
 
 @Fig:scatter shows a simulated scatter plot with linear regression, generated inline by Python.
 
-```{python file="scripts/scatter.py" output="scatter" caption="Simulated regression with n = 150 data points." label="scatter"}
+```{python file=".inkwell/scripts/scatter.py" output="scatter" caption="Simulated regression with n = 150 data points." label="scatter"}
 ```
 
 # Results {#sec:results}
 
 @Tbl:convergence shows the convergence behavior of the Fourier partial sums at the midpoint $x = \pi/2$, where the true value is $f(x) = 1$. The peak overshoot column quantifies the Gibbs phenomenon: regardless of $n$, the maximum value overshoots by approximately 9% of the jump magnitude.
 
-```{python file="scripts/convergence_table.py" output="convergence" caption="Convergence of Fourier partial sums at x = pi/2." label="convergence"}
+```{python file=".inkwell/scripts/convergence_table.py" output="convergence" caption="Convergence of Fourier partial sums at x = pi/2." label="convergence"}
 ```
 
 # Conclusion
