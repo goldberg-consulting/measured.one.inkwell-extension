@@ -27,7 +27,7 @@ classoption:
 # lot: true                           # list of tables
 
 # --- Bibliography ---
-bibliography: references/refs.bib
+bibliography: .inkwell/references/refs.bib
 link-citations: true
 
 # --- Cross-reference prefixes ---
@@ -108,11 +108,11 @@ for ax, (x, y, label) in zip(
 fig.supxlabel("x", fontsize=10)
 fig.supylabel("y", fontsize=10)
 fig.tight_layout()
-plt.savefig("figures/anscombe.pdf", bbox_inches="tight")
+plt.savefig(".inkwell/figures/anscombe.pdf", bbox_inches="tight")
 plt.close()
 ```
 
-![Anscombe's quartet: four datasets with identical summary statistics but distinct patterns.](figures/anscombe.pdf){#fig:anscombe}
+![Anscombe's quartet: four datasets with identical summary statistics but distinct patterns.](.inkwell/figures/anscombe.pdf){#fig:anscombe}
 
 As @fig:anscombe shows, the four sets share the same mean, variance, and
 correlation, yet the visual stories are entirely different.
@@ -125,7 +125,7 @@ let the main text flow without interruption.
 
 \begin{marginfigure}
 \centering
-\includegraphics[width=\linewidth]{figures/anscombe.pdf}
+\includegraphics[width=\linewidth]{.inkwell/figures/anscombe.pdf}
 \caption{The same Anscombe quartet, placed in the margin for reference.}
 \end{marginfigure}
 
