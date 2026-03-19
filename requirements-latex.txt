@@ -95,5 +95,19 @@ soul
 stix2-type1
 tex-gyre
 
+# ETH report dependencies
+koma-script
+babel-german
+stringstrings
+listofitems
+translations
+totcount
+ltabptch
+accsupp
+floatrow
+textcase
+subcaption
+tabularx
+
 # document classes
 tufte-latex

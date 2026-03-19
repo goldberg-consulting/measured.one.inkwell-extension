@@ -1,0 +1,5 @@
+{
+  "name": "ETH Report",
+  "description": "ETH Zürich IVT working paper / report. Single-column A4 with title page, abstract, KOMA-Script article class.",
+  "engine": "pdflatex"
+}

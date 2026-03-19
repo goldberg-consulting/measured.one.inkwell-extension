@@ -248,6 +248,26 @@ classoption:
   - justified
   - a4paper
 `,
+  "eth-report": `template: eth-report
+papertype: "Working Paper"
+headingstitle: "Short Title"
+eth-authors:
+  - name: "Author One"
+    department: "Department"
+    institution: "ETH Zürich"
+    address: "CH-8093 Zurich"
+    email: "author@ethz.ch"
+  - name: "Author Two"
+    department: "Department"
+    institution: "ETH Zürich"
+reportdate: "${new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}"
+reportnumber: ""
+keywords: "keyword1, keyword2"
+suggestedcitation: ""
+toc: true
+lot: true
+lof: true
+`,
   "kth-letter": `template: kth-letter
 name: "Sender Name"
 email: "sender@kth.se"
