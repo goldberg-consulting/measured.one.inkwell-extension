@@ -14,6 +14,8 @@ Scaffold resources consolidated into `.inkwell/` for a cleaner project layout.
 - Fixed toolchain setup re-downloading MacTeX (~5 GB) when a TeX distribution is already installed
 - New Project now scaffolds template-specific YAML frontmatter (authors, affiliations, journal metadata) for Ludus, Rho, RMxAA, TMSCE, Tufte, and KTH Letter
 - Added "default" as an alias for the Inkwell Default template so `template: default` resolves correctly
+- Added ETH Report template (ETH Zürich IVT working paper style, KOMA-Script article, pdfLaTeX)
+- Added `babel-german`, `koma-script`, and other ETH class dependencies to `requirements-latex.txt`
 
 ## 0.1.4 (2026-03-18)
 
