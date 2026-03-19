@@ -59,7 +59,7 @@ linenumbers: false                    # line numbers in the margin
 # lot: true                           # list of tables
 
 # --- Bibliography ---
-bibliography: .inkwell/references/refs.bib
+bibliography: references/refs.bib
 link-citations: true
 
 # --- Cross-reference prefixes ---

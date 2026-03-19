@@ -50,7 +50,7 @@ accepted: "20 February 2026"
 # lot: true                           # list of tables
 
 # --- Bibliography ---
-bibliography: .inkwell/references/refs.bib
+bibliography: references/refs.bib
 link-citations: true
 
 # --- Cross-reference prefixes ---
@@ -93,7 +93,7 @@ f_n(x) = \sum_{k=1}^{n} \frac{4}{(2k-1)\pi} \sin\bigl((2k-1)x\bigr).
 
 As $n \to \infty$, $f_n(x) \to f(x)$ pointwise for all $x$ not at a discontinuity.
 
-```{python file=".inkwell/scripts/sine_plot.py" output="sine_plot" caption="Fourier partial sums for n = 1, 3, 5, 9 showing convergence and Gibbs overshoot."}
+```{python file="scripts/sine_plot.py" output="sine_plot" caption="Fourier partial sums for n = 1, 3, 5, 9 showing convergence and Gibbs overshoot."}
 ```
 
 # Regression Example
