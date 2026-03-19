@@ -173,12 +173,6 @@
       }
     },
     "menus": {
-      "commandPalette": [
-        {
-          "command": "inkwell.bootstrapWorkspaceInkwell",
-          "when": "!inkwell.hasProject"
-        }
-      ],
       "editor/title": [
         {
           "command": "inkwell.preview",
