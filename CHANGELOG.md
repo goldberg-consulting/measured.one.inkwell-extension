@@ -16,6 +16,10 @@ Scaffold resources consolidated into `.inkwell/` for a cleaner project layout.
 - Added "default" as an alias for the Inkwell Default template so `template: default` resolves correctly
 - Added ETH Report template (ETH Zürich IVT working paper style, KOMA-Script article, pdfLaTeX)
 - Added `babel-german`, `koma-script`, and other ETH class dependencies to `requirements-latex.txt`
+- Updated all demo `.md` examples to use `.inkwell/` paths (bibliography, scripts, figures)
+- Added Run Code Blocks button to the editor title bar (no longer requires the preview panel to be open)
+- Fixed mermaid `mmdc` availability cache (now rechecks every 30s instead of caching forever)
+- Mermaid render failures are now logged instead of silently swallowed
 
 ## 0.1.4 (2026-03-18)
 
