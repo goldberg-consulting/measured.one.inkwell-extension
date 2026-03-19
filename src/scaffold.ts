@@ -147,6 +147,123 @@ r = np.corrcoef(x, y)[0, 1]
 print(f"n = {len(x)}, r = {r:.3f}, slope = {m:.3f}")
 `;
 
+const TEMPLATE_FRONTMATTER: Record<string, string> = {
+  ludus: `template: ludus
+classoption:
+  - red                               # theme: red, blue, green, orange
+  - fullpaper                         # type: fullpaper, shortpaper
+ludus-authors:
+  - name: "Author One"
+    superscript: "1"
+  - name: "Author Two"
+    superscript: "2"
+ludus-affiliations:
+  - superscript: "1"
+    text: "Department, University, Country"
+  - superscript: "2"
+    text: "Department, University, Country"
+corresponding-email: "author@university.edu"
+shorttitle: "Short Title"
+shortauthor: "Author & Author"
+journalname: "Journal Name"
+journalsubtitle: "Subtitle"
+publicationyear: ${new Date().getFullYear()}
+articledoi: "10.0000/example"
+acknowledgments: |
+  The authors thank the reviewers.
+`,
+  rho: `template: rho
+rho-authors:
+  - name: "Author One"
+    superscript: "1,*"
+  - name: "Author Two"
+    superscript: "2"
+rho-affiliations:
+  - superscript: "1"
+    text: "Department, University, Country"
+  - superscript: "2"
+    text: "Department, University, Country"
+  - superscript: "*"
+    text: "These authors contributed equally"
+journalname: "Journal Name"
+leadauthor: "Author et al."
+footinfo: "Creative Commons CC BY 4.0"
+smalltitle: "Short Title"
+institution: "University Name"
+theday: "${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}"
+corres: "Corresponding author information."
+email: "author@university.edu"
+doi: "https://doi.org/10.0000/example"
+received: ""
+accepted: ""
+`,
+  rmxaa: `template: rmxaa
+classoption: [9pt, twoside]
+rmxaa-authors:
+  - name: "Author One"
+    affiliations: "1"
+  - name: "Author Two"
+    affiliations: "2"
+rmxaa-affiliations:
+  - id: "1"
+    text: "Department, University, Country"
+  - id: "2"
+    text: "Department, University, Country"
+leadauthor: "Author et al."
+smalltitle: "Short Title"
+corresponding-author: "Author One"
+corresponding-email: "author@university.edu"
+resumen: |
+  Spanish abstract here.
+vol: 1
+pages: "1--10"
+yearofpub: ${new Date().getFullYear()}
+received: ""
+accepted: ""
+`,
+  tmsce: `template: tmsce
+tmsce-authors:
+  - name: "Author One"
+    superscript: "1"
+  - name: "Author Two"
+    superscript: "2"
+tmsce-affiliations:
+  - superscript: "1"
+    text: "Department, University, Country"
+  - superscript: "2"
+    text: "Department, University, Country"
+corresponding-email: "author@university.edu"
+journalname: "Transactions on Mathematical Sciences and Computational Engineering"
+doi: "10.0000/tmsce.${new Date().getFullYear()}.001"
+vol: 1
+issue: 1
+yearofpub: ${new Date().getFullYear()}
+pagerange: "1--10"
+received: ""
+revised: ""
+accepted: ""
+`,
+  tufte: `template: tufte
+classoption:
+  - justified
+  - a4paper
+`,
+  "kth-letter": `template: kth-letter
+name: "Sender Name"
+email: "sender@kth.se"
+web: "www.kth.se"
+telephone: "+46 8 790 60 00"
+dnr: ""
+recipient:
+  - "Recipient Name"
+  - "Department"
+  - "Address"
+  - "Country"
+opening: "Dear Dr. Name,"
+closing: "Kind regards,"
+`,
+};
+
 const MANIFEST_TEMPLATE = (template?: string) =>
   JSON.stringify(
     {
@@ -351,7 +468,10 @@ function createStructure(opts: ScaffoldOptions): void {
       '"Untitled"',
       `"${opts.name}"`
     );
-    if (opts.template) {
+    const templateStub = opts.template && TEMPLATE_FRONTMATTER[opts.template];
+    if (templateStub) {
+      frontmatter = frontmatter.replace("---\n\n", `${templateStub}---\n\n`);
+    } else if (opts.template) {
       frontmatter = frontmatter.replace(
         "---\n\n",
         `template: ${opts.template}\n---\n\n`
