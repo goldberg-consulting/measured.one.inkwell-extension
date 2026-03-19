@@ -11,35 +11,37 @@
 
 import * as path from "path";
 import * as fs from "fs";
-import * as os from "os";
 import * as crypto from "crypto";
 import { execFileSync } from "child_process";
 import { BlockResult, CodeBlock, DisplayMode, parseCodeBlocks, parseRunConfig, RunConfig } from "./runner";
+import { buildCodeBlockPath, findBinaryViaShell } from "./shell-env";
+import { getInkwellOutputChannel } from "./inkwell-output";
 
-function buildShellPath(): string {
-  const base = ["/usr/local/bin", "/usr/bin"];
-  const home = os.homedir();
-  const npmGlobal = path.join(home, ".npm-global", "bin");
-  if (process.platform === "darwin") {
-    return [
-      "/opt/homebrew/bin",
-      npmGlobal,
-      `${home}/Library/TinyTeX/bin/universal-darwin`,
-      "/Library/TeX/texbin",
-      ...base,
-      process.env.PATH,
-    ].join(":");
-  }
-  return [
-    npmGlobal,
-    ...base,
-    `${home}/.TinyTeX/bin/x86_64-linux`,
-    `${home}/.TinyTeX/bin/aarch64-linux`,
-    process.env.PATH,
-  ].join(":");
+/** Session-local dirs prepended after `mmdc` is resolved via login shell. */
+const injectPathShellPrepends: string[] = [];
+let shellMmdcProbeDone = false;
+
+function getInjectPath(): string {
+  const base = buildCodeBlockPath();
+  if (!injectPathShellPrepends.length) return base;
+  return [...injectPathShellPrepends, base].join(":");
 }
 
-const INJECT_ENV = { ...process.env, PATH: buildShellPath() };
+function getInjectEnv(): NodeJS.ProcessEnv {
+  return { ...process.env, PATH: getInjectPath() };
+}
+
+function tryAugmentMmdcFromShell(): void {
+  if (shellMmdcProbeDone) return;
+  shellMmdcProbeDone = true;
+  const resolved = findBinaryViaShell("mmdc");
+  if (resolved) {
+    const dir = path.dirname(resolved);
+    if (dir && !injectPathShellPrepends.includes(dir)) {
+      injectPathShellPrepends.push(dir);
+    }
+  }
+}
 
 const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".svg", ".pdf", ".eps"]);
 
@@ -487,13 +489,31 @@ function mmdcAvailable(): boolean {
   if (_mmdcAvailable !== undefined && Date.now() - _mmdcCheckTime < MMDC_CACHE_TTL) {
     return _mmdcAvailable;
   }
-  try {
+  const tryProbe = (): boolean => {
     execFileSync("mmdc", ["--version"], {
-      encoding: "utf-8", timeout: 5000, stdio: "pipe", env: INJECT_ENV,
+      encoding: "utf-8",
+      timeout: 5000,
+      stdio: "pipe",
+      env: getInjectEnv(),
     });
+    return true;
+  };
+  try {
+    tryProbe();
     _mmdcAvailable = true;
   } catch {
-    _mmdcAvailable = false;
+    tryAugmentMmdcFromShell();
+    try {
+      tryProbe();
+      _mmdcAvailable = true;
+    } catch {
+      _mmdcAvailable = false;
+      const p = getInjectPath();
+      const head = p.split(":").slice(0, 8).join(":");
+      getInkwellOutputChannel().appendLine(
+        `[mermaid] mmdc not found or failed --version. PATH head (extension-constructed): ${head}${p.split(":").length > 8 ? " ..." : ""}`,
+      );
+    }
   }
   _mmdcCheckTime = Date.now();
   return _mmdcAvailable;
@@ -554,7 +574,7 @@ export function renderMermaidBlocks(markdown: string, workDir: string): string {
           cwd: workDir,
           timeout: 30_000,
           stdio: "pipe",
-          env: INJECT_ENV,
+          env: getInjectEnv(),
         });
         if (!fs.existsSync(svgPath)) {
           const alt = svgPath.replace(".svg", "-1.svg");
@@ -564,7 +584,7 @@ export function renderMermaidBlocks(markdown: string, workDir: string): string {
           cwd: workDir,
           timeout: 30_000,
           stdio: "pipe",
-          env: INJECT_ENV,
+          env: getInjectEnv(),
         });
         if (!fs.existsSync(pngPath)) {
           const alt = pngPath.replace(".png", "-1.png");

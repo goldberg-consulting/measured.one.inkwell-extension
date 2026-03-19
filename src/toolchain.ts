@@ -9,6 +9,7 @@ import { promisify } from "util";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+import { collectNodeToolBinDirs, findBinaryViaShell } from "./shell-env";
 
 const exec = promisify(execFile);
 
@@ -69,18 +70,23 @@ const isMac = process.platform === "darwin";
 const isLinux = process.platform === "linux";
 
 function searchPaths(): string[] {
+  const home = os.homedir();
+  const npmGlobal = path.join(home, ".npm-global", "bin");
+  const nodeBins = collectNodeToolBinDirs();
   const common = ["/usr/local/bin", "/usr/bin"];
   if (isMac) {
-    const home = os.homedir();
     return [
       "/opt/homebrew/bin",
+      npmGlobal,
+      ...nodeBins,
       ...common,
       "/Library/TeX/texbin",
       path.join(home, "Library/TinyTeX/bin/universal-darwin"),
     ];
   }
-  const home = os.homedir();
   return [
+    npmGlobal,
+    ...nodeBins,
     ...common,
     `${home}/bin`,
     `${home}/.TinyTeX/bin/x86_64-linux`,
@@ -120,6 +126,19 @@ async function probe(
       }
     }
   } catch {}
+
+  if (name === "mmdc") {
+    const p = findBinaryViaShell(name);
+    if (p && fs.existsSync(p)) {
+      try {
+        const { stdout } = await exec(p, ["--version"], { timeout: 5000 });
+        return { installed: true, version: stdout.split("\n")[0].trim(), path: p };
+      } catch {
+        return { installed: true, path: p };
+      }
+    }
+  }
+
   return { installed: false };
 }
 

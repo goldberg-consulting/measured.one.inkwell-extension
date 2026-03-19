@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.6 (2026-03-19)
+
+PATH construction for subprocesses (Mermaid CLI, Pandoc/TeX) so **GUI-launched** VS Code/Cursor finds **`mmdc`** when Node tools live under **nvm**, **fnm**, or **Volta**.
+
+- Added `src/shell-env.ts`: `buildCodeBlockPath`, `buildTexInvocationPath`, `collectNodeToolBinDirs`, `findBinaryViaShell` (login-shell fallback; Windows `where`)
+- **`inject`**: dynamic `getInjectEnv()`, one-time shell resolution + prepend if `mmdc --version` fails; log PATH head to **Inkwell LaTeX** on failure
+- **`compiler`**: `TEX_ENV.PATH` uses `buildTexInvocationPath()` (same node-manager coverage, TeX-first order)
+- **`toolchain`**: search paths include `~/.npm-global/bin` + node-manager bins; **`mmdc`** probe uses shell fallback
+- **`inkwell-output`**: singleton output channel; **preview** uses it
+- **README**: VSIX smoke-test, troubleshooting for Node managers + output channel, packaging tip
+
 ## 0.1.5 (2026-03-19)
 
 Scaffold resources consolidated into `.inkwell/` for a cleaner project layout.
