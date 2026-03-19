@@ -59,7 +59,7 @@ linenumbers: false                    # line numbers in the margin
 # lot: true                           # list of tables
 
 # --- Bibliography ---
-bibliography: references/refs.bib
+bibliography: .inkwell/references/refs.bib
 link-citations: true
 
 # --- Cross-reference prefixes ---
@@ -99,14 +99,14 @@ f_n(x) = \sum_{k=1}^{n} \frac{4}{(2k-1)\pi}\sin\bigl((2k-1)x\bigr).
 
 Figure 1 shows the convergence for increasing $n$.
 
-```{python file="scripts/sine_plot.py" output="sine_plot" caption="Fourier partial sums for n = 1, 3, 5, 9."}
+```{python file=".inkwell/scripts/sine_plot.py" output="sine_plot" caption="Fourier partial sums for n = 1, 3, 5, 9."}
 ```
 
 # DATA EXAMPLE {#sec:data}
 
 A simulated regression demonstrates inline code execution:
 
-```{python file="scripts/scatter.py" output="scatter" caption="Bivariate scatter with OLS regression."}
+```{python file=".inkwell/scripts/scatter.py" output="scatter" caption="Bivariate scatter with OLS regression."}
 ```
 
 # RESULTS
