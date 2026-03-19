@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.5 (2026-03-19)
+
+Scaffold resources consolidated into `.inkwell/` for a cleaner project layout.
+
+- Moved `scripts/`, `figures/`, `references/`, and `examples/` under `.inkwell/` in both New Project and Bootstrap Workspace flows
+- Updated bibliography discovery and compilation to search `.inkwell/references/` and `.inkwell/figures/`
+- Updated guide and cursor agent docs to reflect new resource paths
+- Added `.inkwell/mermaid/` to the default `.gitignore` template
+- Bumped scaffold version to 3
+
 ## 0.1.4 (2026-03-18)
 
 Installer guidance and docs now consistently point to full LaTeX dependency provisioning.
