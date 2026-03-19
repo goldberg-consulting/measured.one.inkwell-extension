@@ -50,7 +50,7 @@ pandoc "$BASE/examples/demo-<name>.md" \
   --pdf-engine=<pdflatex|xelatex> \
   --standalone \
   --template="$BASE/templates/<name>/<name>.latex" \
-  --resource-path="$BASE/templates/<name>:$BASE/examples" \
+  --resource-path="$BASE/templates/<name>:$BASE/examples:$BASE/.inkwell" \
   -V graphics=true --citeproc \
-  --bibliography="$BASE/examples/references/refs.bib"
+  --bibliography="$BASE/.inkwell/references/refs.bib"
 ```

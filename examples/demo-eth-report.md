@@ -29,7 +29,7 @@ toc: true
 lot: true
 lof: true
 
-bibliography: references/refs.bib
+bibliography: .inkwell/references/refs.bib
 link-citations: true
 
 figPrefix: "Figure"
@@ -64,12 +64,12 @@ As $n \to \infty$, the partial sums converge pointwise to the square wave at all
 
 @Fig:fourier shows the Fourier partial sums converging to the square wave as $n$ increases.
 
-```{python file="scripts/sine_plot.py" output="sine_plot" caption="Fourier partial sums converging to a square wave." label="fourier"}
+```{python file=".inkwell/scripts/sine_plot.py" output="sine_plot" caption="Fourier partial sums converging to a square wave." label="fourier"}
 ```
 
 @Fig:scatter presents a simulated scatter plot with linear regression, demonstrating the integration of Python-generated figures.
 
-```{python file="scripts/scatter.py" output="scatter" caption="Scatter plot with linear regression." label="scatter"}
+```{python file=".inkwell/scripts/scatter.py" output="scatter" caption="Scatter plot with linear regression." label="scatter"}
 ```
 
 # Discussion {#sec:discussion}

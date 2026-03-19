@@ -39,7 +39,7 @@ linestretch: 1.4                      # line spacing multiplier
 # lot: true                           # list of tables
 
 # --- Bibliography ---
-# bibliography: references/refs.bib
+# bibliography: .inkwell/references/refs.bib
 # link-citations: true
 
 # --- Cross-reference prefixes (pandoc-crossref) ---
