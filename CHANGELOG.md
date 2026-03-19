@@ -9,6 +9,8 @@ Scaffold resources consolidated into `.inkwell/` for a cleaner project layout.
 - Updated guide and cursor agent docs to reflect new resource paths
 - Added `.inkwell/mermaid/` to the default `.gitignore` template
 - Bumped scaffold version to 3
+- Fixed Bootstrap Workspace command being hidden when any `.inkwell/` directory existed in the workspace
+- Restructured README install flow: extension first, toolchain second, workspace bootstrap third
 
 ## 0.1.4 (2026-03-18)
 
