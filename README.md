@@ -24,8 +24,8 @@ Inkwell lets you stay in markdown, stay in your editor, and still get publicatio
 Download the latest `.vsix` from [Releases](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases), then:
 
 ```bash
-cursor --install-extension inkwell-0.1.6.vsix --force
-# or: code --install-extension inkwell-0.1.6.vsix --force
+cursor --install-extension inkwell-0.1.7.vsix --force
+# or: code --install-extension inkwell-0.1.7.vsix --force
 ```
 
 Or in the editor: `Cmd+Shift+P` > **Extensions: Install from VSIX...** and select the file.
@@ -131,11 +131,11 @@ See the **[Syntax Guide](guide.md)** for the complete reference on YAML frontmat
 
 ## Project structure
 
-Everything Inkwell manages lives under `.inkwell/`, keeping your working tree clean:
+Everything Inkwell manages lives under **one** `.inkwell/` at the **Inkwell project root** (the first folder found when walking up from your `.md` file that contains `.inkwell/`—usually the repo root next to `.cursor/`). Nested markdown (e.g. `docs/chapter.md`) does **not** get a second `.inkwell/` beside the file.
 
 ```
 my-paper/
-  my-paper.md              # your document
+  my-paper.md              # your document (any path under the project root)
   requirements.txt         # Python dependencies (if enabled)
   venv/                    # Python environment (if enabled)
   .inkwell/
@@ -145,8 +145,9 @@ my-paper/
     figures/               # static images, diagrams
     references/            # .bib files
     examples/              # demo .md files for each template
-    outputs/               # cached code block results (gitignored)
-    mermaid/               # cached mermaid renders (gitignored)
+    outputs/               # per-document cache dirs (gitignored), e.g. outputs/my-paper/
+    compiled/              # injected markdown for Pandoc (gitignored), e.g. compiled/my-paper.md
+    mermaid/               # cached mermaid renders (gitignored, shared by hash)
     templates/             # project-local template overrides (optional)
   .gitignore
 ```
@@ -201,7 +202,7 @@ echo "Built on $(date)"
 | `label`   | Cross-reference label (produces `fig:label` or `tbl:label`) |
 | `cache`   | Set to `"false"` to re-run every time, skipping the content cache |
 
-Results cache in `.inkwell/outputs/`. Only re-run when the code actually changes.
+Results cache under `.inkwell/outputs/<document-key>/` (derived from each source file’s path relative to the project root). Only re-run when the code actually changes.
 
 ### Generated tables and figures
 
@@ -313,7 +314,7 @@ inkwell:
 
 ### Self-contained `.inkwell/` workspace
 
-All extension-managed resources live under a single `.inkwell/` directory: scripts, figures, references, examples, cached outputs, mermaid renders, and templates. Your project root stays clean — just your `.md` document files, a `.gitignore`, and optionally a Python venv. The scaffold creates the full structure automatically via **New Project** or **Bootstrap Workspace**, and the **Update Project** command backfills any missing directories or starter files.
+All extension-managed resources live under a single `.inkwell/` directory at the **project root**: scripts, figures, references, examples, per-document output caches (`.inkwell/outputs/<doc-key>/`), compiled staging (`.inkwell/compiled/`), shared mermaid cache, and templates. Markdown can live in subfolders; with a **single-folder workspace** opened at the repo root, Inkwell uses that root’s `.inkwell/` (not a nested `.inkwell` next to the file). **Multi-Inkwell monorepos:** open each subproject as its own workspace folder (multi-root), or only the root that should own `.inkwell/`. The scaffold creates the full structure via **New Project** or **Bootstrap Workspace**, and **Update Project** backfills missing directories.
 
 ## Templates
 
@@ -756,6 +757,10 @@ Inkwell includes a Cursor agent at `.cursor/agents/inkwell-guide.md`. When worki
 The agent references the full [Syntax Guide](guide.md) for field names, attribute tables, and conversion rules.
 
 ## Releases
+
+### [v0.1.7](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.1.7) (March 19, 2026)
+
+Single **project-root** `.inkwell/` for outputs, mermaid, and compiled staging (with per-document subfolders). Prefers the **workspace folder** when it contains `.inkwell/` so nested stray folders don’t take over. See [CHANGELOG](CHANGELOG.md).
 
 ### [v0.1.6](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.1.6) (March 19, 2026)
 

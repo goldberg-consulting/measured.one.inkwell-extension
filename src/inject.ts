@@ -16,6 +16,12 @@ import { execFileSync } from "child_process";
 import { BlockResult, CodeBlock, DisplayMode, parseCodeBlocks, parseRunConfig, RunConfig } from "./runner";
 import { buildCodeBlockPath, findBinaryViaShell } from "./shell-env";
 import { getInkwellOutputChannel } from "./inkwell-output";
+import {
+  getInkwellCompiledPath,
+  getInkwellOutputsDir,
+  getInkwellProjectRoot,
+  resolveBlockFilePath,
+} from "./config";
 
 /** Session-local dirs prepended after `mmdc` is resolved via login shell. */
 const injectPathShellPrepends: string[] = [];
@@ -109,7 +115,8 @@ export function injectResults(
   markdown: string,
   results: BlockResult[],
   defaultDisplay: DisplayMode = "output",
-  workDir?: string,
+  docDir: string,
+  projectRoot: string,
 ): string {
   if (!results.length) return markdown;
 
@@ -132,7 +139,7 @@ export function injectResults(
     const start = output.indexOf(block.raw, offset);
     if (start === -1) continue;
 
-    const replacement = buildBlockOutput(block, result, display, workDir);
+    const replacement = buildBlockOutput(block, result, display, docDir, projectRoot);
 
     output =
       output.substring(0, start) +
@@ -148,11 +155,12 @@ function buildBlockOutput(
   block: CodeBlock,
   result: BlockResult | undefined,
   display: DisplayMode,
-  workDir?: string,
+  docDir: string,
+  projectRoot: string,
 ): string {
   if (display === "none") return "";
 
-  const codeSection = formatCodeBlock(block, workDir);
+  const codeSection = formatCodeBlock(block, docDir, projectRoot);
   const outputSection = result && result.exitCode === 0
     ? buildOutputContent(result) : null;
 
@@ -169,10 +177,10 @@ function pandocLang(lang: string): string {
   return PANDOC_LANG_MAP[lower] || lower;
 }
 
-function formatCodeBlock(block: CodeBlock, workDir?: string): string {
+function formatCodeBlock(block: CodeBlock, docDir: string, projectRoot: string): string {
   const lang = pandocLang(block.lang);
   if (block.file) {
-    const filePath = workDir ? path.resolve(workDir, block.file) : block.file;
+    const filePath = resolveBlockFilePath(block.file, docDir, projectRoot);
     let source: string;
     try {
       source = fs.readFileSync(filePath, "utf-8").trim();
@@ -328,8 +336,7 @@ export function gatherCachedResults(
   markdown: string,
   sourceFile: string,
 ): BlockResult[] {
-  const workDir = path.dirname(sourceFile);
-  const cacheDir = path.join(workDir, ".inkwell", "outputs");
+  const cacheDir = getInkwellOutputsDir(sourceFile);
 
   const blocks = parseCodeBlocks(markdown);
   const results: BlockResult[] = [];
@@ -369,13 +376,16 @@ export function gatherCachedResults(
 
 const INLINE_EXPR_RE = /`\{python\}\s+([^`]+)`/g;
 
-function resolvePython(runConfig: RunConfig, workDir: string): string {
+function resolvePython(runConfig: RunConfig, docDir: string, projectRoot: string): string {
   const envSpec = runConfig.pythonEnv;
   if (envSpec) {
-    const resolved = path.resolve(workDir, envSpec.replace(/^~/, process.env.HOME || "~"));
-    for (const bin of ["bin/python3", "bin/python"]) {
-      const full = path.join(resolved, bin);
-      if (fs.existsSync(full)) return full;
+    const home = process.env.HOME || "~";
+    for (const base of [projectRoot, docDir]) {
+      const resolved = path.resolve(base, envSpec.replace(/^~/, home));
+      for (const bin of ["bin/python3", "bin/python"]) {
+        const full = path.join(resolved, bin);
+        if (fs.existsSync(full)) return full;
+      }
     }
   }
   return "python3";
@@ -385,7 +395,8 @@ export function evaluateInlineExpressions(
   markdown: string,
   vars: Map<string, string>,
   runConfig: RunConfig,
-  workDir: string,
+  docDir: string,
+  projectRoot: string,
   cacheDir: string,
 ): string {
   const matches: { full: string; expr: string }[] = [];
@@ -435,12 +446,12 @@ export function evaluateInlineExpressions(
   const scriptPath = path.join(evalDir, "eval.py");
   fs.writeFileSync(scriptPath, script, "utf-8");
 
-  const python = resolvePython(runConfig, workDir);
+  const python = resolvePython(runConfig, docDir, projectRoot);
 
   let stdout: string;
   try {
     stdout = execFileSync(python, ["-u", scriptPath], {
-      cwd: workDir,
+      cwd: projectRoot,
       timeout: 30_000,
       encoding: "utf-8",
       env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" },
@@ -530,7 +541,8 @@ function parseMermaidAttrs(raw: string | undefined): Record<string, string> {
   return attrs;
 }
 
-export function renderMermaidBlocks(markdown: string, workDir: string): string {
+/** `projectRoot` — Inkwell project directory containing `.inkwell/` (not the `.md` folder when nested). */
+export function renderMermaidBlocks(markdown: string, projectRoot: string): string {
   if (!mmdcAvailable()) return markdown;
 
   const matches: { raw: string; attrsStr?: string; source: string }[] = [];
@@ -541,7 +553,7 @@ export function renderMermaidBlocks(markdown: string, workDir: string): string {
   }
   if (!matches.length) return markdown;
 
-  const mermaidDir = path.join(workDir, ".inkwell", "mermaid");
+  const mermaidDir = path.join(projectRoot, ".inkwell", "mermaid");
   fs.mkdirSync(mermaidDir, { recursive: true });
 
   let output = markdown;
@@ -571,7 +583,7 @@ export function renderMermaidBlocks(markdown: string, workDir: string): string {
       fs.writeFileSync(inputPath, match.source, "utf-8");
       try {
         execFileSync("mmdc", ["-i", inputPath, "-o", svgPath], {
-          cwd: workDir,
+          cwd: projectRoot,
           timeout: 30_000,
           stdio: "pipe",
           env: getInjectEnv(),
@@ -581,7 +593,7 @@ export function renderMermaidBlocks(markdown: string, workDir: string): string {
           if (fs.existsSync(alt)) fs.renameSync(alt, svgPath);
         }
         execFileSync("mmdc", ["-i", inputPath, "-o", pngPath, "-s", "4"], {
-          cwd: workDir,
+          cwd: projectRoot,
           timeout: 30_000,
           stdio: "pipe",
           env: getInjectEnv(),
@@ -630,11 +642,12 @@ export function prepareForCompilation(
   markdown: string,
   sourceFile: string,
 ): { injected: string; tempFile: string } {
-  const workDir = path.dirname(sourceFile);
+  const docDir = path.dirname(sourceFile);
+  const projectRoot = getInkwellProjectRoot(sourceFile);
 
   const hasMermaid = /^```(?:\{mermaid|mermaid)/m.test(markdown);
   const processed = hasMermaid
-    ? renderMermaidBlocks(markdown, workDir)
+    ? renderMermaidBlocks(markdown, projectRoot)
     : markdown;
 
   const blocks = parseCodeBlocks(processed);
@@ -651,14 +664,13 @@ export function prepareForCompilation(
   const results = gatherCachedResults(processed, sourceFile);
   const vars = collectVariables(results);
 
-  let injected = injectResults(processed, results, defaultDisplay, workDir);
+  let injected = injectResults(processed, results, defaultDisplay, docDir, projectRoot);
   injected = substituteVariables(injected, vars);
 
-  const cacheDir = path.join(workDir, ".inkwell", "outputs");
-  injected = evaluateInlineExpressions(injected, vars, runConfig, workDir, cacheDir);
+  const cacheDir = getInkwellOutputsDir(sourceFile);
+  injected = evaluateInlineExpressions(injected, vars, runConfig, docDir, projectRoot, cacheDir);
 
-  const ext = path.extname(sourceFile);
-  const tempFile = path.join(workDir, ".inkwell", `compiled${ext}`);
+  const tempFile = getInkwellCompiledPath(sourceFile);
   fs.mkdirSync(path.dirname(tempFile), { recursive: true });
   fs.writeFileSync(tempFile, injected, "utf-8");
 
@@ -681,17 +693,18 @@ export function prepareForPreview(
 
   if (!hasBlocks && !hasVarRefs && !hasInlineExprs) return processed;
 
-  const workDir = path.dirname(sourceFile);
+  const docDir = path.dirname(sourceFile);
+  const projectRoot = getInkwellProjectRoot(sourceFile);
   const runConfig = parseRunConfig(processed);
   const defaultDisplay = runConfig.defaultDisplay || "output";
   const results = gatherCachedResults(processed, sourceFile);
   const vars = collectVariables(results);
 
-  let injected = injectResults(processed, results, defaultDisplay, workDir);
+  let injected = injectResults(processed, results, defaultDisplay, docDir, projectRoot);
   injected = substituteVariables(injected, vars);
 
-  const cacheDir = path.join(workDir, ".inkwell", "outputs");
-  injected = evaluateInlineExpressions(injected, vars, runConfig, workDir, cacheDir);
+  const cacheDir = getInkwellOutputsDir(sourceFile);
+  injected = evaluateInlineExpressions(injected, vars, runConfig, docDir, projectRoot, cacheDir);
 
   return injected;
 }

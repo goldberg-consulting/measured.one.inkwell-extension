@@ -17,23 +17,24 @@ alwaysApply: true
 | `inject.ts` | Injects cached code outputs into markdown before compilation |
 | `preamble.ts` | Generates LaTeX preamble from `inkwell:` frontmatter options |
 | `cache.ts` | Code block output caching and invalidation |
-| `config.ts` | Project root detection, .bib discovery, defaults.yaml |
+| `config.ts` | Project root detection (`.inkwell/`), artifact paths, .bib discovery, defaults.yaml |
+| `shell-env.ts` | Augmented `PATH` for subprocesses (TeX, `mmdc`, node managers) |
 | `diagnostics.ts` | Error parsing, VS Code diagnostic reporting |
 | `scaffold.ts` | New project scaffolding (Inkwell: New Project command) |
 | `toolchain.ts` | Pandoc/TeX binary detection and guided installation |
 
 ## Key Conventions
 
-- Compilation always happens in an isolated temp directory (`getCacheDir`). The user's working tree is never written to except for the final PDF output.
-- `TEX_ENV` is constructed at module load with expanded PATH for TeX binaries. All `exec` calls for TeX/Pandoc use this environment, never bare `process.env`.
+- Compilation always happens in an isolated temp directory (`getCacheDir`). The user's working tree is never written to except for the final PDF output and Inkwell’s **project-root** `.inkwell/` dirs: `outputs/<doc-key>/`, `compiled/`, `mermaid/` (see `config.getInkwellProjectRoot`, `getInkwellOutputsDir`, `getInkwellCompiledPath`).
+- `TEX_ENV` uses `buildTexInvocationPath()` from `shell-env.ts`. All `exec` calls for TeX/Pandoc use this environment, never bare `process.env`.
 - Template selection flows: YAML frontmatter `template:` field > `.inkwell/manifest.json` > default "inkwell" template.
-- Code block outputs cache by content hash. A block only re-runs when its source changes.
+- Code block outputs cache by content hash under **per-document** subfolders. A block only re-runs when its source changes.
 
 ## Environment
 
 - TypeScript compiled to `out/` via `tsc`.
 - `__dirname` at runtime is `<extension-root>/out/`. Built-in templates live at `path.join(__dirname, "..", "templates")`.
-- VS Code on macOS does not inherit the user's shell PATH when launched from the Dock. `buildTexPath()` in `compiler.ts` adds common TeX locations explicitly.
+- VS Code on macOS does not inherit the user's shell PATH when launched from the Dock. `shell-env.ts` adds common TeX and Node-tool locations explicitly.
 
 ## Testing
 
