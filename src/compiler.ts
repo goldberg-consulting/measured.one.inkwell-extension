@@ -11,7 +11,7 @@ import * as os from "os";
 import * as crypto from "crypto";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { findInkwellRoot, findBibFiles, findDefaultsYaml } from "./config";
+import { findBibFiles, findDefaultsYaml, getInkwellProjectRoot } from "./config";
 import { InkwellDiagnostics, CompileError } from "./diagnostics";
 import { getTemplateForDocument, copySupportingFiles, PdfEngine, ResolvedTemplate, collectAllFeatures } from "./templates";
 import { prepareForCompilation } from "./inject";
@@ -178,7 +178,8 @@ async function compileTeX(
   const tmpSource = path.join(cacheDir, path.basename(sourceFile));
   fs.writeFileSync(tmpSource, document.getText(), "utf-8");
 
-  copySiblingFiles(sourceDir, cacheDir);
+  const projectRoot = getInkwellProjectRoot(sourceFile);
+  copySiblingFiles(sourceDir, projectRoot, cacheDir);
   const template = getTemplateForDocument(document);
   copySupportingFiles(template, cacheDir);
 
@@ -281,20 +282,24 @@ const COPY_EXTS = new Set([
 
 const RESOURCE_SUBDIRS = ["references", "figures", "images", "assets"];
 
-function copySiblingFiles(sourceDir: string, cacheDir: string): void {
+function copySiblingFiles(sourceDir: string, projectRoot: string, cacheDir: string): void {
   copyDirFiles(sourceDir, cacheDir);
-  for (const sub of RESOURCE_SUBDIRS) {
-    const subSrc = path.join(sourceDir, sub);
-    if (fs.existsSync(subSrc) && fs.statSync(subSrc).isDirectory()) {
-      const subDst = path.join(cacheDir, sub);
-      fs.mkdirSync(subDst, { recursive: true });
-      copyDirFiles(subSrc, subDst);
-    }
-    const inkwellSub = path.join(sourceDir, ".inkwell", sub);
-    if (fs.existsSync(inkwellSub) && fs.statSync(inkwellSub).isDirectory()) {
-      const subDst = path.join(cacheDir, ".inkwell", sub);
-      fs.mkdirSync(subDst, { recursive: true });
-      copyDirFiles(inkwellSub, subDst);
+  const roots = [sourceDir];
+  if (projectRoot !== sourceDir) roots.push(projectRoot);
+  for (const root of roots) {
+    for (const sub of RESOURCE_SUBDIRS) {
+      const subSrc = path.join(root, sub);
+      if (fs.existsSync(subSrc) && fs.statSync(subSrc).isDirectory()) {
+        const subDst = path.join(cacheDir, sub);
+        fs.mkdirSync(subDst, { recursive: true });
+        copyDirFiles(subSrc, subDst);
+      }
+      const inkwellSub = path.join(root, ".inkwell", sub);
+      if (fs.existsSync(inkwellSub) && fs.statSync(inkwellSub).isDirectory()) {
+        const subDst = path.join(cacheDir, ".inkwell", sub);
+        fs.mkdirSync(subDst, { recursive: true });
+        copyDirFiles(inkwellSub, subDst);
+      }
     }
   }
 }
@@ -416,7 +421,8 @@ async function compilePandoc(
   else if (ext === ".org") fromFormat = "org";
   else if (ext === ".txt") fromFormat = `markdown+${PANDOC_EXTENSIONS}`;
 
-  const resourcePath = [cacheDir, template.dir, sourceDir].join(":");
+  const projectRoot = getInkwellProjectRoot(sourceFile);
+  const resourcePath = [cacheDir, template.dir, sourceDir, projectRoot].join(":");
 
   const args = [
     tmpSource,
@@ -446,19 +452,16 @@ async function compilePandoc(
     args.splice(args.indexOf("--citeproc"), 0, "--filter", crossref);
   }
 
-  const projectRoot = findInkwellRoot(document.uri);
-  if (projectRoot) {
-    const bibFiles = findBibFiles(projectRoot);
-    for (const bib of bibFiles) {
-      args.push("--bibliography", bib);
-    }
-    const defaults = findDefaultsYaml(projectRoot);
-    if (defaults) {
-      args.push("--defaults", defaults);
-    }
+  const bibFiles = findBibFiles(projectRoot);
+  for (const bib of bibFiles) {
+    args.push("--bibliography", bib);
+  }
+  const defaults = findDefaultsYaml(projectRoot);
+  if (defaults) {
+    args.push("--defaults", defaults);
   }
 
-  copySiblingFiles(sourceDir, cacheDir);
+  copySiblingFiles(sourceDir, projectRoot, cacheDir);
 
   let stderr = "";
   let stdout = "";
@@ -467,7 +470,7 @@ async function compilePandoc(
   // files that live in the cache dir, the template's own directory (for
   // subdirectory-structured classes like rmaa-rho-class/), or beside
   // the source document. The trailing colon preserves default TeX paths.
-  const texInputs = [cacheDir, template.dir, sourceDir, ""].join(":");
+  const texInputs = [cacheDir, template.dir, sourceDir, projectRoot, ""].join(":");
   const texEnv = {
     ...TEX_ENV,
     TEXINPUTS: texInputs,
