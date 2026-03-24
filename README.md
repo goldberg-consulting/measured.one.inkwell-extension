@@ -533,7 +533,7 @@ opening: "Dear Professor Lovelace,"
 closing: "Kind regards,"
 ```
 
-Features: KTH branded letterhead with school logo, institutional footer with address and contact details, page numbering, recipient address block.
+Features: KTH branded letterhead with school logo, institutional footer with address and contact details, page numbering, recipient address block, section headings, tables (booktabs), code blocks with syntax highlighting, math (amsmath), graphics, and hyperlinks.
 
 [Source](examples/demo-kth-letter.md) | [PDF](examples/demo-kth-letter.pdf)
 
