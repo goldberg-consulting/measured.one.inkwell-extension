@@ -477,10 +477,39 @@ export async function bootstrapWorkspaceInkwell(): Promise<void> {
   const gi = updateGitignore(baseDir);
   if (gi.length) report.push(`updated .gitignore (${gi.length} entries)`);
   if (copyGuide(baseDir)) report.push("updated .inkwell/guide.md");
+  if (copyAgent(baseDir)) report.push("updated .cursor/agents/inkwell-guide.md");
 
   const seedFiles = ensureStarterFiles(baseDir);
   if (seedFiles.length) {
     report.push(`added starter files: ${seedFiles.join(", ")}`);
+  }
+
+  const demos = copyDemoFiles(baseDir);
+  if (demos.length) {
+    report.push(`copied examples: ${demos.length} files`);
+  }
+
+  const envChoice = await vscode.window.showQuickPick(
+    [
+      { label: "Yes", detail: "Create a Python venv and requirements.txt" },
+      { label: "No", detail: "Skip Python setup" },
+    ],
+    { placeHolder: "Set up a Python virtual environment?" }
+  );
+
+  if (envChoice?.label === "Yes") {
+    const reqPath = path.join(baseDir, "requirements.txt");
+    if (!fs.existsSync(reqPath)) {
+      fs.writeFileSync(reqPath, "numpy\nmatplotlib\npandas\npolars\nscikit-learn\numap-learn\nseaborn\n");
+      report.push("created requirements.txt");
+    }
+    const terminal = vscode.window.createTerminal("Inkwell Setup");
+    terminal.show();
+    const venvPath = path.join(baseDir, "venv");
+    terminal.sendText(
+      `python3 -m venv "${venvPath}" && source "${venvPath}/bin/activate" && pip install -r "${reqPath}" && python3 --version`
+    );
+    report.push("creating venv (installing in terminal)");
   }
 
   if (report.length) {
