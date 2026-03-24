@@ -9,6 +9,11 @@ $if(telephone)$\telephone{$telephone$}$endif$
 $if(location)$\location{$location$}$endif$
 $if(signature-name)$\signature[$if(signature-cols)$$signature-cols$$else$1$endif$]{$signature-name$}$endif$
 
+% pandoc-crossref expects these; the letter class doesn't define them
+\providecommand{\figurename}{Figure}
+\providecommand{\tablename}{Table}
+\providecommand{\listfigurename}{List of Figures}
+\providecommand{\listtablename}{List of Tables}
 \providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
 \makeatletter
 \providecommand\pandocbounded[1]{%
