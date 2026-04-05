@@ -113,8 +113,8 @@
       },
       {
         "command": "inkwell.runCodeBlocks",
-        "key": "ctrl+shift+b",
-        "mac": "cmd+shift+b",
+        "key": "ctrl+alt+r",
+        "mac": "cmd+alt+r",
         "when": "editorLangId == markdown"
       }
     ],
