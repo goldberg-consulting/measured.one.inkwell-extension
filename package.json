@@ -33,21 +33,6 @@
     "onLanguage:latex",
     "workspaceContains:.inkwell"
   ],
-  "files": [
-    "LICENSE",
-    "CHANGELOG.md",
-    "out/**",
-    "templates/**",
-    "media/**",
-    "examples/*.md",
-    ".inkwell/manifest.json",
-    ".inkwell/scripts/**",
-    ".inkwell/references/**",
-    ".inkwell/figures/.gitkeep",
-    "guide.md",
-    "requirements-latex.txt",
-    ".cursor/agents/inkwell-guide.md"
-  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [

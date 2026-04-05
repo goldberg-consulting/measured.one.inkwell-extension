@@ -17,31 +17,33 @@ Inkwell lets you stay in markdown, stay in your editor, and still get publicatio
 
 ## Installation
 
-### 1. Install everything with Brew (macOS, recommended)
+### 1. Install with Brew (macOS, recommended)
 
-One command installs the extension from the VS Code/Cursor marketplace plus the full toolchain:
+Two commands install the extension, Pandoc, pandoc-crossref, and a full TeX distribution:
 
 ```bash
-brew bundle
+brew tap goldberg-consulting/inkwell
+brew install --cask inkwell
 ```
 
-This uses the [`Brewfile`](Brewfile) in the repo root, which declares:
-
-- **`pandoc`** and **`pandoc-crossref`** (formulae)
-- **MacTeX** (cask, for XeLaTeX and pdfLaTeX)
-- **`measure-one.inkwell`** (VS Code extension, installed via `code --install-extension`)
-
-After `brew bundle`, install Mermaid CLI for diagram support in PDFs:
+Then add Mermaid CLI for diagram support in PDFs:
 
 ```bash
 npm install -g @mermaid-js/mermaid-cli
 ```
 
-If you need BasicTeX instead of full MacTeX, or want the LaTeX package pass and Mermaid in one shot:
+The cask installs:
+- **Inkwell** extension in Cursor or VS Code (auto-detected)
+- **Pandoc** and **pandoc-crossref** (formula dependencies)
+- **MacTeX** (cask dependency, skipped if already installed)
+
+**Alternative: `brew bundle`** from the repo root uses the [`Brewfile`](Brewfile) for the same result.
+
+**Alternative: full script** with LaTeX package pass and Mermaid in one shot:
 
 ```bash
 ./scripts/install-inkwell-macos.sh              # full MacTeX + extension + mermaid + tlmgr packages
-./scripts/install-inkwell-macos.sh --basictex   # BasicTeX variant
+./scripts/install-inkwell-macos.sh --basictex   # BasicTeX variant (~300 MB instead of ~5 GB)
 ```
 
 ### 2. Other install methods
