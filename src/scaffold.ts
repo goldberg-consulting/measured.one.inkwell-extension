@@ -428,32 +428,25 @@ export async function initProject(): Promise<void> {
   vscode.window.showInformationMessage(`Inkwell project "${options.name}" initialized.`);
 }
 
-export async function bootstrapWorkspaceInkwell(): Promise<void> {
+export async function setupWorkspace(): Promise<void> {
   const baseDir = await pickWorkspaceRoot("Select workspace root");
   if (!baseDir) return;
 
   const report: string[] = [];
   const inkwellDir = path.join(baseDir, ".inkwell");
-  const bootstrapDirs = [
-    "outputs", "compiled", "templates", "scripts", "figures", "references", "examples",
-  ];
-  const manifestPath = path.join(inkwellDir, "manifest.json");
 
-  if (!fs.existsSync(inkwellDir)) {
-    fs.mkdirSync(inkwellDir, { recursive: true });
-    report.push("created .inkwell/");
-  }
-  for (const sub of bootstrapDirs) {
-    const dir = path.join(inkwellDir, sub);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-      report.push(`created .inkwell/${sub}/`);
-    }
-  }
+  const dirs = ensureDirs(baseDir);
+  if (dirs.length) report.push(`created: ${dirs.join(", ")}`);
+
+  const manifestPath = path.join(inkwellDir, "manifest.json");
   if (!fs.existsSync(manifestPath)) {
+    fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
     fs.writeFileSync(manifestPath, MANIFEST_TEMPLATE("inkwell"), "utf-8");
     report.push("created .inkwell/manifest.json");
   }
+
+  const mf = updateManifest(baseDir);
+  if (mf.length) report.push(`manifest: ${mf.join("; ")}`);
 
   const copyTemplates = await vscode.window.showQuickPick(
     [
@@ -514,11 +507,11 @@ export async function bootstrapWorkspaceInkwell(): Promise<void> {
 
   if (report.length) {
     vscode.window.showInformationMessage(
-      `Workspace bootstrap complete: ${report.join("; ")}.`
+      `Workspace setup complete: ${report.join("; ")}.`
     );
   } else {
     vscode.window.showInformationMessage(
-      "Workspace already contains a usable .inkwell setup."
+      "Workspace is already up to date."
     );
   }
 }
@@ -737,47 +730,3 @@ function ensureStarterFiles(projectRoot: string): string[] {
   return created;
 }
 
-export async function updateProject(): Promise<void> {
-  const editor = vscode.window.activeTextEditor;
-  if (!editor) {
-    vscode.window.showWarningMessage("Open a file inside an Inkwell project first.");
-    return;
-  }
-
-  const { findInkwellRoot } = await import("./config");
-  const projectRoot = findInkwellRoot(editor.document.uri);
-  if (!projectRoot) {
-    vscode.window.showWarningMessage(
-      "No Inkwell project found. Run \"Inkwell: Bootstrap Workspace (.inkwell Folder)\" or \"Inkwell: New Project\" first."
-    );
-    return;
-  }
-
-  const report: string[] = [];
-
-  const dirs = ensureDirs(projectRoot);
-  if (dirs.length) report.push(`Created directories: ${dirs.join(", ")}`);
-
-  const gi = updateGitignore(projectRoot);
-  if (gi.length) report.push(`Added .gitignore entries: ${gi.join(", ")}`);
-
-  const mf = updateManifest(projectRoot);
-  if (mf.length) report.push(`Manifest: ${mf.join("; ")}`);
-
-  const files = ensureStarterFiles(projectRoot);
-  if (files.length) report.push(`Created starter files: ${files.join(", ")}`);
-
-  const demos = copyDemoFiles(projectRoot);
-  if (demos.length) report.push(`Copied demo files: ${demos.join(", ")}`);
-
-  if (copyGuide(projectRoot)) report.push("Updated .inkwell/guide.md");
-  if (copyAgent(projectRoot)) report.push("Updated .cursor/agents/inkwell-guide.md");
-
-  if (report.length) {
-    vscode.window.showInformationMessage(
-      `Project updated (${report.length} change${report.length > 1 ? "s" : ""}). ${report.join(". ")}.`
-    );
-  } else {
-    vscode.window.showInformationMessage("Project is already up to date.");
-  }
-}

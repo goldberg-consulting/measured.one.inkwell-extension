@@ -11,7 +11,7 @@ import { findInkwellRoot, getInkwellOutputsDir, getInkwellProjectRoot, saveManif
 import { checkToolchain, installLatexPackage, showToolchainStatus, setExtensionPath } from "./toolchain";
 import { runAllBlocks, parseCodeBlocks, RunCancellation } from "./runner";
 import { clearCache } from "./cache";
-import { bootstrapWorkspaceInkwell, initProject, updateProject } from "./scaffold";
+import { setupWorkspace, initProject } from "./scaffold";
 import * as path from "path";
 import * as fs from "fs";
 
@@ -137,12 +137,8 @@ export function activate(context: vscode.ExtensionContext) {
       initProject();
     }),
 
-    vscode.commands.registerCommand("inkwell.bootstrapWorkspaceInkwell", () => {
-      bootstrapWorkspaceInkwell();
-    }),
-
-    vscode.commands.registerCommand("inkwell.updateProject", () => {
-      updateProject();
+    vscode.commands.registerCommand("inkwell.setupWorkspace", () => {
+      setupWorkspace();
     }),
 
     vscode.workspace.onDidSaveTextDocument((document) => {
