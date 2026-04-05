@@ -31,6 +31,8 @@ export class InkwellPreviewProvider {
   private outputChannel: vscode.OutputChannel = getInkwellOutputChannel();
   private initialized = false;
   private pdfCache: { path: string; mtimeMs: number; base64: string } | undefined;
+  private compileInFlight = false;
+  private compileQueued = false;
   onRun?: () => Promise<void>;
 
   constructor(context: vscode.ExtensionContext) {
@@ -328,71 +330,86 @@ export class InkwellPreviewProvider {
   }
 
   private async handleCompile(): Promise<void> {
-    const doc = this.currentDocument;
-    if (!this.panel || !doc) return;
+    if (!this.panel || !this.currentDocument) return;
+    if (this.compileInFlight) {
+      this.compileQueued = true;
+      return;
+    }
 
-    this.panel.webview.postMessage({ type: "compileStarted" });
-
+    this.compileInFlight = true;
     try {
-      const result = await compile(doc);
+      do {
+        this.compileQueued = false;
+        const doc = this.currentDocument;
+        if (!this.panel || !doc) break;
 
-      this.outputChannel.clear();
-      this.outputChannel.appendLine(`Inkwell compile: ${doc.uri.fsPath}`);
-      this.outputChannel.appendLine(
-        `Result: ${result.success ? "success" : "failed"} (${result.duration.toFixed(1)}s)`
-      );
-      if (result.errors.length) {
-        this.outputChannel.appendLine(`\n--- Errors (${result.errors.length}) ---`);
-        for (const err of result.errors) {
-          const loc = err.line ? `line ${err.line}` : "unknown location";
-          this.outputChannel.appendLine(`  [${err.severity}] ${loc}: ${err.message}`);
+        this.panel.webview.postMessage({ type: "compileStarted" });
+
+        try {
+          const result = await compile(doc);
+
+          this.outputChannel.clear();
+          this.outputChannel.appendLine(`Inkwell compile: ${doc.uri.fsPath}`);
+          this.outputChannel.appendLine(
+            `Result: ${result.success ? "success" : "failed"} (${result.duration.toFixed(1)}s)`
+          );
+          if (result.errors.length) {
+            this.outputChannel.appendLine(`\n--- Errors (${result.errors.length}) ---`);
+            for (const err of result.errors) {
+              const loc = err.line ? `line ${err.line}` : "unknown location";
+              this.outputChannel.appendLine(`  [${err.severity}] ${loc}: ${err.message}`);
+            }
+          }
+          if (result.log.trim()) {
+            this.outputChannel.appendLine("\n--- Full Log ---");
+            this.outputChannel.appendLine(result.log);
+          }
+
+          if (this.diagnostics) {
+            this.diagnostics.report(doc.uri, result.errors);
+          }
+
+          if (result.success && result.pdfPath && this.panel) {
+            const pdfData = fs.readFileSync(result.pdfPath).toString("base64");
+            this.panel.webview.postMessage({
+              type: "compileDone",
+              pdfData,
+              duration: result.duration,
+              errors: [],
+              log: "",
+            });
+            const warnings = result.errors.filter(e => e.severity === "warning");
+            for (const w of warnings) {
+              const loc = w.line ? `line ${w.line}: ` : "";
+              this.sendLogEntry("warn", `${loc}${w.message}`);
+            }
+          } else if (this.panel) {
+            this.panel.webview.postMessage({
+              type: "compileDone",
+              pdfUri: null,
+              duration: result.duration,
+              errors: result.errors.map((e) => {
+                const loc = e.line ? `Line ${e.line}: ` : "";
+                return `${loc}${e.message}`;
+              }),
+              log: result.log,
+            });
+          }
+        } catch (err) {
+          if (this.panel) {
+            this.panel.webview.postMessage({
+              type: "compileDone",
+              pdfData: null,
+              duration: 0,
+              errors: [String(err)],
+              log: "",
+            });
+          }
         }
-      }
-      if (result.log.trim()) {
-        this.outputChannel.appendLine("\n--- Full Log ---");
-        this.outputChannel.appendLine(result.log);
-      }
-
-      if (this.diagnostics) {
-        this.diagnostics.report(doc.uri, result.errors);
-      }
-
-      if (result.success && result.pdfPath && this.panel) {
-        const pdfData = fs.readFileSync(result.pdfPath).toString("base64");
-        this.panel.webview.postMessage({
-          type: "compileDone",
-          pdfData,
-          duration: result.duration,
-          errors: [],
-          log: "",
-        });
-        const warnings = result.errors.filter(e => e.severity === "warning");
-        for (const w of warnings) {
-          const loc = w.line ? `line ${w.line}: ` : "";
-          this.sendLogEntry("warn", `${loc}${w.message}`);
-        }
-      } else if (this.panel) {
-        this.panel.webview.postMessage({
-          type: "compileDone",
-          pdfUri: null,
-          duration: result.duration,
-          errors: result.errors.map((e) => {
-            const loc = e.line ? `Line ${e.line}: ` : "";
-            return `${loc}${e.message}`;
-          }),
-          log: result.log,
-        });
-      }
-    } catch (err) {
-      if (this.panel) {
-        this.panel.webview.postMessage({
-          type: "compileDone",
-          pdfData: null,
-          duration: 0,
-          errors: [String(err)],
-          log: "",
-        });
-      }
+      } while (this.compileQueued);
+    } finally {
+      this.compileInFlight = false;
+      this.compileQueued = false;
     }
   }
 

@@ -1,0 +1,14 @@
+.git/**
+.github/**
+src/**
+scripts/**
+node_modules/**
+venv/**
+tsconfig.json
+eslint.config.mjs
+*.vsix
+out/**/*.map
+.cursor/**
+!.cursor/
+!.cursor/agents/
+!.cursor/agents/inkwell-guide.md
