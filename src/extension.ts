@@ -8,7 +8,7 @@ import { compile, exportPDF, isCompilable } from "./compiler";
 import { InkwellDiagnostics } from "./diagnostics";
 import { selectTemplateCommand } from "./templates";
 import { findInkwellRoot, getInkwellOutputsDir, getInkwellProjectRoot, saveManifestField } from "./config";
-import { checkToolchain, showToolchainStatus, setExtensionPath } from "./toolchain";
+import { checkToolchain, installLatexPackage, showToolchainStatus, setExtensionPath } from "./toolchain";
 import { runAllBlocks, parseCodeBlocks, RunCancellation } from "./runner";
 import { clearCache } from "./cache";
 import { bootstrapWorkspaceInkwell, initProject, updateProject } from "./scaffold";
@@ -18,6 +18,8 @@ import * as fs from "fs";
 let diagnostics: InkwellDiagnostics;
 let autoCompileTimer: ReturnType<typeof setInterval> | undefined;
 let activeRunCancel: RunCancellation | undefined;
+let compileInFlight = false;
+let queuedCompile: vscode.TextDocument | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
   setExtensionPath(context.extensionPath);
@@ -85,6 +87,18 @@ export function activate(context: vscode.ExtensionContext) {
 
     vscode.commands.registerCommand("inkwell.setupToolchain", () => {
       showToolchainStatus();
+    }),
+
+    vscode.commands.registerCommand("inkwell.installPackage", async (pkg?: string) => {
+      let packageName = pkg?.trim();
+      if (!packageName) {
+        packageName = await vscode.window.showInputBox({
+          prompt: "LaTeX package name to install via tlmgr",
+          placeHolder: "e.g. booktabs",
+        });
+      }
+      if (!packageName) return;
+      await installLatexPackage(packageName);
     }),
 
     vscode.commands.registerCommand("inkwell.runCodeBlocks", async () => {
@@ -196,22 +210,39 @@ function setupAutoCompileTimer(): void {
 }
 
 async function runCompile(document: vscode.TextDocument): Promise<void> {
+  if (compileInFlight) {
+    queuedCompile = document;
+    return;
+  }
+
+  compileInFlight = true;
+  let current: vscode.TextDocument | undefined = document;
+
   try {
-    const result = await compile(document);
-    diagnostics.report(document.uri, result.errors);
-    if (result.success && result.pdfPath) {
-      vscode.window.setStatusBarMessage(
-        `Inkwell: PDF compiled (${result.duration.toFixed(1)}s)`,
-        5000
-      );
-    } else if (result.errors.length > 0) {
-      vscode.window.setStatusBarMessage(
-        `Inkwell: ${result.errors.length} error(s)`,
-        5000
-      );
+    while (current) {
+      queuedCompile = undefined;
+      try {
+        const result = await compile(current);
+        diagnostics.report(current.uri, result.errors);
+        if (result.success && result.pdfPath) {
+          vscode.window.setStatusBarMessage(
+            `Inkwell: PDF compiled (${result.duration.toFixed(1)}s)`,
+            5000
+          );
+        } else if (result.errors.length > 0) {
+          vscode.window.setStatusBarMessage(
+            `Inkwell: ${result.errors.length} error(s)`,
+            5000
+          );
+        }
+      } catch (err) {
+        console.error("Inkwell compile error:", err);
+      }
+      current = queuedCompile;
     }
-  } catch (err) {
-    console.error("Inkwell compile error:", err);
+  } finally {
+    compileInFlight = false;
+    queuedCompile = undefined;
   }
 }
 
@@ -238,40 +269,48 @@ async function runCodeBlocksWithProgress(
 
   previewProvider.sendRunStarted(blocks.length);
 
-  const results = await runAllBlocks(text, sourceFile, cancel, (p) => {
-    previewProvider.sendBlockProgress(p);
-    if (p.warning) {
-      previewProvider.sendLogEntry("error", p.warning);
+  let results: Awaited<ReturnType<typeof runAllBlocks>> = [];
+  let threw = false;
+  try {
+    results = await runAllBlocks(text, sourceFile, cancel, (p) => {
+      previewProvider.sendBlockProgress(p);
+      if (p.warning) {
+        previewProvider.sendLogEntry("error", p.warning);
+      }
+      if (p.interpreter && p.status === "running") {
+        previewProvider.sendLogEntry("info", `Block ${p.index + 1}: using ${p.interpreter}`);
+      }
+    });
+  } catch (err) {
+    threw = true;
+    previewProvider.sendLogEntry("error", "Run failed unexpectedly", String(err));
+  } finally {
+    activeRunCancel = undefined;
+    const failed = results.filter((r) => r.exitCode !== 0 && r.exitCode !== 130);
+    const cancelled = results.filter((r) => r.exitCode === 130);
+    const cached = results.filter((r) => r.cached);
+    const ran = results.length - cached.length - cancelled.length;
+
+    for (const r of failed) {
+      previewProvider.sendLogEntry(
+        "error",
+        `Block ${r.block.index + 1} (${r.block.lang}) failed`,
+        r.stderr,
+      );
     }
-    if (p.interpreter && p.status === "running") {
-      previewProvider.sendLogEntry("info", `Block ${p.index + 1}: using ${p.interpreter}`);
+
+    if (threw) {
+      previewProvider.sendRunComplete("failed", ran, cached.length, cancelled.length, failed.length || 1);
+    } else if (cancel.cancelled) {
+      previewProvider.sendRunComplete("cancelled", ran, cached.length, cancelled.length);
+    } else if (failed.length) {
+      previewProvider.sendRunComplete("failed", ran, cached.length, 0, failed.length);
+    } else {
+      previewProvider.sendRunComplete("done", ran, cached.length);
     }
-  });
 
-  activeRunCancel = undefined;
-
-  const failed = results.filter((r) => r.exitCode !== 0 && r.exitCode !== 130);
-  const cancelled = results.filter((r) => r.exitCode === 130);
-  const cached = results.filter((r) => r.cached);
-  const ran = results.length - cached.length - cancelled.length;
-
-  for (const r of failed) {
-    previewProvider.sendLogEntry(
-      "error",
-      `Block ${r.block.index + 1} (${r.block.lang}) failed`,
-      r.stderr,
-    );
+    previewProvider.notifyBlocksRan();
   }
-
-  if (cancel.cancelled) {
-    previewProvider.sendRunComplete("cancelled", ran, cached.length, cancelled.length);
-  } else if (failed.length) {
-    previewProvider.sendRunComplete("failed", ran, cached.length, 0, failed.length);
-  } else {
-    previewProvider.sendRunComplete("done", ran, cached.length);
-  }
-
-  previewProvider.notifyBlocksRan();
 }
 
 async function setupPythonEnv(document: vscode.TextDocument): Promise<void> {

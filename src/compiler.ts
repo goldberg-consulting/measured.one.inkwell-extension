@@ -449,7 +449,12 @@ async function compilePandoc(
 
   const crossref = await findBinary("pandoc-crossref");
   if (crossref) {
-    args.splice(args.indexOf("--citeproc"), 0, "--filter", crossref);
+    const citeprocIndex = args.indexOf("--citeproc");
+    if (citeprocIndex >= 0) {
+      args.splice(citeprocIndex, 0, "--filter", crossref);
+    } else {
+      args.push("--filter", crossref);
+    }
   }
 
   const bibFiles = findBibFiles(projectRoot);

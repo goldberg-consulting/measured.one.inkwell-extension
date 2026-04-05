@@ -430,6 +430,18 @@ async function installMissingPackages(packages: string[]): Promise<void> {
   terminal.sendText(cmd);
 }
 
+export async function installLatexPackage(packageName: string): Promise<void> {
+  const normalized = packageName.trim();
+  if (!normalized) return;
+  if (!/^[A-Za-z0-9._-]+$/.test(normalized)) {
+    vscode.window.showErrorMessage(
+      `Invalid package name "${normalized}". Use letters, numbers, dot, underscore, or hyphen.`,
+    );
+    return;
+  }
+  await installMissingPackages([normalized]);
+}
+
 function showPackageDetails(status: ToolchainStatus): void {
   const doc: string[] = ["# Inkwell: LaTeX Package Status\n"];
 

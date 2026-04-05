@@ -78,6 +78,11 @@
         "category": "Inkwell"
       },
       {
+        "command": "inkwell.installPackage",
+        "title": "Inkwell: Install LaTeX Package",
+        "category": "Inkwell"
+      },
+      {
         "command": "inkwell.runCodeBlocks",
         "title": "Inkwell: Run Code Blocks",
         "category": "Inkwell"
@@ -205,7 +210,8 @@
     "package": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node18 --minify",
     "lint": "eslint src --ext ts",
     "test:regressions": "node scripts/check-template-regressions.mjs",
-    "verify": "npm run typecheck && npm run lint && npm run test:regressions"
+    "test:stability": "node scripts/check-shortcuts-and-commands.mjs",
+    "verify": "npm run typecheck && npm run lint && npm run test:regressions && npm run test:stability"
   },
   "dependencies": {
     "markdown-it": "^14.1.0"

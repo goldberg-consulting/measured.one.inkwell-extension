@@ -81,6 +81,7 @@ export interface BlockResult {
   exitCode: number;
   artifacts: Map<string, string>;
   cached: boolean;
+  cacheStatus?: "hit" | "miss";
   interpreter?: string;
   warning?: string;
 }
@@ -480,7 +481,7 @@ export async function runAllBlocks(
 
       results.push({
         block, stdout, stderr: "", exitCode: 0,
-        artifacts, cached: true,
+        artifacts, cached: true, cacheStatus: "hit",
       });
       continue;
     }
