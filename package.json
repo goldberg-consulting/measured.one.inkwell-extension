@@ -211,7 +211,8 @@
     "lint": "eslint src --ext ts",
     "test:regressions": "node scripts/check-template-regressions.mjs",
     "test:stability": "node scripts/check-shortcuts-and-commands.mjs",
-    "verify": "npm run typecheck && npm run lint && npm run test:regressions && npm run test:stability"
+    "test:installer": "bash -n scripts/install-inkwell-macos.sh",
+    "verify": "npm run typecheck && npm run lint && npm run test:regressions && npm run test:stability && npm run test:installer"
   },
   "dependencies": {
     "markdown-it": "^14.1.0"
