@@ -19,7 +19,42 @@ Inkwell lets you stay in markdown, stay in your editor, and still get publicatio
 
 ### 1. Install the extension
 
-**Option A: Install a pre-built .vsix** (recommended)
+**Option A: Extension marketplace (recommended)**
+
+Install directly from the extension store:
+
+```bash
+cursor --install-extension measure-one.inkwell --force
+# or: code --install-extension measure-one.inkwell --force
+```
+
+Or in the editor extensions pane, search for **Inkwell** and install.
+
+**Option B: One-command macOS setup (no sub-menus)**
+
+From the repo root:
+
+```bash
+./scripts/install-inkwell-macos.sh
+```
+
+This script installs:
+
+- `measure-one.inkwell` from the extension marketplace (via `cursor` or `code` CLI)
+- `pandoc` and `pandoc-crossref`
+- MacTeX (full install by default, or `--basictex`)
+- Mermaid CLI (`@mermaid-js/mermaid-cli`)
+- required LaTeX packages from `requirements-latex.txt` when `tlmgr` is available
+
+Examples:
+
+```bash
+./scripts/install-inkwell-macos.sh --basictex
+./scripts/install-inkwell-macos.sh --editor=cursor
+./scripts/install-inkwell-macos.sh --editor=code
+```
+
+**Option C: Install a pre-built .vsix**
 
 Download the latest `.vsix` from [Releases](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases), then:
 
@@ -30,9 +65,7 @@ cursor --install-extension inkwell-0.1.9.vsix --force
 
 Or in the editor: `Cmd+Shift+P` > **Extensions: Install from VSIX...** and select the file.
 
-**Verify a `.vsix` install (recommended):** `Cmd+Shift+P` > **Developer: Reload Window**. Then run **Inkwell: Check / Install Toolchain**, open a markdown file with `{mermaid}` blocks (e.g. `examples/demo-default.md`), run **Inkwell: Compile PDF**, and confirm `.inkwell/mermaid/` contains rendered images and the PDF shows diagrams—not raw mermaid source as code listings. That matches what end users get (a bundled extension with no dev-folder fallback).
-
-**Option B: Build from source**
+**Option D: Build from source**
 
 ```bash
 git clone https://github.com/goldberg-consulting/measured.one.inkwell-extension.git
