@@ -17,44 +17,45 @@ Inkwell lets you stay in markdown, stay in your editor, and still get publicatio
 
 ## Installation
 
-### 1. Install the extension
+### 1. Install everything with Brew (macOS, recommended)
 
-**Option A: Extension marketplace (recommended)**
+One command installs the extension from the VS Code/Cursor marketplace plus the full toolchain:
 
-Install directly from the extension store:
+```bash
+brew bundle
+```
+
+This uses the [`Brewfile`](Brewfile) in the repo root, which declares:
+
+- **`pandoc`** and **`pandoc-crossref`** (formulae)
+- **MacTeX** (cask, for XeLaTeX and pdfLaTeX)
+- **`measure-one.inkwell`** (VS Code extension, installed via `code --install-extension`)
+
+After `brew bundle`, install Mermaid CLI for diagram support in PDFs:
+
+```bash
+npm install -g @mermaid-js/mermaid-cli
+```
+
+If you need BasicTeX instead of full MacTeX, or want the LaTeX package pass and Mermaid in one shot:
+
+```bash
+./scripts/install-inkwell-macos.sh              # full MacTeX + extension + mermaid + tlmgr packages
+./scripts/install-inkwell-macos.sh --basictex   # BasicTeX variant
+```
+
+### 2. Other install methods
+
+**Extension marketplace only** (if you already have Pandoc and LaTeX):
 
 ```bash
 cursor --install-extension measure-one.inkwell --force
 # or: code --install-extension measure-one.inkwell --force
 ```
 
-Or in the editor extensions pane, search for **Inkwell** and install.
+Or search for **Inkwell** in the editor extensions pane.
 
-**Option B: One-command macOS setup (no sub-menus)**
-
-From the repo root:
-
-```bash
-./scripts/install-inkwell-macos.sh
-```
-
-This script installs:
-
-- `measure-one.inkwell` from the extension marketplace (via `cursor` or `code` CLI)
-- `pandoc` and `pandoc-crossref`
-- MacTeX (full install by default, or `--basictex`)
-- Mermaid CLI (`@mermaid-js/mermaid-cli`)
-- required LaTeX packages from `requirements-latex.txt` when `tlmgr` is available
-
-Examples:
-
-```bash
-./scripts/install-inkwell-macos.sh --basictex
-./scripts/install-inkwell-macos.sh --editor=cursor
-./scripts/install-inkwell-macos.sh --editor=code
-```
-
-**Option C: Install a pre-built .vsix**
+**Pre-built .vsix**
 
 Download the latest `.vsix` from [Releases](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases), then:
 
@@ -79,7 +80,7 @@ Then either:
 - **Install from folder** (development): `Cmd+Shift+P` > **Developer: Install Extension from Location...** > select the repo folder > reload the window.
 - **Package as .vsix**: `npm run package && npx @vscode/vsce package` > install the resulting `.vsix` as above. (`vscode:prepublish` runs `package` before publish, but run it locally too before `vsce package` so `out/extension.js` includes the latest bundle.)
 
-### 2. Install the toolchain (Pandoc + LaTeX)
+### 3. Install the toolchain manually (if not using Brew)
 
 After the extension is active, run `Cmd+Shift+P` → **Inkwell: Check / Install Toolchain**. The guided installer detects what you have and walks you through installing the rest, including the full LaTeX package set from `requirements-latex.txt`.
 
@@ -141,7 +142,7 @@ python3 -m venv venv && source venv/bin/activate && pip install -r requirements.
 - **Mermaid in PDF:** Diagram blocks need `mmdc` from `@mermaid-js/mermaid-cli` (e.g. `npm install -g @mermaid-js/mermaid-cli`). Without it, live preview may still show something useful, but **compiled PDFs** often leave mermaid as code listings and **`.inkwell/mermaid/`** stays empty.
 - **Cursor/VS Code launched from the Dock (Node managers):** GUI apps do not inherit your shell `PATH`. Inkwell augments `PATH` for subprocesses (Mermaid, Pandoc/TeX) with **`~/.npm-global/bin`**, **`nvm`** (`NVM_BIN`, **`~/.nvm/alias/default`**, and every **`~/.nvm/versions/node/<version>/bin`**), **`fnm`** (`FNM_MULTISHELL_PATH`), and **Volta** (`VOLTA_HOME` or **`~/.volta/bin`**). If `mmdc` is still missing, it runs a one-time **`SHELL -ilc`** resolution and prepends that directory for the session. Check **View → Output → Inkwell LaTeX** for a PATH diagnostic if **`mmdc --version`** fails. You can still install **`mmdc`** via **Homebrew** or symlink it into **`/opt/homebrew/bin`** if you prefer.
 
-### 3. Bootstrap your workspace
+### 4. Bootstrap your workspace
 
 For a **new project**: `Cmd+Shift+P` > **Inkwell: New Project** — scaffolds a complete project with starter document, scripts, bibliography, example files, and a syntax guide, all organized under `.inkwell/`.
 

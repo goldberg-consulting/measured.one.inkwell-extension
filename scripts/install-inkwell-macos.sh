@@ -49,25 +49,34 @@ if [[ "$EDITOR_CLI" == "auto" ]]; then
   fi
 fi
 
-echo "Installing toolchain with Homebrew..."
-brew install pandoc pandoc-crossref
-if [[ "$TEX_DIST" == "basictex" ]]; then
-  brew install --cask basictex
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+BREWFILE="$REPO_ROOT/Brewfile"
+
+if [[ -f "$BREWFILE" ]] && [[ "$TEX_DIST" == "mactex" ]]; then
+  echo "Installing toolchain and extension via brew bundle..."
+  brew bundle --file="$BREWFILE"
 else
-  brew install --cask mactex
+  echo "Installing toolchain with Homebrew..."
+  brew install pandoc pandoc-crossref
+  if [[ "$TEX_DIST" == "basictex" ]]; then
+    brew install --cask basictex
+  else
+    brew install --cask mactex
+  fi
+
+  if [[ -n "$EDITOR_CLI" ]]; then
+    echo "Installing extension from marketplace with $EDITOR_CLI..."
+    "$EDITOR_CLI" --install-extension "$EXTENSION_ID" --force
+  else
+    echo "Could not find cursor or code CLI."
+    echo "Install extension manually from the extension marketplace:"
+    echo "  $EXTENSION_ID"
+  fi
 fi
 
 echo "Installing Mermaid CLI..."
 npm install -g @mermaid-js/mermaid-cli
-
-if [[ -n "$EDITOR_CLI" ]]; then
-  echo "Installing extension from marketplace with $EDITOR_CLI..."
-  "$EDITOR_CLI" --install-extension "$EXTENSION_ID" --force
-else
-  echo "Could not find cursor or code CLI."
-  echo "Install extension manually from the extension marketplace:"
-  echo "  $EXTENSION_ID"
-fi
 
 export PATH="/Library/TeX/texbin:$HOME/Library/TinyTeX/bin/universal-darwin:$PATH"
 
