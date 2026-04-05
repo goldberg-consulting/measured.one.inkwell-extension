@@ -71,6 +71,7 @@ export function collectVariables(results: BlockResult[]): Map<string, string> {
   const vars = new Map<string, string>();
 
   for (const r of results) {
+    if (r.cacheStatus === "miss") continue;
     if (r.exitCode !== 0) continue;
 
     for (const line of r.stdout.split("\n")) {
@@ -343,6 +344,7 @@ export function gatherCachedResults(
 
   for (const block of blocks) {
     const blockDir = path.join(cacheDir, `block_${block.index}`);
+    const hasBlockDir = fs.existsSync(blockDir);
     let stdout = "";
     try {
       stdout = fs.readFileSync(path.join(blockDir, "stdout.txt"), "utf-8");
@@ -359,13 +361,17 @@ export function gatherCachedResults(
       }
     } catch {}
 
+    const cacheStatus: "hit" | "miss" =
+      hasBlockDir && (stdout.trim().length > 0 || artifacts.size > 0) ? "hit" : "miss";
+
     results.push({
       block,
       stdout,
       stderr: "",
       exitCode: 0,
       artifacts,
-      cached: true,
+      cached: cacheStatus === "hit",
+      cacheStatus,
     });
   }
 
