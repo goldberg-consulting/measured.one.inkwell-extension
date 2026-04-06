@@ -62,8 +62,8 @@ Or search for **Inkwell** in the editor extensions pane.
 Download the latest `.vsix` from [Releases](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases), then:
 
 ```bash
-cursor --install-extension inkwell-0.1.9.vsix --force
-# or: code --install-extension inkwell-0.1.9.vsix --force
+cursor --install-extension inkwell-0.2.0.vsix --force
+# or: code --install-extension inkwell-0.2.0.vsix --force
 ```
 
 Or in the editor: `Cmd+Shift+P` > **Extensions: Install from VSIX...** and select the file.
@@ -539,7 +539,7 @@ Features: margin notes via `\marginnote{}` or `\sidenote{}`, margin figures via 
 </td>
 <td width="50%">
 
-![Tufte Handout output](media/examples/demo-tufte.png)
+*Screenshot pending. Compile `examples/demo-tufte.md` to see the output.*
 
 </td>
 </tr></table>
@@ -576,7 +576,7 @@ Features: KTH branded letterhead with school logo, institutional footer with add
 </td>
 <td width="50%">
 
-![KTH Letter output](media/examples/demo-kth-letter.png)
+*Screenshot pending. Compile `examples/demo-kth-letter.md` to see the output.*
 
 </td>
 </tr></table>
@@ -791,6 +791,10 @@ Inkwell includes a Cursor agent at `.cursor/agents/inkwell-guide.md`. When worki
 The agent references the full [Syntax Guide](guide.md) for field names, attribute tables, and conversion rules.
 
 ## Releases
+
+### [v0.2.0](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.2.0) (April 6, 2026)
+
+Homebrew cask install (`brew install --cask inkwell`), merged Bootstrap/Update into Setup Workspace, Run Code Blocks shortcut changed to `Cmd+Alt+R`, stability and packaging fixes, release automation.
 
 ### [v0.1.9](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.1.9) (March 19, 2026)
 
