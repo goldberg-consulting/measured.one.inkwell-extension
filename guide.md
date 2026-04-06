@@ -107,7 +107,7 @@ With these set, `@Fig:scatter` renders as "Figure 1", `@Tbl:stats` as "Table 1",
 
 ## Code Blocks
 
-Inkwell code blocks are fenced with ```` ```{lang} ```` and execute when you run with `Cmd+Shift+B`.
+Inkwell code blocks are fenced with ```` ```{lang} ```` and execute when you run with `Cmd+Alt+R`.
 
 ### Syntax
 
@@ -711,7 +711,7 @@ Do not convert these; Inkwell passes raw LaTeX through to the PDF engine:
 
 **Reload after rebuilding.** If you rebuild the extension from source (`npm run compile`), reload the editor with `Cmd+Shift+P` > **Developer: Reload Window**.
 
-**Re-run after adding exports.** If you add `::inkwell` print lines to a code block, re-run the block (`Cmd+Shift+B`) before compiling so the variable store picks up the new values.
+**Re-run after adding exports.** If you add `::inkwell` print lines to a code block, re-run the block (`Cmd+Alt+R`) before compiling so the variable store picks up the new values.
 
 **Clear cache when stuck.** If outputs seem stale, run **Inkwell: Clear Code Block Cache** and re-run all blocks.
 

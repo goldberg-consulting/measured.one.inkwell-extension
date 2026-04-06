@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0 (2026-04-05)
+
+- **Homebrew cask install**: `brew tap goldberg-consulting/inkwell && brew install --cask inkwell` installs the extension plus Pandoc, pandoc-crossref, and MacTeX in one command.
+- **Merged Bootstrap and Update** into a single idempotent **Setup Workspace** command. Run it once for initial setup, re-run after extension updates to backfill new files.
+- **Run Code Blocks shortcut** changed from `Cmd+Shift+B` (conflicted with VS Code's Run Build Task) to `Cmd+Alt+R`.
+- **Stability fixes**: `inkwell.installPackage` command wired end-to-end, compile queue-latest behavior, `try/finally` cleanup for run progress, `pandoc-crossref` argument guard, explicit cache hit/miss metadata.
+- **Packaging**: replaced `files` whitelist with `.vscodeignore`, added CI bundle gate (`npm run package`), shortcut/command stability regression checks, pre-commit config.
+- **Release automation**: GitHub Actions workflow builds VSIX on release publish and auto-bumps the Homebrew tap cask.
+
 ## 0.1.9 (2026-03-19)
 
 - **Bootstrap Workspace** now runs the same **starter file** seeding as New Project / Update Project: `sine_plot.py`, `scatter.py`, **`convergence_table.py`**, `refs.bib`, `figures/.gitkeep`.

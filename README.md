@@ -148,7 +148,7 @@ python3 -m venv venv && source venv/bin/activate && pip install -r requirements.
 
 For a **new project**: `Cmd+Shift+P` > **Inkwell: New Project** — scaffolds a complete project with starter document, scripts, bibliography, example files, and a syntax guide, all organized under `.inkwell/`.
 
-For an **existing repo**: `Cmd+Shift+P` > **Inkwell: Bootstrap Workspace (.inkwell Folder)** — adds a `.inkwell/` directory with the standard subdirectory structure, manifest, templates, and guide without touching your existing files.
+For an **existing repo**: `Cmd+Shift+P` > **Inkwell: Setup Workspace** — adds or updates the `.inkwell/` directory with the standard subdirectory structure, manifest, templates, examples, and guide without touching your existing files. Safe to re-run after extension updates to pick up new examples and starter files.
 
 See the **[Syntax Guide](guide.md)** for the complete reference on YAML frontmatter, code blocks, math, citations, and template-specific fields.
 
@@ -161,7 +161,7 @@ See the **[Syntax Guide](guide.md)** for the complete reference on YAML frontmat
 5. Choose whether to set up a Python virtual environment (recommended if your document will have code blocks)
 6. Inkwell creates the project with starter files, example scripts, bibliography, and a syntax guide at `.inkwell/guide.md`
 7. Write your markdown in the generated `.md` file
-8. `Cmd+Shift+B` to **Run** code blocks
+8. `Cmd+Alt+R` to **Run** code blocks
 9. `Cmd+Shift+R` to **Compile** to PDF
 10. `Cmd+Shift+V` to open the **Preview** panel (live HTML, compiled PDF, and build log)
 
@@ -289,7 +289,7 @@ $r = `{python} f"{float(corr_r):.2f}"`$ and
 $\hat\beta = `{python} f"{float(slope):.1f}"`$.
 ```
 
-Re-run the code blocks (`Cmd+Shift+B`) after adding or changing `::inkwell` exports so the variable store picks up the new values.
+Re-run the code blocks (`Cmd+Alt+R`) after adding or changing `::inkwell` exports so the variable store picks up the new values.
 
 ### Mermaid diagrams
 
@@ -350,7 +350,7 @@ inkwell:
 
 ### Self-contained `.inkwell/` workspace
 
-All extension-managed resources live under a single `.inkwell/` directory at the **project root**: scripts, figures, references, examples, per-document output caches (`.inkwell/outputs/<doc-key>/`), compiled staging (`.inkwell/compiled/`), shared mermaid cache, and templates. Markdown can live in subfolders; with a **single-folder workspace** opened at the repo root, Inkwell uses that root’s `.inkwell/` (not a nested `.inkwell` next to the file). **Multi-Inkwell monorepos:** open each subproject as its own workspace folder (multi-root), or only the root that should own `.inkwell/`. The scaffold creates the full structure via **New Project** or **Bootstrap Workspace**, and **Update Project** backfills missing directories.
+All extension-managed resources live under a single `.inkwell/` directory at the **project root**: scripts, figures, references, examples, per-document output caches (`.inkwell/outputs/<doc-key>/`), compiled staging (`.inkwell/compiled/`), shared mermaid cache, and templates. Markdown can live in subfolders; with a **single-folder workspace** opened at the repo root, Inkwell uses that root’s `.inkwell/` (not a nested `.inkwell` next to the file). **Multi-Inkwell monorepos:** open each subproject as its own workspace folder (multi-root), or only the root that should own `.inkwell/`. The scaffold creates the full structure via **New Project** or **Setup Workspace**. Re-running Setup Workspace backfills new files from extension updates.
 
 ## Templates
 
@@ -755,11 +755,10 @@ All commands are available from the command palette (`Cmd+Shift+P` / `Ctrl+Shift
 | Command | Shortcut | Description |
 |---------|----------|-------------|
 | **Inkwell: New Project** | | Scaffold a project with starter files, bibliography, and example scripts under `.inkwell/` |
-| **Inkwell: Bootstrap Workspace** | | Add `.inkwell/` with standard subdirectories to an existing repo |
-| **Inkwell: Update Project** | | Backfill missing directories, `.gitignore` entries, manifest fields, and starter files |
+| **Inkwell: Setup Workspace** | | Add or update `.inkwell/` with standard subdirectories, examples, and starter files |
 | **Inkwell: Open Preview** | `Cmd+Shift+V` | Side panel with live HTML, compiled PDF, and build log tabs |
 | **Inkwell: Compile PDF** | `Cmd+Shift+R` | Compile through Pandoc + XeLaTeX/pdfLaTeX (engine selected per template) |
-| **Inkwell: Run Code Blocks** | `Cmd+Shift+B` | Execute all code blocks, cache results in `.inkwell/outputs/` |
+| **Inkwell: Run Code Blocks** | `Cmd+Alt+R` | Execute all code blocks, cache results in `.inkwell/outputs/` |
 | **Inkwell: Cancel Running Code Blocks** | | Stop in-progress code execution |
 | **Inkwell: Clear Code Block Cache** | | Delete cached outputs so all blocks re-run on next execution |
 | **Inkwell: Export PDF to File...** | | Save the compiled PDF to a chosen location |
@@ -795,7 +794,7 @@ The agent references the full [Syntax Guide](guide.md) for field names, attribut
 
 ### [v0.1.9](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.1.9) (March 19, 2026)
 
-Bootstrap seeds **`.inkwell/scripts/`** (including `convergence_table.py`) and references like New Project / Update Project.
+Setup Workspace seeds **`.inkwell/scripts/`** (including `convergence_table.py`) and references like New Project.
 
 ### [v0.1.8](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.1.8) (March 19, 2026)
 
@@ -837,7 +836,7 @@ First release.
 
 **Compilation**: Pandoc + XeLaTeX/pdfLaTeX with per-template engine selection, pandoc-crossref support, bibliography processing, and toolchain detection with guided install.
 
-**Project scaffolding**: `Inkwell: New Project` and `Inkwell: Update Project` commands with starter files, bibliography, example scripts, and syntax guide.
+**Project scaffolding**: `Inkwell: New Project` and `Inkwell: Setup Workspace` commands with starter files, bibliography, example scripts, and syntax guide.
 
 **Quality gates**: CI verify workflow (typecheck + lint + template regression tests), pre-commit hook.
 
