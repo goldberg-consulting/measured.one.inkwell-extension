@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.3 (2026-04-17)
+
+- **Package only pure template assets in the VSIX.** Earlier builds shipped `demo.md`, `examples/*.md`, `examples/*.pdf`, `guide.md`, `media/examples/*.png`, and generated `.inkwell/` artifacts (mermaid cache, compiled markdown). The published VSIX now contains `templates/`, the bundled extension code, the extension icon, and standard metadata (`LICENSE`, `README.md`, `CHANGELOG.md`, `package.json`) only. Setup Workspace continues to function \u2014 `copyGuide` and `copyDemoFiles` both fall back silently when the optional sources are absent.
+- **Purged prior VSIX releases.** The `v0.2.1` and `v0.2.2` GitHub release assets, which contained personal scratch content alongside the template fixes, have been removed. Install this release (`v0.2.3`) or `brew upgrade --cask inkwell` to get a clean bundle.
+
 ## 0.2.2 (2026-04-17)
 
 - **Rho template: reduce table whitespace.** The v0.2.1 fix eliminated the infinite-page loop on tall tables by wrapping every `longtable` in `\onecolumn` / `\twocolumn`, which forced a full column flush before and after each table. On documents with many tables this left large empty regions and inflated page count (40 pages for the 1000-line reference document, most of it blank). The revised approach redirects `longtable` to `\begin{table*}[!tbp]` + `\tabular`, a two-column-spanning float with flexible placement. LaTeX's float mechanism then places each table at the top, bottom, or on a dedicated float page, whichever fits. Same reference document now compiles to 18 pages with no infinite-loop risk.
