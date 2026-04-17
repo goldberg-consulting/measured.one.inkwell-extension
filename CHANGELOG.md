@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 (2026-04-17)
+
+- **Rho template: reduce table whitespace.** The v0.2.1 fix eliminated the infinite-page loop on tall tables by wrapping every `longtable` in `\onecolumn` / `\twocolumn`, which forced a full column flush before and after each table. On documents with many tables this left large empty regions and inflated page count (40 pages for the 1000-line reference document, most of it blank). The revised approach redirects `longtable` to `\begin{table*}[!tbp]` + `\tabular`, a two-column-spanning float with flexible placement. LaTeX's float mechanism then places each table at the top, bottom, or on a dedicated float page, whichever fits. Same reference document now compiles to 18 pages with no infinite-loop risk.
+
 ## 0.2.1 (2026-04-17)
 
 - **Rho template: fix infinite-loop compile on tall tables.** The previous `longtable` redefinition forced every table into `\begin{table}[H]` + `\tabular`. Tables that did not fit on a page silently overflowed the output routine and sent xelatex into an unbounded page loop (`xdvipdfmx:fatal: Page number 65536 too large`), typically after a minute or more of apparent hang. The replacement wraps the original `longtable` in a `\onecolumn` / `\twocolumn` switch so page-breaking works inside rho's twocolumn layout. Compile for a 1000-line document with 17 longtables drops from unbounded to under 10 seconds.
