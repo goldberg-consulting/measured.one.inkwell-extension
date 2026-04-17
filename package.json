@@ -2,7 +2,7 @@
   "name": "inkwell",
   "displayName": "Inkwell",
   "description": "Markdown to publication-quality PDF. Live preview, Pandoc + XeLaTeX compilation, runnable code blocks, and LaTeX template management.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "measure-one",
   "icon": "media/icon.png",
   "license": "SEE LICENSE IN LICENSE",

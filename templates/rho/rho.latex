@@ -54,29 +54,35 @@ $endif$
 
 $if(keywords)$\keywords{$keywords$}$endif$
 
-% Pandoc longtable in twocolumn: redirect to table float + tabular.
+% Pandoc longtable handling. rho loads with twocolumn by default, where
+% the stock longtable environment cannot break across pages. The earlier
+% approach forced every longtable into a \begin{table}[H]+\tabular float,
+% which silently overflowed and, for tall tables (>1 page), sent xelatex
+% into an infinite output-routine loop ("Page number 65536 too large").
+%
+% New approach: wrap the original longtable in a \onecolumn/\twocolumn
+% switch so page-breaking works. For single-column document classes this
+% is effectively a no-op. The switch forces a column flush which is the
+% standard cost of multi-page tables in twocolumn journal layouts.
 \usepackage{array}
 \usepackage{longtable}
 \makeatletter
-\newcommand{\rho@colspec}{}
+\let\rho@origlongtable\longtable
+\let\rho@origendlongtable\endlongtable
+\newcommand{\rho@restorecolumn}{}
 \renewenvironment{longtable}[2][]{%
-  \begin{table}[H]%
-  \centering\small
-  \gdef\rho@colspec{#2}%
-  \let\rho@origtabularnewline\tabularnewline
-  \def\tabularnewline{%
-    \let\tabularnewline\rho@origtabularnewline
-    \expandafter\tabular\expandafter{\rho@colspec}%
-  }%
+  \if@twocolumn
+    \onecolumn
+    \def\rho@restorecolumn{\twocolumn}%
+  \else
+    \def\rho@restorecolumn{}%
+  \fi
+  \small
+  \rho@origlongtable[#1]{#2}%
 }{%
-  \bottomrule
-  \endtabular
-  \end{table}%
+  \rho@origendlongtable
+  \rho@restorecolumn
 }
-\def\endfirsthead#1\endlastfoot{}
-\def\endhead{}
-\def\endfoot{}
-\def\endlastfoot{}
 \makeatother
 
 \usepackage{parskip}

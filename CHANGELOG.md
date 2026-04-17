@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 (2026-04-17)
+
+- **Rho template: fix infinite-loop compile on tall tables.** The previous `longtable` redefinition forced every table into `\begin{table}[H]` + `\tabular`. Tables that did not fit on a page silently overflowed the output routine and sent xelatex into an unbounded page loop (`xdvipdfmx:fatal: Page number 65536 too large`), typically after a minute or more of apparent hang. The replacement wraps the original `longtable` in a `\onecolumn` / `\twocolumn` switch so page-breaking works inside rho's twocolumn layout. Compile for a 1000-line document with 17 longtables drops from unbounded to under 10 seconds.
+
 ## 0.2.0 (2026-04-05)
 
 - **Homebrew cask install**: `brew tap goldberg-consulting/inkwell && brew install --cask inkwell` installs the extension plus Pandoc, pandoc-crossref, and MacTeX in one command.

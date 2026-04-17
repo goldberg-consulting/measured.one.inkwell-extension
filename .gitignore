@@ -16,6 +16,9 @@ examples/*.pdf
 .inkwell/examples/
 .inkwell/templates/
 demo-project/
+# Local demo/test documents should not be committed
+demo.md
+demo.pdf
 *.aux
 *.log
 *.out
