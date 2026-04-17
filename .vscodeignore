@@ -28,4 +28,22 @@ out/shell-env.js
 out/templates.js
 out/toolchain.js
 .cursor/**
+# Keep the agent guide that ships with the extension (consumed by the
+# Setup Workspace command when .cursor/agents/ exists in the user's
+# project).
 !.cursor/agents/inkwell-guide.md
+# Exclude personal / scratch documents that must never ship to end
+# users. The published VSIX should contain templates + compiled
+# extension code only; anything else is either a local test artifact
+# or derivative content that was accidentally tracked in the past.
+demo.md
+demo.pdf
+# Example documents and their preview images. These are demo content,
+# not templates. Setup Workspace degrades gracefully when they are
+# absent (copyGuide / copyDemoFiles both short-circuit on ENOENT).
+guide.md
+examples/**
+media/examples/**
+# Generated artifacts under .inkwell/ (mermaid cache, compiled md,
+# outputs directory) are never part of a clean extension bundle.
+.inkwell/**
