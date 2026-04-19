@@ -277,15 +277,20 @@ export class InkwellPreviewProvider {
       const refsPlaceholder = INKWELL_REFS_SLOT;
       let refsSlotInjected = false;
       body = body.replace(
-        /^:::\s*(?:\{#refs[^}]*\}|refs)\s*$[\s\S]*?^:::\s*$/gm,
+        /^:::[ \t]*(?:\{#refs[^}]*\}|refs)[ \t]*$[\s\S]*?^:::[ \t]*$/gm,
         () => {
           refsSlotInjected = true;
           return `\n\n${refsPlaceholder}\n\n`;
         },
       );
 
-      // Strip any remaining Pandoc header attributes not caught above
-      body = body.replace(/\s*\{[#.][\w:. -]+\}\s*$/gm, "");
+      // Strip any remaining Pandoc header attributes not caught above.
+      // Use [ \t]*$ rather than \s*$ — JavaScript's `\s` matches `\n`,
+      // and with the /m flag the greedy `\s*$` will eat the blank line
+      // *after* the attribute, merging the attribute's line into the
+      // next block. That broke lists and headings downstream of any
+      // `{#foo}` attribute.
+      body = body.replace(/[ \t]*\{[#.][\w:. -]+\}[ \t]*$/gm, "");
       // Clean up unresolved inline expression errors for preview
       body = body.replace(
         /\?\?\(([^)]+)\)/g,
@@ -1975,9 +1980,14 @@ function resolveReferences(
   let tblNum = 0;
   let eqNum = 0;
 
-  // Headers: # Title {#sec:label} -> numbered anchor + clean heading
+  // Headers: # Title {#sec:label} -> numbered anchor + clean heading.
+  // NB: use [ \t]* for the surrounding whitespace rather than \s* —
+  // \s matches \n and, with /m, a greedy \s*$ eats the blank line
+  // after the heading and glues the heading into whatever block
+  // follows (list, paragraph, table). That causes markdown-it to
+  // render both as a single run of text.
   let result = body.replace(
-    /^(#{1,6})\s+(.*?)\s*\{#([\w:.-]+)\}\s*$/gm,
+    /^(#{1,6})\s+(.*?)[ \t]*\{#([\w:.-]+)\}[ \t]*$/gm,
     (_, hashes: string, title: string, label: string) => {
       if (label.startsWith("sec:")) {
         const level = hashes.length - 1;
@@ -2035,7 +2045,7 @@ function resolveReferences(
 
   // Table caption labels: : caption {#tbl:label} -> HTML figcaption
   result = result.replace(
-    /^:\s+(.*?)\s*\{#(tbl:[\w:.-]+)\}\s*$/gm,
+    /^:\s+(.*?)[ \t]*\{#(tbl:[\w:.-]+)\}[ \t]*$/gm,
     (_, caption: string, label: string) => {
       tblNum++;
       labels.set(label, `${prefixes.tbl}\u00a0${tblNum}`);
