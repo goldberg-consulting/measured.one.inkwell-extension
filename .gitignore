@@ -15,6 +15,7 @@ examples/*.pdf
 .inkwell/guide.md
 .inkwell/examples/
 .inkwell/templates/
+.inkwell/.cache/
 demo-project/
 # Local demo/test documents should not be committed
 demo.md
