@@ -263,6 +263,22 @@ export class InkwellPreviewProvider {
       body = citeResult.body;
       this.reportCitationStatus(citeResult);
 
+      // If the author marked a references slot with Pandoc's fenced-div
+      // `::: {#refs} ... :::` syntax (or similar variants such as
+      // `::: refs`), swap it out for a sentinel that we can replace with
+      // the CSL references block after markdown-it renders. markdown-it
+      // does not understand `:::` fenced divs, so without this step the
+      // `:::` lines surface as literal text in the preview.
+      const refsPlaceholder = INKWELL_REFS_SLOT;
+      let refsSlotInjected = false;
+      body = body.replace(
+        /^:::\s*(?:\{#refs[^}]*\}|refs)\s*$[\s\S]*?^:::\s*$/gm,
+        () => {
+          refsSlotInjected = true;
+          return `\n\n${refsPlaceholder}\n\n`;
+        },
+      );
+
       // Strip any remaining Pandoc header attributes not caught above
       body = body.replace(/\s*\{[#.][\w:. -]+\}\s*$/gm, "");
       // Clean up unresolved inline expression errors for preview
@@ -299,6 +315,7 @@ export class InkwellPreviewProvider {
       rendered = restore(rendered);
       rendered = this.convertLocalImages(rendered, document);
       rendered = applyBooktabsClasses(rendered);
+      rendered = softenMissingCitations(rendered);
       htmlBody = addDataLineAttrs(rendered);
       title = fm.title;
 
@@ -333,8 +350,22 @@ export class InkwellPreviewProvider {
         }
       }
 
-      if (citeResult.referencesHtml) {
-        htmlBody = htmlBody + citeResult.referencesHtml;
+      // Build the final references section. Prefer pandoc's rendered
+      // CSL block; when every key is missing (pandoc emits no refs div
+      // in that case), synthesize a stub that lists the unresolved
+      // keys so the reader still sees a visible References section and
+      // knows which entries the bibliography is missing.
+      const referencesHtml = buildReferencesSection(citeResult);
+      if (referencesHtml) {
+        if (refsSlotInjected && htmlBody.includes(refsPlaceholder)) {
+          htmlBody = htmlBody.replace(refsPlaceholder, referencesHtml);
+        } else {
+          htmlBody = htmlBody + referencesHtml;
+        }
+      } else if (refsSlotInjected) {
+        // Author asked for refs but there were no citations at all;
+        // drop the placeholder so it doesn't appear as raw text.
+        htmlBody = htmlBody.replace(refsPlaceholder, "");
       }
     }
 
@@ -2136,6 +2167,78 @@ function tableFontSizeToCss(size: string): string | undefined {
 
 function applyBooktabsClasses(html: string): string {
   return html.replace(/<table>/g, '<table class="booktabs">');
+}
+
+const INKWELL_REFS_SLOT = "<!--INKWELL-REFS-SLOT-->";
+
+/**
+ * Assemble the final References section HTML.
+ *
+ * Pandoc normally emits a `<div id="refs">` block that we pick up via
+ * `citeResult.referencesHtml`. But when EVERY cited key is missing from
+ * the configured bibliography, pandoc emits no references block at
+ * all, which leaves the author staring at a document whose cites look
+ * broken and with no explanation why. Synthesize a fallback section
+ * that lists each unresolved key under the "References" heading with
+ * an italic "(not in bibliography)" marker, so the user sees where a
+ * real entry is expected and what key is missing.
+ *
+ * When there are no citations in the document at all, return `""`:
+ * the author did not ask for a References section and we should not
+ * conjure one.
+ */
+function buildReferencesSection(
+  r: Pick<CitationRenderResult, "referencesHtml" | "resolvedKeys" | "missingKeys">,
+): string {
+  if (r.referencesHtml && r.referencesHtml.trim()) {
+    return r.referencesHtml;
+  }
+  if (r.missingKeys.size === 0 && r.resolvedKeys.size === 0) {
+    return "";
+  }
+  const items = [...r.missingKeys].sort().map((key) => {
+    const safeKey = escapeHtml(key);
+    return `<div class="csl-entry citation-missing" id="ref-${safeKey}"><strong>${safeKey}</strong> <em>(not in bibliography)</em></div>`;
+  }).join("\n");
+  return [
+    '<section class="references-section references-stub">',
+    '<h2 class="references-heading">References</h2>',
+    '<p class="references-stub-note"><em>Bibliography resolved 0 of ',
+    String(r.missingKeys.size + r.resolvedKeys.size),
+    ' citations. Add the following entries to your <code>.bib</code> file:</em></p>',
+    '<div class="csl-bib-body">',
+    items,
+    '</div>',
+    '</section>',
+  ].join("");
+}
+
+/**
+ * Pandoc-citeproc renders missing citations as `(<strong>key?</strong>)`
+ * inside a `<span class="citation-missing">` (or, for bracketed groups,
+ * without that class). That bold-with-question-mark styling reads as an
+ * error; a softer `[key]` in italic gray with the `.citation-missing`
+ * class applied uniformly is easier to scan and makes it obvious the
+ * reference is pending rather than broken.
+ */
+function softenMissingCitations(html: string): string {
+  // Replace `<strong>key?</strong>` inside any .citation span with a
+  // cleaner `[key]` marker. The outer span keeps its data-cites attr
+  // so click-to-scroll and cache keying still work.
+  return html.replace(
+    /(<span[^>]*class="[^"]*citation[^"]*"[^>]*>)([\s\S]*?)(<\/span>)/g,
+    (_m, open: string, inner: string, close: string) => {
+      const replaced = inner.replace(
+        /<strong>([^<]+?)\?<\/strong>/g,
+        (_, key: string) => `<em class="citation-missing-inline">[${escapeHtml(key)}]</em>`,
+      );
+      const wasMissing = replaced !== inner;
+      const openAdj = wasMissing && !/citation-missing/.test(open)
+        ? open.replace(/class="([^"]*)"/, 'class="$1 citation-missing"')
+        : open;
+      return openAdj + replaced + close;
+    },
+  );
 }
 
 /**
