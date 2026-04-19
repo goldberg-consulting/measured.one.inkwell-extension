@@ -249,7 +249,12 @@ export class InkwellPreviewProvider {
         eqn: fm.eqnPrefix || "Equation",
         sec: fm.secPrefix || "Section",
       };
-      let body = resolveReferences(fm.body, mermaidMeta, prefixes);
+      let body = resolveReferences(
+        fm.body,
+        mermaidMeta,
+        prefixes,
+        fm.sectionNumbering || "decimal",
+      );
 
       const projectRoot = getInkwellProjectRoot(sourceFile);
       const citeResult = await renderCitations(body, {
@@ -1434,16 +1439,13 @@ export class InkwellPreviewProvider {
     }
 
     printBtn.addEventListener("click", function() {
-      document.body.classList.add("printing");
-      var wasTab = currentTab;
-      if (wasTab !== "preview") {
-        switchTab("preview");
-      }
-      setTimeout(function() {
-        try { window.print(); } catch (e) {}
-        document.body.classList.remove("printing");
-        if (wasTab !== currentTab) switchTab(wasTab);
-      }, 120);
+      // window.print() is unreliable inside a VS Code webview (the
+      // sandbox often swallows the dialog silently), so rebind Print
+      // to the same pipeline as the Compile button: pandoc + xelatex
+      // produces a real PDF and the extension then switches to the
+      // PDF tab to display it. This matches what "print" means for a
+      // typeset document anyway.
+      vscodeApi.postMessage({ type: "compile" });
     });
 
     window.addEventListener("message", function(event) {
@@ -1631,11 +1633,28 @@ interface FrontmatterResult {
   // specify their own {mermaid max-width="..."} attributes)
   mermaidMaxWidth?: string;
   mermaidMaxHeight?: string;
+  // Heading and code typography
+  headingFont?: string;
+  headingColor?: string;
+  headingWeight?: string;
+  headingScale?: number;
+  codeFontSize?: string;
+  captionFontSize?: string;
+  sectionNumbering?: SectionNumberingStyle;
   // Citations
   bibliography?: string[];
   csl?: string;
   linkCitations?: boolean;
 }
+
+/**
+ * Section-numbering style for auto-generated heading numbers.
+ *
+ * - `decimal`: 1 / 1.1 / 1.1.1 (default; matches Pandoc / LaTeX default)
+ * - `legal`:   1 / 1.a / 1.a.i / 1.a.i.(1) (outline / legal style)
+ * - `none`:    no numbers
+ */
+type SectionNumberingStyle = "decimal" | "legal" | "none";
 
 function stripFrontmatter(text: string): FrontmatterResult {
   const match = text.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
@@ -1694,6 +1713,34 @@ function stripFrontmatter(text: string): FrontmatterResult {
   const mermaidMaxHeight = inkwellBlock
     ? inkwellValue(inkwellBlock, "mermaid-max-height")
     : undefined;
+  const headingFont = inkwellBlock
+    ? inkwellValue(inkwellBlock, "heading-font")
+    : undefined;
+  const headingColor = inkwellBlock
+    ? inkwellValue(inkwellBlock, "heading-color")
+    : undefined;
+  const headingWeight = inkwellBlock
+    ? inkwellValue(inkwellBlock, "heading-weight")
+    : undefined;
+  const headingScaleRaw = inkwellBlock
+    ? inkwellValue(inkwellBlock, "heading-scale")
+    : undefined;
+  const headingScale = headingScaleRaw ? parseFloat(headingScaleRaw) : undefined;
+  const codeFontSize = inkwellBlock
+    ? inkwellValue(inkwellBlock, "code-font-size")
+    : undefined;
+  const captionFontSize = inkwellBlock
+    ? inkwellValue(inkwellBlock, "caption-font-size")
+    : undefined;
+  const sectionNumberingRaw = inkwellBlock
+    ? inkwellValue(inkwellBlock, "section-numbering")
+    : undefined;
+  const sectionNumbering: SectionNumberingStyle =
+    sectionNumberingRaw === "legal" || sectionNumberingRaw === "outline"
+      ? "legal"
+      : sectionNumberingRaw === "none" || sectionNumberingRaw === "off"
+      ? "none"
+      : "decimal";
 
   const linkCitRaw = scalar("link-citations");
   const linkCitations =
@@ -1724,6 +1771,13 @@ function stripFrontmatter(text: string): FrontmatterResult {
     captionStyle,
     mermaidMaxWidth,
     mermaidMaxHeight,
+    headingFont,
+    headingColor,
+    headingWeight,
+    headingScale: Number.isFinite(headingScale) && headingScale! > 0 ? headingScale : undefined,
+    codeFontSize,
+    captionFontSize,
+    sectionNumbering,
     bibliography: list("bibliography"),
     csl: scalar("csl"),
     linkCitations,
@@ -1848,10 +1902,72 @@ function sanitizeCssLength(raw: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Format a section counter array into a label string per the chosen
+ * numbering style.
+ *
+ *   decimal (default): [1, 2, 3]     -> "1.2.3"
+ *   legal / outline:   [1, 2, 3]     -> "1.b.iii"
+ *                      [1, 2, 3, 4]  -> "1.b.iii.(4)"
+ *                      [1, 2, 3, 4, 5] -> "1.b.iii.(4).(e)"
+ *   none:              [1, 2, 3]     -> ""
+ *
+ * The legal style uses: uppercase decimal for level 1, lowercase latin
+ * for level 2, lowercase roman for level 3, parenthesised decimal for
+ * level 4, parenthesised latin for level 5+ (uncommon but preserves
+ * distinctness).
+ */
+function formatSectionNumber(counters: number[], style: SectionNumberingStyle): string {
+  const active = counters.filter((n) => n > 0);
+  if (!active.length) return "";
+  if (style === "none") return "";
+  if (style === "decimal") return active.join(".");
+  // legal / outline
+  const parts: string[] = [];
+  for (let i = 0; i < active.length; i++) {
+    const n = active[i];
+    if (i === 0) parts.push(String(n));
+    else if (i === 1) parts.push(latinLower(n));
+    else if (i === 2) parts.push(romanLower(n));
+    else if (i === 3) parts.push(`(${n})`);
+    else parts.push(`(${latinLower(n)})`);
+  }
+  return parts.join(".");
+}
+
+function latinLower(n: number): string {
+  // 1 -> a, 2 -> b, ..., 26 -> z, 27 -> aa, 28 -> ab, ...
+  if (n <= 0) return "";
+  let s = "";
+  let v = n;
+  while (v > 0) {
+    const rem = (v - 1) % 26;
+    s = String.fromCharCode(97 + rem) + s;
+    v = Math.floor((v - 1) / 26);
+  }
+  return s;
+}
+
+function romanLower(n: number): string {
+  if (n <= 0 || n >= 4000) return String(n);
+  const table: Array<[number, string]> = [
+    [1000, "m"], [900, "cm"], [500, "d"], [400, "cd"],
+    [100, "c"], [90, "xc"], [50, "l"], [40, "xl"],
+    [10, "x"], [9, "ix"], [5, "v"], [4, "iv"], [1, "i"],
+  ];
+  let v = n;
+  let out = "";
+  for (const [val, sym] of table) {
+    while (v >= val) { out += sym; v -= val; }
+  }
+  return out;
+}
+
 function resolveReferences(
   body: string,
   mermaidMeta: MermaidMeta[],
   prefixes: { fig: string; tbl: string; eqn: string; sec: string },
+  sectionNumbering: SectionNumberingStyle = "decimal",
 ): string {
   const labels = new Map<string, string>();
   const secNums = [0, 0, 0, 0, 0, 0];
@@ -1867,11 +1983,9 @@ function resolveReferences(
         const level = hashes.length - 1;
         secNums[level]++;
         for (let i = level + 1; i < secNums.length; i++) secNums[i] = 0;
-        const num = secNums
-          .slice(0, level + 1)
-          .filter((n) => n > 0)
-          .join(".");
-        labels.set(label, `${prefixes.sec}\u00a0${num}`);
+        const num = formatSectionNumber(secNums.slice(0, level + 1), sectionNumbering);
+        if (num) labels.set(label, `${prefixes.sec}\u00a0${num}`);
+        else labels.set(label, prefixes.sec);
       }
       return `${hashes} <a id="${label}"></a>${title}`;
     },
@@ -2064,6 +2178,33 @@ function buildLayoutStyle(fm: FrontmatterResult): LayoutPayload {
   const mmh = fm.mermaidMaxHeight ? sanitizeCssLength(fm.mermaidMaxHeight) : undefined;
   if (mmh) vars.push(`--mermaid-max-height: ${mmh}`);
 
+  // Heading typography (separate from body font so the author can
+  // pair, say, a serif body with a sans display face for headings).
+  if (fm.headingFont) {
+    const safe = fm.headingFont.replace(/'/g, "\\'");
+    // Overrides the --heading-font set by mainfont above.
+    vars.push(`--heading-font: '${safe}', Georgia, 'Palatino Linotype', serif`);
+  }
+  if (fm.headingColor && /^[#a-zA-Z0-9(),.\s%-]+$/.test(fm.headingColor)) {
+    vars.push(`--heading-color: ${fm.headingColor}`);
+  }
+  if (fm.headingWeight && /^(\d{3}|normal|bold|lighter|bolder)$/.test(fm.headingWeight)) {
+    vars.push(`--heading-weight: ${fm.headingWeight}`);
+  }
+  if (fm.headingScale && fm.headingScale > 0 && fm.headingScale < 4) {
+    vars.push(`--heading-scale: ${fm.headingScale}`);
+  }
+
+  // Code and caption font-size controls.
+  if (fm.codeFontSize) {
+    const cfs = tableFontSizeToCss(fm.codeFontSize);
+    if (cfs) vars.push(`--code-font-size: ${cfs}`);
+  }
+  if (fm.captionFontSize) {
+    const capfs = tableFontSizeToCss(fm.captionFontSize);
+    if (capfs) vars.push(`--caption-font-size: ${capfs}`);
+  }
+
   const tableStyle = fm.tableStyle || "booktabs";
   vars.push(`--table-style: "${tableStyle}"`);
   if (fm.tableStripe) {
@@ -2078,6 +2219,7 @@ function buildLayoutStyle(fm: FrontmatterResult): LayoutPayload {
   if (fm.captionStyle === "above") bodyClasses.push("caption-above");
   else bodyClasses.push("caption-below");
   if (fm.pagestyle) bodyClasses.push(`pagestyle-${fm.pagestyle.replace(/[^\w-]/g, "")}`);
+  bodyClasses.push(`section-numbering-${fm.sectionNumbering || "decimal"}`);
 
   const cssText = vars.length ? `:root { ${vars.join("; ")}; }` : "";
   return { cssText, bodyClasses };
