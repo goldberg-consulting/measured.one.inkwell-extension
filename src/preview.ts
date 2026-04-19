@@ -1677,10 +1677,20 @@ function inkwellValue(block: string, key: string): string | undefined {
 
 function addDataLineAttrs(html: string): string {
   let lineCounter = 0;
-  return html.replace(/<(h[1-6]|p|pre|blockquote|table|ul|ol|li|hr)/g, (match, tag) => {
-    lineCounter++;
-    return `<${tag} data-line="${lineCounter}"`;
-  });
+  // Alternation order matters: JavaScript's regex engine takes the
+  // FIRST matching alternative, not the longest. If `p` appears before
+  // `pre`, the engine matches `<pre>` as `<p` and the replacement
+  // corrupts the opening tag to `<p data-line="N"re>`, which the HTML
+  // parser then collapses to a `<p>` \u2014 silently converting every code
+  // block into a paragraph, losing `white-space: pre`, and making all
+  // newlines disappear. Put longer tokens before their prefixes.
+  return html.replace(
+    /<(pre|h[1-6]|blockquote|table|ul|ol|li|hr|p)(?=[\s>])/g,
+    (_match, tag) => {
+      lineCounter++;
+      return `<${tag} data-line="${lineCounter}"`;
+    },
+  );
 }
 
 function escapeHtml(text: string): string {
