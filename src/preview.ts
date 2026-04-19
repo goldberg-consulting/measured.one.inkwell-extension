@@ -14,6 +14,7 @@ import { parseCodeBlocks, BlockProgress } from "./runner";
 import { prepareForPreview } from "./inject";
 import { getInkwellOutputChannel } from "./inkwell-output";
 import { getInkwellOutputsDir, getInkwellProjectRoot } from "./config";
+import { renderCitations, CitationRenderResult } from "./citations";
 
 const md = new MarkdownIt({
   html: true,
@@ -50,7 +51,7 @@ export class InkwellPreviewProvider {
   notifyBlocksRan(): void {
     if (!this.panel || !this.initialized) return;
     if (this.currentDocument) {
-      this.sendContentUpdate(this.currentDocument);
+      void this.sendContentUpdate(this.currentDocument);
     }
   }
 
@@ -73,6 +74,36 @@ export class InkwellPreviewProvider {
       type: "runComplete", outcome, ran, cached,
       cancelled: cancelled || 0, failed: failed || 0,
     });
+  }
+
+  /**
+   * Surface citation-engine results in the preview Log tab. Only emits
+   * when there's a plausibly interesting signal (unresolved keys, or a
+   * total-miss when bibliography was referenced but the engine was
+   * unavailable) so we don't spam the log on every keystroke.
+   */
+  private lastCitationSignature: string | undefined;
+  private reportCitationStatus(r: CitationRenderResult): void {
+    const total = r.resolvedKeys.size + r.missingKeys.size;
+    if (total === 0) return;
+
+    const sig = `${r.engine}|${[...r.missingKeys].sort().join(",")}`;
+    if (sig === this.lastCitationSignature) return;
+    this.lastCitationSignature = sig;
+
+    if (r.missingKeys.size > 0) {
+      const sample = [...r.missingKeys].slice(0, 8).join(", ");
+      const extra = r.missingKeys.size > 8 ? ` (+${r.missingKeys.size - 8} more)` : "";
+      this.sendLogEntry(
+        "warn",
+        `Citations: ${r.resolvedKeys.size} resolved, ${r.missingKeys.size} unresolved via ${r.engine}. Missing keys: ${sample}${extra}`,
+      );
+    } else if (r.engine === "none") {
+      this.sendLogEntry(
+        "warn",
+        `Citations present in document but no bibliography or pandoc available to resolve them.`,
+      );
+    }
   }
 
   sendLogEntry(tag: string, message: string, details?: string): void {
@@ -144,7 +175,7 @@ export class InkwellPreviewProvider {
       } else if (msg.type === "ready") {
         this.initialized = true;
         if (this.currentDocument) {
-          this.sendContentUpdate(this.currentDocument);
+          void this.sendContentUpdate(this.currentDocument);
         }
       }
     });
@@ -164,7 +195,7 @@ export class InkwellPreviewProvider {
       if (this.panel && e && isCompilable(e.document)) {
         this.currentDocument = e.document;
         this.updateResourceRoots(e.document);
-        this.sendContentUpdate(e.document);
+        void this.sendContentUpdate(e.document);
       }
     });
 
@@ -191,7 +222,7 @@ export class InkwellPreviewProvider {
     };
   }
 
-  private sendContentUpdate(document: vscode.TextDocument): void {
+  private async sendContentUpdate(document: vscode.TextDocument): Promise<void> {
     if (!this.panel || !this.initialized) return;
 
     const text = document.getText();
@@ -201,13 +232,14 @@ export class InkwellPreviewProvider {
 
     let htmlBody: string;
     let title: string | undefined;
+    let layout: LayoutPayload = { cssText: "", bodyClasses: [] };
 
     if (isTeX) {
       htmlBody = `<pre><code>${escapeHtml(text)}</code></pre>`;
       const titleMatch = text.match(/\\title\{([^}]+)\}/);
       title = titleMatch ? titleMatch[1] : undefined;
     } else {
-      const mermaidLabels = extractMermaidLabels(text);
+      const mermaidMeta = extractMermaidMeta(text);
       const injected = prepareForPreview(text, sourceFile);
       const fm = stripFrontmatter(injected);
 
@@ -217,8 +249,20 @@ export class InkwellPreviewProvider {
         eqn: fm.eqnPrefix || "Equation",
         sec: fm.secPrefix || "Section",
       };
-      let body = resolveReferences(fm.body, mermaidLabels, prefixes);
-      body = resolveCitations(body);
+      let body = resolveReferences(fm.body, mermaidMeta, prefixes);
+
+      const projectRoot = getInkwellProjectRoot(sourceFile);
+      const citeResult = await renderCitations(body, {
+        sourceFile,
+        projectRoot,
+        bibliography: fm.bibliography,
+        csl: fm.csl,
+        linkCitations: fm.linkCitations,
+        referencesHeading: "References",
+      });
+      body = citeResult.body;
+      this.reportCitationStatus(citeResult);
+
       // Strip any remaining Pandoc header attributes not caught above
       body = body.replace(/\s*\{[#.][\w:. -]+\}\s*$/gm, "");
       // Clean up unresolved inline expression errors for preview
@@ -234,15 +278,23 @@ export class InkwellPreviewProvider {
       // Convert raw LaTeX table environments to HTML for preview
       body = convertLatexTables(body);
 
-      let rendered = md.render(body);
+      // Shield math blocks from markdown-it's escape / emphasis rules
+      // before rendering. markdown-it does not know about `$$...$$` or
+      // `$...$` delimiters, so underscores, backslashes, and asterisks
+      // inside math would otherwise be consumed as emphasis or escape
+      // sequences and reach KaTeX in a corrupted form. We swap each
+      // math span for an opaque placeholder, render markdown, then
+      // restore the raw LaTeX so KaTeX auto-render sees it intact.
+      const { shielded, restore } = shieldMathForMarkdown(body);
+
+      let rendered = md.render(shielded);
+      rendered = restore(rendered);
       rendered = this.convertLocalImages(rendered, document);
+      rendered = applyBooktabsClasses(rendered);
       htmlBody = addDataLineAttrs(rendered);
       title = fm.title;
 
-      const fontStyle = buildFontOverrides(fm);
-      if (fontStyle) {
-        htmlBody = fontStyle + htmlBody;
-      }
+      layout = buildLayoutStyle(fm);
 
       const parts: string[] = [];
       if (fm.title) {
@@ -272,6 +324,10 @@ export class InkwellPreviewProvider {
           htmlBody = abstractBlock + htmlBody;
         }
       }
+
+      if (citeResult.referencesHtml) {
+        htmlBody = htmlBody + citeResult.referencesHtml;
+      }
     }
 
     const baseName = path.basename(sourceFile, path.extname(sourceFile));
@@ -298,6 +354,9 @@ export class InkwellPreviewProvider {
       isTeX,
       hasCodeBlocks,
       blockCount: blocks.length,
+      title: title || "",
+      layoutCss: layout.cssText,
+      bodyClasses: layout.bodyClasses,
     });
   }
 
@@ -326,7 +385,7 @@ export class InkwellPreviewProvider {
   // re-rendering on every keystroke during rapid editing.
   private scheduleUpdate(document: vscode.TextDocument): void {
     if (this.throttle) clearTimeout(this.throttle);
-    this.throttle = setTimeout(() => this.sendContentUpdate(document), 150);
+    this.throttle = setTimeout(() => void this.sendContentUpdate(document), 150);
   }
 
   private async handleCompile(): Promise<void> {
@@ -424,7 +483,7 @@ export class InkwellPreviewProvider {
     const cssUri = mediaUri("preview.css");
     const nonce = getNonce();
 
-    const previewLabel = defaultToPdf ? "Source" : "Preview";
+    const previewLabel = defaultToPdf ? "Source" : "Draft";
     const previewActive = defaultToPdf ? "" : " active";
     const pdfActive = defaultToPdf ? " active" : "";
     const initialTab = defaultToPdf ? "pdf" : "preview";
@@ -435,8 +494,8 @@ export class InkwellPreviewProvider {
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'none';
-      style-src ${webview.cspSource} 'unsafe-inline' https://cdn.jsdelivr.net;
-      font-src https://cdn.jsdelivr.net;
+      style-src ${webview.cspSource} 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
+      font-src https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
       script-src 'nonce-${nonce}' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
       worker-src blob:;
       img-src ${webview.cspSource} data: https:;
@@ -444,6 +503,8 @@ export class InkwellPreviewProvider {
       frame-src ${webview.cspSource};">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <link rel="stylesheet" id="hljs-light" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+  <link rel="stylesheet" id="hljs-dark" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
   <link rel="stylesheet" href="${cssUri}">
   <style>
     :root {
@@ -457,7 +518,29 @@ export class InkwellPreviewProvider {
       --hr-display: block;
     }
     html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
-    .mermaid { text-align: center; margin: 1.5em 0; }
+    /* Mermaid diagram sizing. Inline mermaid SVGs expand to their
+       natural size, which often exceeds the preview pane; these rules
+       constrain each diagram to its container while preserving aspect
+       ratio. Frontmatter and per-block attrs can override the maxes. */
+    .mermaid {
+      text-align: center; margin: 1.5em auto;
+      max-width: var(--mermaid-max-width, 100%);
+      max-height: var(--mermaid-max-height, none);
+      overflow: hidden;
+    }
+    .mermaid svg {
+      max-width: 100%;
+      max-height: 100%;
+      height: auto;
+      display: block;
+      margin: 0 auto;
+    }
+    .mermaid-frame {
+      display: block; margin: 1.5em auto; text-align: center; overflow: hidden;
+    }
+    .mermaid-frame .mermaid {
+      max-width: 100%; max-height: 100%; margin: 0 auto;
+    }
 
     .inkwell-toolbar {
       display: flex; align-items: center; height: 36px;
@@ -630,16 +713,127 @@ export class InkwellPreviewProvider {
       text-align: center; line-height: 14px; margin-left: 4px; padding: 0 3px;
     }
     .log-badge.visible { display: inline-block; }
+
+    /* ── Print View: paginated simulation ─────────────────────── */
+    .inkwell-pane.print-pane {
+      display: none; background: #5a5a5a; padding: 24px 0;
+    }
+    @media (prefers-color-scheme: dark) {
+      .inkwell-pane.print-pane { background: #2a2a2a; }
+    }
+    .inkwell-pane.print-pane.active { display: block; }
+    .print-page-stage {
+      display: flex; flex-direction: column; align-items: center; gap: 18px;
+      min-height: 100%;
+    }
+    .page-sheet {
+      width: var(--page-width, 8.5in);
+      min-height: var(--page-height, 11in);
+      background: #fff;
+      color: #111;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.35);
+      padding: var(--page-margin-top, 1in) var(--page-margin-right, 1in)
+               var(--page-margin-bottom, 1in) var(--page-margin-left, 1in);
+      position: relative;
+      display: flex; flex-direction: column;
+      font-family: var(--body-font);
+      font-size: var(--base-size, 11pt);
+      line-height: var(--line-height, 1.4);
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+    .page-sheet .page-header,
+    .page-sheet .page-footer {
+      position: absolute; left: var(--page-margin-left, 1in);
+      right: var(--page-margin-right, 1in);
+      font-size: 9pt; color: #555;
+      display: flex; justify-content: space-between;
+      font-family: var(--body-font);
+    }
+    .page-sheet .page-header {
+      top: calc(var(--page-margin-top, 1in) / 2); padding-bottom: 4px;
+      border-bottom: 0.4pt solid #ccc;
+    }
+    .page-sheet .page-footer {
+      bottom: calc(var(--page-margin-bottom, 1in) / 2); padding-top: 4px;
+    }
+    .page-sheet .page-body { flex: 1; }
+    .page-sheet .page-body > :first-child { margin-top: 0; }
+    .page-sheet .page-body > :last-child { margin-bottom: 0; }
+    .page-sheet :is(figure, table, pre, .theorem-env, blockquote) {
+      break-inside: avoid; page-break-inside: avoid;
+    }
+    .page-sheet h1, .page-sheet h2, .page-sheet h3 {
+      page-break-after: avoid; break-after: avoid;
+    }
+
+    /* HLJS: match Pandoc Shaded background */
+    .hljs { background: var(--code-bg); padding: 0; font-size: 0.85em; }
+    pre code.hljs { padding: 0; }
+
+    /* Visible, inline mermaid error boxes instead of silent failure */
+    .mermaid.mermaid-error { text-align: left; margin: 1.2em 0; }
+    .mermaid-error-box {
+      border-left: 3px solid #e05252;
+      background: rgba(224, 82, 82, 0.08);
+      padding: 10px 14px;
+      border-radius: 2px;
+      font-family: var(--body-font);
+    }
+    .mermaid-error-title {
+      font-weight: 600; color: #e05252; margin-bottom: 6px; font-size: 0.95em;
+    }
+    .mermaid-error-msg {
+      font-family: var(--mono-font); font-size: 0.82em; color: var(--text);
+      white-space: pre-wrap; word-wrap: break-word;
+    }
+    .mermaid-error-box details { margin-top: 8px; font-size: 0.82em; }
+    .mermaid-error-box summary { cursor: pointer; color: var(--accent); }
+    .mermaid-error-src {
+      margin-top: 6px; padding: 8px; background: var(--code-bg);
+      font-family: var(--mono-font); font-size: 0.78em;
+      white-space: pre-wrap; word-wrap: break-word; border-radius: 2px;
+    }
+
+    /* Print button icon alignment */
+    #print-btn span { font-size: 13px; }
+
+    /* ── @page for window.print() ─────────────────────────────── */
+    @page {
+      size: var(--page-size, letter);
+      margin: var(--page-margin-top, 1in) var(--page-margin-right, 1in)
+              var(--page-margin-bottom, 1in) var(--page-margin-left, 1in);
+    }
+
+    /* When printing, hide all chrome and paginate from the active source. */
+    @media print {
+      html, body { overflow: visible !important; height: auto !important; background: #fff !important; }
+      .inkwell-toolbar, .run-panel, #pane-pdf, #pane-log, #pane-print, .inkwell-spacer { display: none !important; }
+      .inkwell-content, .inkwell-pane.preview-pane { position: static !important; display: block !important; overflow: visible !important; padding: 0 !important; }
+      #article-content { max-width: none !important; color: #000 !important; }
+    }
+    /* When the webview body carries .printing, only the preview pane prints. */
+    body.printing .inkwell-toolbar,
+    body.printing .run-panel,
+    body.printing #pane-pdf,
+    body.printing #pane-log,
+    body.printing #pane-print {
+      display: none !important;
+    }
   </style>
 </head>
 <body>
   <div class="inkwell-wrapper">
     <div class="inkwell-toolbar">
       <button class="inkwell-tab${previewActive}" data-tab="preview">${previewLabel}</button>
+      <button class="inkwell-tab" data-tab="print">Print View</button>
       <button class="inkwell-tab${pdfActive}" data-tab="pdf">PDF</button>
       <button class="inkwell-tab" data-tab="log">Log<span class="log-badge" id="log-badge"></span></button>
       <div class="inkwell-spacer"></div>
       <span class="inkwell-status" id="compile-status"></span>
+      <button class="inkwell-compile-btn" id="print-btn" title="Print / Save as PDF">
+        <span>&#128424;</span> Print
+      </button>
       <button class="inkwell-compile-btn" id="run-btn" title="Run Code Blocks (Cmd+Shift+B)" style="display:none;">
         <span id="run-icon">&#9881;</span> Run
       </button>
@@ -659,6 +853,9 @@ export class InkwellPreviewProvider {
     <div class="inkwell-content">
       <div class="inkwell-pane preview-pane${previewActive}" id="pane-preview">
         <article id="article-content"></article>
+      </div>
+      <div class="inkwell-pane print-pane" id="pane-print">
+        <div class="print-page-stage" id="print-page-stage"></div>
       </div>
       <div class="inkwell-pane pdf-pane${pdfActive}" id="pane-pdf">
         <div class="pdf-placeholder" id="pdf-placeholder">
@@ -683,6 +880,16 @@ export class InkwellPreviewProvider {
   <script nonce="${nonce}" src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
   <script nonce="${nonce}" src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+  <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/bash.min.js"></script>
+  <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+  <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/r.min.js"></script>
+  <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+  <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/julia.min.js"></script>
+  <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/yaml.min.js"></script>
+  <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/json.min.js"></script>
+  <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/latex.min.js"></script>
   <script nonce="${nonce}">
   (function() {
     var vscodeApi = acquireVsCodeApi();
@@ -699,6 +906,8 @@ export class InkwellPreviewProvider {
     var tabs = document.querySelectorAll(".inkwell-tab");
     var previewPane = document.getElementById("pane-preview");
     var pdfPane = document.getElementById("pane-pdf");
+    var printPane = document.getElementById("pane-print");
+    var printStage = document.getElementById("print-page-stage");
     var articleEl = document.getElementById("article-content");
     var compileBtn = document.getElementById("compile-btn");
     var compileIcon = document.getElementById("compile-icon");
@@ -712,12 +921,15 @@ export class InkwellPreviewProvider {
     var runBlockList = document.getElementById("run-block-list");
     var runCancelBtn = document.getElementById("run-cancel-btn");
     var runPanelClose = document.getElementById("run-panel-close");
+    var printBtn = document.getElementById("print-btn");
     var logPane = document.getElementById("pane-log");
     var logEntries = document.getElementById("log-entries");
     var logClearBtn = document.getElementById("log-clear-btn");
     var logBadge = document.getElementById("log-badge");
     var isRunning = false;
     var logErrorCount = 0;
+    var docTitle = "";
+    var printPaginated = false;
 
     var STATUS_ICONS = {
       pending: "\\u25CB",
@@ -734,10 +946,14 @@ export class InkwellPreviewProvider {
         t.classList.toggle("active", t.getAttribute("data-tab") === tab);
       });
       previewPane.classList.toggle("active", tab === "preview");
+      if (printPane) printPane.classList.toggle("active", tab === "print");
       pdfPane.classList.toggle("active", tab === "pdf");
       logPane.classList.toggle("active", tab === "log");
       if (tab === "pdf" && currentPdfData) {
         renderPdf(currentPdfData);
+      }
+      if (tab === "print") {
+        paginateForPrint();
       }
       if (tab === "log") {
         logErrorCount = 0;
@@ -745,6 +961,100 @@ export class InkwellPreviewProvider {
         logBadge.textContent = "";
       }
     }
+
+    /* Populate #print-page-stage by cloning the article-content and
+       splitting children across fixed-height page sheets. Purely visual
+       — the original article is never modified. Uses overflow detection
+       with getBoundingClientRect after each append. Re-runs on content
+       updates and on explicit window resize. */
+    function paginateForPrint() {
+      if (!printStage || !articleEl) return;
+      if (printPaginated) return;
+
+      var source = articleEl.cloneNode(true);
+      var children = Array.prototype.slice.call(source.childNodes).filter(function(n) {
+        if (n.nodeType === 1) return true;
+        if (n.nodeType === 3 && n.textContent.trim()) return true;
+        return false;
+      });
+
+      printStage.innerHTML = "";
+      var pageIndex = 0;
+      var page = createPageSheet(++pageIndex);
+      printStage.appendChild(page);
+      var body = page.querySelector(".page-body");
+
+      function overflowing(el) {
+        return el.scrollHeight > el.clientHeight + 2;
+      }
+
+      for (var i = 0; i < children.length; i++) {
+        var node = children[i].cloneNode(true);
+        body.appendChild(node);
+
+        if (overflowing(body)) {
+          if (body.childNodes.length === 1) {
+            // single oversized element — leave it on its page.
+            page = createPageSheet(++pageIndex);
+            printStage.appendChild(page);
+            body = page.querySelector(".page-body");
+          } else {
+            body.removeChild(node);
+            page = createPageSheet(++pageIndex);
+            printStage.appendChild(page);
+            body = page.querySelector(".page-body");
+            body.appendChild(node);
+            if (overflowing(body) && body.childNodes.length === 1) {
+              // accept the overflow for single oversized nodes.
+            }
+          }
+        }
+      }
+
+      var totalPages = pageIndex;
+      printStage.querySelectorAll(".page-sheet").forEach(function(sheet, idx) {
+        var ft = sheet.querySelector(".page-footer");
+        if (ft) {
+          var right = ft.querySelector(".pf-right");
+          if (right) right.textContent = (idx + 1) + " / " + totalPages;
+        }
+      });
+
+      printPaginated = true;
+    }
+
+    function createPageSheet(idx) {
+      var sheet = document.createElement("div");
+      sheet.className = "page-sheet";
+
+      var header = document.createElement("div");
+      header.className = "page-header";
+      header.innerHTML = '<span class="ph-left">' + esc(docTitle || "") + '</span>' +
+        '<span class="ph-right"></span>';
+      sheet.appendChild(header);
+
+      var body = document.createElement("div");
+      body.className = "page-body";
+      sheet.appendChild(body);
+
+      var footer = document.createElement("div");
+      footer.className = "page-footer";
+      footer.innerHTML = '<span class="pf-left"></span>' +
+        '<span class="pf-right">' + idx + '</span>';
+      sheet.appendChild(footer);
+
+      return sheet;
+    }
+
+    var paginateResizeTimer = null;
+    window.addEventListener("resize", function() {
+      if (currentTab !== "print") return;
+      if (paginateResizeTimer) clearTimeout(paginateResizeTimer);
+      paginateResizeTimer = setTimeout(function() {
+        printPaginated = false;
+        paginateForPrint();
+      }, 300);
+    });
 
     function addLogEntry(tag, tagClass, message, details) {
       var empty = logEntries.querySelector(".log-empty");
@@ -891,6 +1201,18 @@ export class InkwellPreviewProvider {
       return d.innerHTML;
     }
 
+    function highlightCode() {
+      if (!articleEl || typeof hljs === "undefined") return;
+      articleEl.querySelectorAll("pre code").forEach(function(block) {
+        if (block.classList.contains("hljs")) return;
+        // Skip mermaid, it's converted separately.
+        if (block.className && block.className.indexOf("language-mermaid") !== -1) return;
+        try {
+          hljs.highlightElement(block);
+        } catch (e) {}
+      });
+    }
+
     function renderMath() {
       if (typeof renderMathInElement !== "undefined" && articleEl) {
         renderMathInElement(articleEl, {
@@ -908,42 +1230,88 @@ export class InkwellPreviewProvider {
     var mermaidInited = false;
     var mermaidSvgCache = {};
 
+    /* Normalize common mermaid-v10 syntax quirks in the raw source.
+       - <br/> (XHTML self-closing) -> <br> which v10 accepts more reliably.
+       - Collapse trailing whitespace that can confuse the parser. */
+    function normalizeMermaidSrc(src) {
+      return src
+        .replace(/<br[^>]*>/g, "<br>")
+        .replace(/[ \\t]+$/gm, "")
+        .trim();
+    }
+
+    var mermaidRenderCounter = 0;
+
     function renderMermaid() {
-      if (!articleEl) return;
-      var needsRun = false;
-      articleEl.querySelectorAll("code.language-mermaid").forEach(function(block) {
+      if (!articleEl || typeof mermaid === "undefined") return;
+
+      var isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      if (!mermaidInited) {
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: isDark ? "dark" : "default",
+          securityLevel: "loose",
+          flowchart: { htmlLabels: true }
+        });
+        mermaidInited = true;
+      }
+
+      var blocks = Array.prototype.slice.call(
+        articleEl.querySelectorAll("code.language-mermaid")
+      );
+
+      blocks.forEach(function(block) {
         var pre = block.parentElement;
-        if (!pre) return;
-        var src = block.textContent || "";
+        if (!pre || !pre.parentNode) return;
+        var src = normalizeMermaidSrc(block.textContent || "");
+
+        var wrapper = document.createElement("div");
+        wrapper.className = "mermaid";
+        wrapper.setAttribute("data-original-src", src);
+        pre.parentNode.replaceChild(wrapper, pre);
+
         var cached = mermaidSvgCache[src];
         if (cached) {
-          var wrapper = document.createElement("div");
-          wrapper.className = "mermaid";
           wrapper.innerHTML = cached;
-          pre.parentNode.replaceChild(wrapper, pre);
-        } else {
-          var div = document.createElement("div");
-          div.className = "mermaid";
-          div.textContent = src;
-          pre.parentNode.replaceChild(div, pre);
-          needsRun = true;
+          wrapper.setAttribute("data-processed", "true");
+          return;
+        }
+
+        var id = "inkwell-mermaid-" + (++mermaidRenderCounter);
+        try {
+          var result = mermaid.render(id, src);
+          var handleResult = function(r) {
+            var svg = typeof r === "string" ? r : r.svg;
+            wrapper.innerHTML = svg;
+            wrapper.setAttribute("data-processed", "true");
+            if (typeof r !== "string" && r.bindFunctions) {
+              try { r.bindFunctions(wrapper); } catch (e) {}
+            }
+            mermaidSvgCache[src] = svg;
+          };
+          if (result && typeof result.then === "function") {
+            result.then(handleResult).catch(function(err) {
+              renderMermaidError(wrapper, src, err);
+            });
+          } else {
+            handleResult(result);
+          }
+        } catch (err) {
+          renderMermaidError(wrapper, src, err);
         }
       });
-      if (needsRun && typeof mermaid !== "undefined") {
-        var isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        if (!mermaidInited) {
-          mermaid.initialize({ startOnLoad: false, theme: isDark ? "dark" : "default" });
-          mermaidInited = true;
-        }
-        mermaid.run().then(function() {
-          articleEl.querySelectorAll(".mermaid[data-processed] svg").forEach(function(svg) {
-            var parent = svg.parentElement;
-            if (parent && parent.textContent) {
-              mermaidSvgCache[parent.getAttribute("data-original-src") || ""] = parent.innerHTML;
-            }
-          });
-        }).catch(function() {});
-      }
+    }
+
+    function renderMermaidError(wrapper, src, err) {
+      var msg = (err && (err.message || err.str)) || String(err);
+      var line = err && err.hash && err.hash.line ? " (line " + err.hash.line + ")" : "";
+      wrapper.className = "mermaid mermaid-error";
+      wrapper.innerHTML =
+        '<div class="mermaid-error-box">' +
+          '<div class="mermaid-error-title">Mermaid error' + esc(line) + '</div>' +
+          '<div class="mermaid-error-msg">' + esc(msg) + '</div>' +
+          '<details><summary>Show source</summary><pre class="mermaid-error-src">' + esc(src) + '</pre></details>' +
+        '</div>';
     }
 
     tabs.forEach(function(t) {
@@ -975,13 +1343,69 @@ export class InkwellPreviewProvider {
       vscodeApi.postMessage({ type: "compile" });
     });
 
+    function wireCitationScroll() {
+      if (!articleEl) return;
+      articleEl.querySelectorAll(".citation a[href^='#'], .cross-ref[href^='#']").forEach(function(a) {
+        a.addEventListener("click", function(ev) {
+          var href = a.getAttribute("href") || "";
+          if (!href.startsWith("#")) return;
+          var target = articleEl.querySelector(href) || document.querySelector(href);
+          if (target) {
+            ev.preventDefault();
+            target.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        });
+      });
+    }
+
+    printBtn.addEventListener("click", function() {
+      document.body.classList.add("printing");
+      var wasTab = currentTab;
+      if (wasTab !== "preview") {
+        switchTab("preview");
+      }
+      setTimeout(function() {
+        try { window.print(); } catch (e) {}
+        document.body.classList.remove("printing");
+        if (wasTab !== currentTab) switchTab(wasTab);
+      }, 120);
+    });
+
     window.addEventListener("message", function(event) {
       var msg = event.data;
 
       if (msg.type === "updateContent") {
         articleEl.innerHTML = msg.html;
+        docTitle = msg.title || "";
+
+        var layoutStyleEl = document.getElementById("inkwell-layout-style");
+        if (!layoutStyleEl) {
+          layoutStyleEl = document.createElement("style");
+          layoutStyleEl.id = "inkwell-layout-style";
+          document.head.appendChild(layoutStyleEl);
+        }
+        layoutStyleEl.textContent = msg.layoutCss || "";
+
+        document.body.className = document.body.className
+          .split(" ")
+          .filter(function(c) {
+            return c && c !== "printing" &&
+              c.indexOf("table-style-") !== 0 &&
+              c.indexOf("pagestyle-") !== 0 &&
+              c !== "table-stripe" &&
+              c !== "caption-above" && c !== "caption-below";
+          }).join(" ");
+        if (msg.bodyClasses && msg.bodyClasses.length) {
+          for (var bc = 0; bc < msg.bodyClasses.length; bc++) {
+            document.body.classList.add(msg.bodyClasses[bc]);
+          }
+        }
+        highlightCode();
         renderMath();
         renderMermaid();
+        wireCitationScroll();
+        printPaginated = false;
+        if (currentTab === "print") paginateForPrint();
         if (msg.pdfData) {
           currentPdfData = msg.pdfData;
         }
@@ -1116,6 +1540,26 @@ interface FrontmatterResult {
   tblPrefix?: string;
   eqnPrefix?: string;
   secPrefix?: string;
+  // Layout parity with LaTeX
+  geometry?: string;
+  papersize?: string;
+  fontsize?: string;
+  linestretch?: string;
+  documentclass?: string;
+  pagestyle?: string;
+  // Inkwell table options mirrored from src/preamble.ts
+  tableStyle?: "booktabs" | "grid" | "plain";
+  tableStripe?: boolean;
+  tableFontSize?: string;
+  captionStyle?: "above" | "below";
+  // Inkwell mermaid sizing defaults (apply to all diagrams that don't
+  // specify their own {mermaid max-width="..."} attributes)
+  mermaidMaxWidth?: string;
+  mermaidMaxHeight?: string;
+  // Citations
+  bibliography?: string[];
+  csl?: string;
+  linkCitations?: boolean;
 }
 
 function stripFrontmatter(text: string): FrontmatterResult {
@@ -1135,6 +1579,51 @@ function stripFrontmatter(text: string): FrontmatterResult {
     return m ? m[1].replace(/^[ \t]+/gm, "").trim() : undefined;
   };
 
+  const list = (key: string): string[] | undefined => {
+    const one = scalar(key);
+    if (one) return [one];
+    const re = new RegExp(`^${key}:\\s*\\n((?:\\s+-\\s+.+\\n?)+)`, "m");
+    const m = fm.match(re);
+    if (!m) return undefined;
+    return m[1]
+      .split("\n")
+      .map((l) => l.replace(/^\s+-\s+/, "").trim())
+      .map((l) => l.replace(/^['"](.*)['"]$/, "$1"))
+      .filter(Boolean);
+  };
+
+  const inkwellBlock = extractInkwellBlock(fm);
+  const tableStyleRaw = inkwellBlock
+    ? inkwellValue(inkwellBlock, "tables")
+    : undefined;
+  const tableStyle =
+    tableStyleRaw === "booktabs" || tableStyleRaw === "grid" || tableStyleRaw === "plain"
+      ? tableStyleRaw
+      : undefined;
+  const captionStyleRaw = inkwellBlock
+    ? inkwellValue(inkwellBlock, "caption-style")
+    : undefined;
+  const captionStyle =
+    captionStyleRaw === "above" || captionStyleRaw === "below"
+      ? captionStyleRaw
+      : undefined;
+  const tableStripe = inkwellBlock
+    ? inkwellValue(inkwellBlock, "table-stripe") === "true"
+    : false;
+  const tableFontSize = inkwellBlock
+    ? inkwellValue(inkwellBlock, "table-font-size")
+    : undefined;
+  const mermaidMaxWidth = inkwellBlock
+    ? inkwellValue(inkwellBlock, "mermaid-max-width")
+    : undefined;
+  const mermaidMaxHeight = inkwellBlock
+    ? inkwellValue(inkwellBlock, "mermaid-max-height")
+    : undefined;
+
+  const linkCitRaw = scalar("link-citations");
+  const linkCitations =
+    linkCitRaw === undefined ? undefined : linkCitRaw.toLowerCase() !== "false";
+
   return {
     body,
     title: scalar("title"),
@@ -1148,7 +1637,42 @@ function stripFrontmatter(text: string): FrontmatterResult {
     tblPrefix: scalar("tblPrefix"),
     eqnPrefix: scalar("eqnPrefix"),
     secPrefix: scalar("secPrefix"),
+    geometry: scalar("geometry"),
+    papersize: scalar("papersize"),
+    fontsize: scalar("fontsize"),
+    linestretch: scalar("linestretch"),
+    documentclass: scalar("documentclass"),
+    pagestyle: scalar("pagestyle"),
+    tableStyle,
+    tableStripe,
+    tableFontSize,
+    captionStyle,
+    mermaidMaxWidth,
+    mermaidMaxHeight,
+    bibliography: list("bibliography"),
+    csl: scalar("csl"),
+    linkCitations,
   };
+}
+
+function extractInkwellBlock(fm: string): string | undefined {
+  const m = fm.match(/^inkwell:\s*$/m);
+  if (!m) return undefined;
+  const start = m.index! + m[0].length;
+  const lines = fm.substring(start).split("\n");
+  const block: string[] = [];
+  for (const line of lines) {
+    if (line.match(/^\S/) && line.trim()) break;
+    block.push(line);
+  }
+  return block.join("\n");
+}
+
+function inkwellValue(block: string, key: string): string | undefined {
+  const m = block.match(
+    new RegExp(`^\\s+${key}:\\s*["']?([^"'\\n]+?)["']?\\s*$`, "m"),
+  );
+  return m ? m[1].trim() : undefined;
 }
 
 function addDataLineAttrs(html: string): string {
@@ -1178,24 +1702,70 @@ function getNonce(): string {
 
 // ── Cross-references and citations ────────────────────────────────────
 
-function extractMermaidLabels(text: string): Map<string, string> {
-  const labels = new Map<string, string>();
+interface MermaidMeta {
+  label?: string;
+  caption?: string;
+  /** Sanitized CSS dimension values keyed by CSS property (max-width, etc.) */
+  sizeStyle?: string;
+}
+
+/**
+ * Walk ```{mermaid ...} fences in source order. We record size attributes
+ * here rather than in inject.ts because normalizeMermaidForPreview strips
+ * the attribute block before markdown-it ever sees it; the preview pipeline
+ * needs an ordered list to reattach styles to the normalized fences.
+ */
+function extractMermaidMeta(text: string): MermaidMeta[] {
+  const out: MermaidMeta[] = [];
   const re = /^```\{mermaid([^}]*)\}/gm;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     const attrs = m[1];
     const labelMatch = attrs.match(/label="([^"]+)"/);
     const captionMatch = attrs.match(/caption="([^"]+)"/);
+    const entry: MermaidMeta = {};
     if (labelMatch) {
-      labels.set(labelMatch[1], captionMatch?.[1] || "Diagram");
+      entry.label = labelMatch[1];
+      entry.caption = captionMatch?.[1] || "Diagram";
     }
+    const sizeStyle = parseMermaidSizeAttrs(attrs);
+    if (sizeStyle) entry.sizeStyle = sizeStyle;
+    out.push(entry);
   }
-  return labels;
+  return out;
+}
+
+/**
+ * Accept a handful of size-like attributes on mermaid fences and emit a
+ * minimal inline style string. We reject anything that doesn't look like a
+ * CSS length/percent to keep the attribute surface small and safe.
+ */
+function parseMermaidSizeAttrs(attrs: string): string | undefined {
+  const keys = ["max-width", "max-height", "width", "height"] as const;
+  const styles: string[] = [];
+  for (const k of keys) {
+    const re = new RegExp(`${k}="([^"]+)"`);
+    const m = attrs.match(re);
+    if (!m) continue;
+    const v = sanitizeCssLength(m[1]);
+    if (v) styles.push(`${k}: ${v}`);
+  }
+  return styles.length ? styles.join("; ") : undefined;
+}
+
+function sanitizeCssLength(raw: string): string | undefined {
+  const s = raw.trim();
+  // Accept numeric lengths with common units, percentages, or bare numbers
+  // (treated as px). Reject anything with spaces/semicolons/quotes.
+  if (/^[+-]?\d+(\.\d+)?%$/.test(s)) return s;
+  if (/^[+-]?\d+(\.\d+)?(px|pt|em|rem|vh|vw|ch|ex|cm|mm|in)$/.test(s)) return s;
+  if (/^[+-]?\d+(\.\d+)?$/.test(s)) return `${s}px`;
+  return undefined;
 }
 
 function resolveReferences(
   body: string,
-  mermaidLabels: Map<string, string>,
+  mermaidMeta: MermaidMeta[],
   prefixes: { fig: string; tbl: string; eqn: string; sec: string },
 ): string {
   const labels = new Map<string, string>();
@@ -1232,20 +1802,36 @@ function resolveReferences(
     },
   );
 
-  // Mermaid diagram labels (extracted from original text before normalization)
-  const mermaidList = [...mermaidLabels.entries()];
+  // Mermaid diagram labels + optional size wrappers. The order of
+  // ```mermaid fences in the normalized body matches the order of
+  // ```{mermaid ...} fences in the source, so we walk the two in lockstep.
   let mermaidIdx = 0;
-  result = result.replace(/^```mermaid\s*$/gm, (match) => {
-    if (mermaidIdx < mermaidList.length) {
-      const [id] = mermaidList[mermaidIdx++];
-      const label = `fig:${id}`;
+  result = result.replace(/^(```mermaid\s*\n[\s\S]*?^```)/gm, (block) => {
+    const meta: MermaidMeta | undefined = mermaidMeta[mermaidIdx++];
+    if (!meta) return block;
+
+    const pieces: string[] = [];
+    if (meta.label) {
+      const label = `fig:${meta.label}`;
       if (!labels.has(label)) {
         figNum++;
         labels.set(label, `${prefixes.fig}\u00a0${figNum}`);
       }
-      return `<a id="${label}"></a>\n\n${match}`;
+      pieces.push(`<a id="${label}"></a>`);
+      pieces.push("");
     }
-    return match;
+    if (meta.sizeStyle) {
+      // Wrap in a sized frame. The blank lines around the fence are
+      // required so markdown-it still parses the inner code block.
+      pieces.push(`<div class="mermaid-frame" style="${meta.sizeStyle}">`);
+      pieces.push("");
+      pieces.push(block);
+      pieces.push("");
+      pieces.push("</div>");
+      return pieces.join("\n");
+    }
+    pieces.push(block);
+    return pieces.join("\n");
   });
 
   // Table caption labels: : caption {#tbl:label} -> HTML figcaption
@@ -1279,21 +1865,6 @@ function resolveReferences(
   );
 
   return result;
-}
-
-function resolveCitations(body: string): string {
-  // Pandoc citation syntax: [@key], [@k1; @k2], [-@key], [@key, p. 23]
-  // Lookahead ensures at least one @ inside the brackets.
-  return body.replace(
-    /\[(?=[^[\]]*@)((?:[^[\]])*)\]/g,
-    (_, inner: string) => {
-      const parts = inner.split(";").map((s) => {
-        const m = s.trim().match(/-?@([\w:./-]+)/);
-        return m ? m[1] : s.trim();
-      });
-      return `<span class="citation">[${parts.join("; ")}]</span>`;
-    },
-  );
 }
 
 function convertLatexTables(body: string): string {
@@ -1358,17 +1929,208 @@ function cleanLatexCell(cell: string): string {
   return c;
 }
 
-function buildFontOverrides(fm: FrontmatterResult): string {
-  const rules: string[] = [];
+interface LayoutPayload {
+  cssText: string;
+  bodyClasses: string[];
+}
+
+function buildLayoutStyle(fm: FrontmatterResult): LayoutPayload {
+  const vars: string[] = [];
+
   if (fm.mainfont) {
     const safe = fm.mainfont.replace(/'/g, "\\'");
-    rules.push(`--body-font: '${safe}', Georgia, 'Palatino Linotype', serif`);
-    rules.push(`--heading-font: '${safe}', Georgia, 'Palatino Linotype', serif`);
+    vars.push(`--body-font: '${safe}', Georgia, 'Palatino Linotype', serif`);
+    vars.push(`--heading-font: '${safe}', Georgia, 'Palatino Linotype', serif`);
   }
   if (fm.monofont) {
     const safe = fm.monofont.replace(/'/g, "\\'");
-    rules.push(`--mono-font: '${safe}', 'SF Mono', Menlo, Consolas, monospace`);
+    vars.push(`--mono-font: '${safe}', 'SF Mono', Menlo, Consolas, monospace`);
   }
-  if (!rules.length) return "";
-  return `<style>:root { ${rules.join("; ")}; }</style>`;
+
+  const paper = parsePaperSize(fm.papersize);
+  if (paper) {
+    vars.push(`--page-width: ${paper.width}`);
+    vars.push(`--page-height: ${paper.height}`);
+    vars.push(`--page-size: ${paper.cssSize}`);
+  }
+
+  const margins = parseGeometry(fm.geometry);
+  vars.push(`--page-margin-top: ${margins.top}`);
+  vars.push(`--page-margin-right: ${margins.right}`);
+  vars.push(`--page-margin-bottom: ${margins.bottom}`);
+  vars.push(`--page-margin-left: ${margins.left}`);
+
+  if (fm.fontsize) {
+    const fs = parseFontSize(fm.fontsize);
+    if (fs) vars.push(`--base-size: ${fs}`);
+  }
+  if (fm.linestretch) {
+    const n = parseFloat(fm.linestretch);
+    if (!Number.isNaN(n) && n > 0) vars.push(`--line-height: ${n}`);
+  }
+
+  if (fm.tableFontSize) {
+    const tfs = tableFontSizeToCss(fm.tableFontSize);
+    if (tfs) vars.push(`--table-font-size: ${tfs}`);
+  }
+
+  const mmw = fm.mermaidMaxWidth ? sanitizeCssLength(fm.mermaidMaxWidth) : undefined;
+  if (mmw) vars.push(`--mermaid-max-width: ${mmw}`);
+  const mmh = fm.mermaidMaxHeight ? sanitizeCssLength(fm.mermaidMaxHeight) : undefined;
+  if (mmh) vars.push(`--mermaid-max-height: ${mmh}`);
+
+  const tableStyle = fm.tableStyle || "booktabs";
+  vars.push(`--table-style: "${tableStyle}"`);
+  if (fm.tableStripe) {
+    vars.push(`--table-stripe-bg: var(--code-bg)`);
+  } else {
+    vars.push(`--table-stripe-bg: transparent`);
+  }
+
+  const bodyClasses: string[] = [];
+  bodyClasses.push(`table-style-${tableStyle}`);
+  if (fm.tableStripe) bodyClasses.push("table-stripe");
+  if (fm.captionStyle === "above") bodyClasses.push("caption-above");
+  else bodyClasses.push("caption-below");
+  if (fm.pagestyle) bodyClasses.push(`pagestyle-${fm.pagestyle.replace(/[^\w-]/g, "")}`);
+
+  const cssText = vars.length ? `:root { ${vars.join("; ")}; }` : "";
+  return { cssText, bodyClasses };
+}
+
+interface PaperSize {
+  width: string;
+  height: string;
+  cssSize: string;
+}
+
+function parsePaperSize(raw: string | undefined): PaperSize | undefined {
+  if (!raw) return { width: "8.5in", height: "11in", cssSize: "letter" };
+  const s = raw.trim().toLowerCase();
+  const known: Record<string, PaperSize> = {
+    letter: { width: "8.5in", height: "11in", cssSize: "letter" },
+    letterpaper: { width: "8.5in", height: "11in", cssSize: "letter" },
+    legal: { width: "8.5in", height: "14in", cssSize: "legal" },
+    legalpaper: { width: "8.5in", height: "14in", cssSize: "legal" },
+    a4: { width: "210mm", height: "297mm", cssSize: "A4" },
+    a4paper: { width: "210mm", height: "297mm", cssSize: "A4" },
+    a5: { width: "148mm", height: "210mm", cssSize: "A5" },
+    a5paper: { width: "148mm", height: "210mm", cssSize: "A5" },
+    b5: { width: "176mm", height: "250mm", cssSize: "B5" },
+    executive: { width: "7.25in", height: "10.5in", cssSize: "7.25in 10.5in" },
+  };
+  return known[s] || { width: "8.5in", height: "11in", cssSize: "letter" };
+}
+
+interface Margins { top: string; right: string; bottom: string; left: string; }
+
+function parseGeometry(raw: string | undefined): Margins {
+  const defaults: Margins = { top: "1in", right: "1in", bottom: "1in", left: "1in" };
+  if (!raw) return defaults;
+
+  const margins: Margins = { ...defaults };
+  const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
+  for (const p of parts) {
+    const eq = p.indexOf("=");
+    if (eq === -1) continue;
+    const key = p.slice(0, eq).trim().toLowerCase();
+    const val = p.slice(eq + 1).trim();
+    if (!val) continue;
+    switch (key) {
+      case "margin":
+        margins.top = margins.right = margins.bottom = margins.left = val;
+        break;
+      case "top": case "tmargin":
+        margins.top = val; break;
+      case "bottom": case "bmargin":
+        margins.bottom = val; break;
+      case "left": case "lmargin": case "inner":
+        margins.left = val; break;
+      case "right": case "rmargin": case "outer":
+        margins.right = val; break;
+      case "hmargin":
+        margins.left = margins.right = val; break;
+      case "vmargin":
+        margins.top = margins.bottom = val; break;
+    }
+  }
+  return margins;
+}
+
+function parseFontSize(raw: string): string | undefined {
+  const s = raw.trim().toLowerCase();
+  // Numeric like "11pt" or "12" — assume pt when unitless.
+  const num = s.match(/^(\d+(?:\.\d+)?)(pt|px|em|rem)?$/);
+  if (num) {
+    const n = parseFloat(num[1]);
+    const unit = num[2] || "pt";
+    return `${n}${unit}`;
+  }
+  return undefined;
+}
+
+function tableFontSizeToCss(size: string): string | undefined {
+  const map: Record<string, string> = {
+    tiny: "0.62em",
+    scriptsize: "0.72em",
+    footnotesize: "0.82em",
+    small: "0.9em",
+    normalsize: "1em",
+  };
+  return map[size];
+}
+
+function applyBooktabsClasses(html: string): string {
+  return html.replace(/<table>/g, '<table class="booktabs">');
+}
+
+/**
+ * Replace math spans (`$$...$$`, `\[...\]`, inline `$...$`, `\(...\)`)
+ * with placeholder tokens that survive markdown-it intact, and return a
+ * `restore` function that swaps the placeholders back with the original
+ * source in the rendered HTML.
+ *
+ * Without shielding, markdown-it interprets `\_`, `\*`, unmatched `_`,
+ * etc. inside math as emphasis or escape sequences, so KaTeX receives
+ * corrupted input and renders the expression as a red error string.
+ *
+ * The placeholder uses letters only so markdown-it cannot split it with
+ * its escape / emphasis rules. Inline math is wrapped in a span so
+ * markdown-it's paragraph detection sees a non-empty line where the
+ * math would otherwise be; block math ($$...$$ on its own) is left as a
+ * bare token so it ends up in its own paragraph, matching KaTeX's
+ * display-mode requirement.
+ */
+function shieldMathForMarkdown(body: string): {
+  shielded: string;
+  restore: (html: string) => string;
+} {
+  const slots: string[] = [];
+  const tokenFor = (raw: string, inline: boolean): string => {
+    const idx = slots.length;
+    slots.push(raw);
+    const marker = `INKWELLMATHPLACEHOLDER${idx}ENDMATH`;
+    return inline ? `<span data-inkwell-math="${idx}">${marker}</span>` : marker;
+  };
+
+  // Order matters: block forms first so inline `$` does not swallow
+  // half of a `$$...$$` span.
+  let shielded = body.replace(/\$\$[\s\S]+?\$\$/g, (m) => tokenFor(m, false));
+  shielded = shielded.replace(/\\\[[\s\S]+?\\\]/g, (m) => tokenFor(m, false));
+  shielded = shielded.replace(/\\\([\s\S]+?\\\)/g, (m) => tokenFor(m, true));
+  // Inline `$...$`: require non-whitespace adjacent to the delimiters
+  // so dollar signs in prose ("costs $5 and $10") do not trigger.
+  shielded = shielded.replace(
+    /(^|[^\\$])\$(?!\s)([^\n$]+?)(?<!\s)\$(?!\d)/g,
+    (_m, pre: string, inner: string) => pre + tokenFor(`$${inner}$`, true),
+  );
+
+  const restore = (html: string): string => {
+    return html.replace(/INKWELLMATHPLACEHOLDER(\d+)ENDMATH/g, (_m, n: string) => {
+      const idx = parseInt(n, 10);
+      return slots[idx] ?? _m;
+    });
+  };
+
+  return { shielded, restore };
 }

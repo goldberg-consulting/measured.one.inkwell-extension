@@ -10,6 +10,21 @@
     --rule-color: #333;
     --rule-color-light: #999;
     --quote-bg: rgba(65, 105, 225, 0.04);
+    /* Paginated layout defaults. Overridden per-document by buildLayoutStyle. */
+    --page-width: 8.5in;
+    --page-height: 11in;
+    --page-size: letter;
+    --page-margin-top: 1in;
+    --page-margin-right: 1in;
+    --page-margin-bottom: 1in;
+    --page-margin-left: 1in;
+    --table-font-size: 0.95em;
+    --table-stripe-bg: transparent;
+    --table-rule-thick: 1.5pt;
+    --table-rule-thin: 0.5pt;
+    /* Mermaid sizing defaults; overridden by frontmatter or per-block attrs. */
+    --mermaid-max-width: 100%;
+    --mermaid-max-height: none;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -82,6 +97,25 @@ pre {
     line-height: 1.45;
     margin: 1.2em 0;
     border: 1px solid var(--border);
+    /* Force whitespace preservation on code blocks. Without this, some
+       webview host stylesheets (VS Code's built-in content security
+       reset; highlight.js's markup choices) can degrade `<pre>` to
+       `white-space: normal`, collapsing newlines into spaces and
+       turning multi-line code into a single wrapped paragraph. Using
+       `pre-wrap` instead of `pre` lets long lines soft-wrap at the
+       preview column width instead of forcing a horizontal scrollbar. */
+    white-space: pre-wrap;
+    word-break: normal;
+    overflow-wrap: anywhere;
+    tab-size: 4;
+}
+
+pre code,
+pre code.hljs,
+pre > code {
+    white-space: inherit;
+    word-break: inherit;
+    overflow-wrap: inherit;
 }
 
 pre code { background: none; padding: 0; font-size: 0.85em; border-radius: 0; }
@@ -97,16 +131,21 @@ blockquote {
     font-size: 0.95em;
 }
 
-/* Booktabs-style tables: horizontal rules only, no vertical borders */
+/* Booktabs-style tables: horizontal rules only (toprule/midrule/bottomrule),
+   no vertical borders, no row stripes by default. Matches LaTeX booktabs. */
 table {
     border-collapse: collapse;
     width: 100%;
     margin: 1.5em 0;
-    font-size: 0.95em;
+    font-size: var(--table-font-size);
+}
+table.booktabs,
+table {
+    border-top: var(--table-rule-thick) solid var(--rule-color);
+    border-bottom: var(--table-rule-thick) solid var(--rule-color);
 }
 thead {
-    border-top: 2px solid var(--rule-color);
-    border-bottom: 1px solid var(--rule-color);
+    border-bottom: var(--table-rule-thin) solid var(--rule-color);
 }
 thead th {
     font-weight: 600;
@@ -119,13 +158,32 @@ tbody td {
     padding: 6px 12px;
     text-align: left;
     border: none;
-    border-bottom: none;
 }
-tbody tr:last-child { border-bottom: 2px solid var(--rule-color); }
-/* Subtle alternating row shading */
-tbody tr:nth-child(even) { background: var(--code-bg); }
+tbody tr:last-child td { border-bottom: none; }
 
-/* Table captions (below tables, matching LaTeX \caption style) */
+/* Optional row striping when frontmatter sets inkwell.table-stripe */
+body.table-stripe tbody tr:nth-child(even) {
+    background: var(--table-stripe-bg);
+}
+
+/* Grid style: vertical+horizontal rules like tabular{|c|c|} */
+body.table-style-grid table {
+    border: var(--table-rule-thin) solid var(--rule-color);
+}
+body.table-style-grid th,
+body.table-style-grid td {
+    border: var(--table-rule-thin) solid var(--rule-color);
+}
+
+/* Plain style: no rules at all */
+body.table-style-plain table,
+body.table-style-plain thead,
+body.table-style-plain tbody tr,
+body.table-style-plain tbody tr:last-child {
+    border: none;
+}
+
+/* Table captions. Default is below-table; caption-above flips it. */
 .table-caption {
     font-size: 0.9em;
     color: var(--blockquote);
@@ -134,6 +192,17 @@ tbody tr:nth-child(even) { background: var(--code-bg); }
     text-align: left;
 }
 .table-caption strong { color: var(--text); }
+
+body.caption-above .table-caption {
+    margin-top: 0;
+    margin-bottom: 0.4em;
+}
+body.caption-above table + .table-caption {
+    /* when caption-above is set and DOM order still has the caption after,
+       visually lift it by negative margin */
+    margin-top: -1.5em;
+    order: -1;
+}
 
 /* Unresolved variable placeholders */
 .var-placeholder {
@@ -260,17 +329,36 @@ em { font-style: italic; }
 .citation { color: var(--cite-color); text-decoration: none; }
 .citation-missing { color: #cc4444; font-style: italic; }
 
-.references {
+.references,
+.references-section {
     margin-top: 3em;
-    font-size: 0.9em;
+    font-size: 0.95em;
     border-top: 1px solid var(--border);
     padding-top: 1em;
+}
+
+.references-heading {
+    font-size: 1.3em;
+    font-weight: 700;
+    margin-top: 0;
+    margin-bottom: 0.8em;
 }
 
 .references h2 { font-size: 1.1em; margin-bottom: 0.5em; }
 .references ol { padding-left: 1.5em; }
 .references li { margin-bottom: 0.75em; line-height: 1.5; }
 .references a { color: var(--accent); text-decoration: none; }
+
+/* Pandoc citeproc emits .csl-entry, .csl-left-margin, .csl-right-inline */
+.csl-entry {
+    margin-bottom: 0.75em;
+    padding-left: 2em;
+    text-indent: -2em;
+    line-height: 1.5;
+}
+.csl-left-margin { display: inline-block; min-width: 2em; }
+.csl-right-inline { display: inline; }
+.csl-bib-body { margin-top: 0.5em; }
 
 /* Theorem-like environments (matches LaTeX amsthm styling) */
 .theorem-env {
@@ -290,17 +378,46 @@ em { font-style: italic; }
         color: black;
         max-width: none;
         padding: 0;
-        font-family: Georgia, 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+        font-family: var(--body-font, Georgia, 'Palatino Linotype', 'Book Antiqua', Palatino, serif);
+        font-size: var(--base-size, 11pt);
+        line-height: var(--line-height, 1.4);
     }
 
     @page {
-        margin: 1in;
-        size: letter;
+        size: var(--page-size, letter);
+        margin: var(--page-margin-top, 1in) var(--page-margin-right, 1in)
+                var(--page-margin-bottom, 1in) var(--page-margin-left, 1in);
+        @top-left { content: string(doc-title); font-size: 9pt; color: #555; }
+        @top-right { content: counter(page) " / " counter(pages); font-size: 9pt; color: #555; }
+        @bottom-center { content: ""; }
     }
 
-    h1, h2, h3 { page-break-after: avoid; }
-    pre, blockquote, table, figure { page-break-inside: avoid; }
+    @page :first {
+        @top-left { content: ""; }
+        @top-right { content: ""; }
+    }
 
-    a { color: black; }
-    a[href]::after { content: " (" attr(href) ")"; font-size: 0.8em; color: #666; }
+    .title-block h1 {
+        string-set: doc-title content();
+    }
+
+    h1, h2, h3, h4 {
+        page-break-after: avoid;
+        break-after: avoid-page;
+    }
+    pre, blockquote, table, figure, .theorem-env {
+        page-break-inside: avoid;
+        break-inside: avoid-page;
+    }
+
+    .references-section, .references { page-break-before: auto; }
+
+    a, .citation a, .cross-ref {
+        color: inherit !important;
+        text-decoration: none !important;
+    }
+    /* Do not expand link URLs inline — matches hyperref colorlinks behavior */
+    a[href]::after { content: none; }
+
+    .citation-missing { color: #000 !important; }
 }
