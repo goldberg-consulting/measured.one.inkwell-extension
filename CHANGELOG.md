@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.5 (2026-04-19)
+
+- **Preview: block math now renders as a proper centered display block.** The v0.2.4 math shield substituted `$$...$$` with a bare placeholder that markdown-it wrapped in a `<p>`. KaTeX's display-mode renderer emits a block-level `.katex-display` span, and nesting that inside a `<p>` forced the browser to auto-close the paragraph, which in turn broke the vertical rhythm and left the equation left-aligned where users expected it centered. Block math is now wrapped in `<div class="math-display">` (with surrounding blank lines so markdown-it treats it as an HTML block) and a matching CSS rule centers the output.
+- **Preview: force code-block whitespace preservation with `!important`.** The v0.2.4 `white-space: pre-wrap` rule was being overridden in practice \u2014 the host webview's default stylesheet (Cursor / VS Code) normalizes `<pre>` to `white-space: normal`, which collapsed newlines into spaces and produced the wrapped-paragraph effect that the earlier fix was meant to eliminate. Apply `white-space: pre-wrap`, `word-break: normal`, and `overflow-wrap: anywhere` with `!important` on `<pre>`, `<code>`, `pre code.hljs`, and nested highlight.js spans so the rule wins the cascade regardless of host defaults.
+
 ## 0.2.4 (2026-04-19)
 
 - **Preview: live bibliography and citations.** New `src/citations.ts` renders `[@key]` / `@key` citations in the preview with full pandoc parity when `pandoc` is on `PATH` (shells out to `pandoc --citeproc` against the frontmatter `bibliography`/`csl`), and falls back to a small in-process `.bib` parser otherwise. Results are cached under `.inkwell/.cache/preview-cites/` keyed on citation tokens, bib mtimes, CSL mtime, and the `link-citations` flag.
