@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.4 (2026-04-19)
+
+- **Preview: live bibliography and citations.** New `src/citations.ts` renders `[@key]` / `@key` citations in the preview with full pandoc parity when `pandoc` is on `PATH` (shells out to `pandoc --citeproc` against the frontmatter `bibliography`/`csl`), and falls back to a small in-process `.bib` parser otherwise. Results are cached under `.inkwell/.cache/preview-cites/` keyed on citation tokens, bib mtimes, CSL mtime, and the `link-citations` flag.
+- **Preview: math rendering fix.** `$$...$$`, `\[...\]`, `\(...\)`, and inline `$...$` spans are now shielded from markdown-it before rendering. markdown-it does not know the math delimiters, so without shielding it consumed `\_` escapes, stray `_` as emphasis, and `\*` as literal asterisks, producing red KaTeX error strings for anything with escapes inside. The shield swaps each math span for an opaque placeholder that survives markdown-it intact, then splices the original LaTeX back into the rendered HTML so KaTeX auto-render sees the source unmodified.
+- **Preview: code block formatting fix.** `<pre>` now sets `white-space: pre-wrap; word-break: normal; overflow-wrap: anywhere; tab-size: 4` with `<pre><code>` inheriting. Fixes the case where webview host stylesheets let `pre` fall back to `white-space: normal`, collapsing newlines into spaces and producing wrapped-paragraph output in place of multi-line code.
+- **Preview: print-ready pagination.** New print view paginates the rendered preview into `.page-sheet` elements with optional headers and footers, for direct-to-printer output without round-tripping through LaTeX.
+- **Config: `findCslFile()` helper.** Locates a CSL stylesheet via the frontmatter `csl` path, falling back to project-root and `.inkwell/references/` lookups.
+- **Gitignore: `.inkwell/.cache/`** added so the citation cache never enters the repo.
+
 ## 0.2.3 (2026-04-17)
 
 - **Package only pure template assets in the VSIX.** Earlier builds shipped `demo.md`, `examples/*.md`, `examples/*.pdf`, `guide.md`, `media/examples/*.png`, and generated `.inkwell/` artifacts (mermaid cache, compiled markdown). The published VSIX now contains `templates/`, the bundled extension code, the extension icon, and standard metadata (`LICENSE`, `README.md`, `CHANGELOG.md`, `package.json`) only. Setup Workspace continues to function \u2014 `copyGuide` and `copyDemoFiles` both fall back silently when the optional sources are absent.

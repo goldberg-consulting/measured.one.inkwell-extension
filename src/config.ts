@@ -156,3 +156,41 @@ export function findDefaultsYaml(projectRoot: string): string | undefined {
   const candidate = path.join(projectRoot, "defaults.yaml");
   return fs.existsSync(candidate) ? candidate : undefined;
 }
+
+/**
+ * Locate a CSL style file. If `name` is provided, try `<name>`, `<name>.csl`
+ * in `.inkwell/csl/`, project root, and `references/`. Otherwise return the
+ * first `.csl` found in `.inkwell/csl/` (deterministic by directory order).
+ */
+export function findCslFile(
+  projectRoot: string,
+  name?: string,
+): string | undefined {
+  const cslDirs = [
+    path.join(projectRoot, ".inkwell", "csl"),
+    path.join(projectRoot, "csl"),
+    projectRoot,
+    path.join(projectRoot, "references"),
+  ];
+
+  if (name) {
+    const candidates = [name, name.endsWith(".csl") ? name : `${name}.csl`];
+    for (const dir of cslDirs) {
+      for (const c of candidates) {
+        const full = path.isAbsolute(c) ? c : path.join(dir, c);
+        if (fs.existsSync(full) && full.endsWith(".csl")) return full;
+      }
+    }
+    if (path.isAbsolute(name) && fs.existsSync(name)) return name;
+    return undefined;
+  }
+
+  for (const dir of cslDirs) {
+    try {
+      for (const f of fs.readdirSync(dir)) {
+        if (f.endsWith(".csl")) return path.join(dir, f);
+      }
+    } catch {}
+  }
+  return undefined;
+}
