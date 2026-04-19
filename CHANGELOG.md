@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.8 (2026-04-19)
+
+- **Preview: honor Pandoc `::: {#refs} :::` placeholder.** The rendered References section now lands at the author-controlled slot (Pandoc's `::: {#refs} :::` fenced div, as used by the rho / rmxaa / tufte templates) instead of being appended to the end of the document after every appendix. When no placeholder is present, we still append at the end.
+- **Preview: always render a References section when citations are present.** When every cited key is missing from the bibliography, pandoc emits no `<div id="refs">` block, so the earlier preview simply showed no References section at all \u2014 users ended up staring at broken-looking cites with no explanation. A stub References section is now synthesized listing each unresolved key under `<em>(not in bibliography)</em>` with a one-line note saying the bibliography resolved 0 of N cites. The stub makes the missing state obvious and tells the reader what entries to add.
+- **Preview: softer missing-citation rendering.** Pandoc emits missing cites as `(<strong>key?</strong>)` which reads like a compile error. Replace with a cleaner `<em>[key]</em>` in subtle gray (shares the `.citation-missing` class so the print view and the stub references section style consistently). The `data-cites` attribute and the link-to-refs anchor are preserved so cached keys and click-to-scroll still work.
+
 ## 0.2.7 (2026-04-19)
 
 - **Preview: mask LaTeX typesetting directives.** Stand-alone `\newpage`, `\clearpage`, `\cleardoublepage`, and `\pagebreak[N]` are replaced in the preview (and the print view) with a subtle dashed rule labelled "page break". Cosmetic spacing commands (`\vspace{..}`, `\hspace{..}`, `\vfill`, `\hfill`, `\bigskip`, `\medskip`, `\smallskip`, `\nopagebreak`, `\noindent`, `\par`, `\null`) are stripped silently. The source markdown is untouched, so the LaTeX compile pipeline still sees the directives verbatim. When the preview is printed through the browser, the page-break marker converts to an actual `page-break-after: always` so the break lands where the author asked for it.
