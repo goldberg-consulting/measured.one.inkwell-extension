@@ -278,6 +278,14 @@ export class InkwellPreviewProvider {
       // Convert raw LaTeX table environments to HTML for preview
       body = convertLatexTables(body);
 
+      // LaTeX typesetting directives (\newpage, \vspace, \hfill, etc.)
+      // are meaningful for the PDF compile but render as literal text
+      // in the preview. Strip cosmetic spacing commands entirely; keep
+      // structural breaks (\newpage / \clearpage / \pagebreak) as a
+      // subtle marker so the reader can still see where the author
+      // intended a page boundary without the raw macro showing.
+      body = maskLatexTypesettingDirectives(body);
+
       // Shield math blocks from markdown-it's escape / emphasis rules
       // before rendering. markdown-it does not know about `$$...$$` or
       // `$...$` delimiters, so underscores, backslashes, and asterisks
@@ -525,7 +533,13 @@ export class InkwellPreviewProvider {
     .mermaid {
       text-align: center; margin: 1.5em auto;
       max-width: var(--mermaid-max-width, 100%);
-      max-height: var(--mermaid-max-height, none);
+      /* Default cap prevents a single uncontrolled diagram from
+         stretching the preview to multiple screens tall. Users can
+         relax the cap with the frontmatter setting
+         inkwell.mermaid-max-height (any CSS length like 90vh or
+         800px) or tighten it per-diagram with a max-height attribute
+         on the mermaid fence. */
+      max-height: var(--mermaid-max-height, 70vh);
       overflow: hidden;
     }
     .mermaid svg {
@@ -766,6 +780,36 @@ export class InkwellPreviewProvider {
     .page-sheet h1, .page-sheet h2, .page-sheet h3 {
       page-break-after: avoid; break-after: avoid;
     }
+
+    /* Visual marker that replaces the newpage / clearpage /
+       pagebreak LaTeX directives in the preview so the intent is
+       visible at a glance but not intrusive. The raw macro still
+       travels to the LaTeX compile pipeline untouched; this is a
+       preview-only affordance. Hidden inside print-view page-sheets
+       since those already paginate physically. */
+    hr.page-break-marker {
+      border: none;
+      border-top: 1px dashed var(--blockquote, #888);
+      margin: 2em 0;
+      position: relative;
+      overflow: visible;
+      opacity: 0.55;
+    }
+    hr.page-break-marker::after {
+      content: "page break";
+      position: absolute;
+      top: -0.7em;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 0 0.6em;
+      background: var(--bg, #fff);
+      font-family: var(--body-font, serif);
+      font-size: 10px;
+      font-variant: small-caps;
+      letter-spacing: 0.12em;
+      color: var(--blockquote, #888);
+    }
+    .page-sheet hr.page-break-marker { display: none; }
 
     /* HLJS: match Pandoc Shaded background */
     .hljs { background: var(--code-bg); padding: 0; font-size: 0.85em; }
@@ -2092,6 +2136,47 @@ function tableFontSizeToCss(size: string): string | undefined {
 
 function applyBooktabsClasses(html: string): string {
   return html.replace(/<table>/g, '<table class="booktabs">');
+}
+
+/**
+ * Hide LaTeX typesetting-only directives from the preview while leaving
+ * the source markdown unchanged (the compile pipeline still sees them).
+ *
+ * - Structural page breaks (`\newpage`, `\clearpage`, `\pagebreak`) are
+ *   replaced with a raw HTML `<hr class="page-break-marker">` surrounded
+ *   by blank lines so markdown-it treats it as an HTML block. A CSS
+ *   rule styles the marker as a faint dashed rule with a "page break"
+ *   label, which is removed in the print view so the actual page-sheet
+ *   pagination does not collide with a decorative marker.
+ * - Cosmetic spacing commands (`\vspace{..}`, `\hspace{..}`, `\vfill`,
+ *   `\hfill`, `\bigskip`, `\medskip`, `\smallskip`, `\noindent`, `\par`)
+ *   are stripped entirely. They have no preview representation and
+ *   would otherwise surface as literal text.
+ */
+function maskLatexTypesettingDirectives(body: string): string {
+  let out = body;
+
+  // Page-break family -> visual marker.
+  out = out.replace(
+    /^[ \t]*\\(?:newpage|clearpage|cleardoublepage|pagebreak(?:\[\d+\])?)[ \t]*$/gm,
+    "\n\n<hr class=\"page-break-marker\">\n\n",
+  );
+
+  // Cosmetic spacing / layout directives -> drop.
+  const droppable: RegExp[] = [
+    /^[ \t]*\\nopagebreak(?:\[\d+\])?[ \t]*$/gm,
+    /^[ \t]*\\vfill[ \t]*$/gm,
+    /^[ \t]*\\hfill[ \t]*$/gm,
+    /^[ \t]*\\(?:big|med|small)skip[ \t]*$/gm,
+    /^[ \t]*\\vspace\*?\{[^}]*\}[ \t]*$/gm,
+    /^[ \t]*\\hspace\*?\{[^}]*\}[ \t]*$/gm,
+    /^[ \t]*\\noindent[ \t]*$/gm,
+    /^[ \t]*\\par[ \t]*$/gm,
+    /^[ \t]*\\null[ \t]*$/gm,
+  ];
+  for (const re of droppable) out = out.replace(re, "");
+
+  return out;
 }
 
 /**

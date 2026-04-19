@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.7 (2026-04-19)
+
+- **Preview: mask LaTeX typesetting directives.** Stand-alone `\newpage`, `\clearpage`, `\cleardoublepage`, and `\pagebreak[N]` are replaced in the preview (and the print view) with a subtle dashed rule labelled "page break". Cosmetic spacing commands (`\vspace{..}`, `\hspace{..}`, `\vfill`, `\hfill`, `\bigskip`, `\medskip`, `\smallskip`, `\nopagebreak`, `\noindent`, `\par`, `\null`) are stripped silently. The source markdown is untouched, so the LaTeX compile pipeline still sees the directives verbatim. When the preview is printed through the browser, the page-break marker converts to an actual `page-break-after: always` so the break lands where the author asked for it.
+- **Preview: default mermaid height cap.** Uncontrolled diagrams were stretching the preview to multiple screens tall. Default `--mermaid-max-height: 70vh` applied to `.mermaid`, overridable via the existing frontmatter (`inkwell.mermaid-max-height`) or per-fence (`{mermaid max-height="400px"}`) mechanisms.
+
 ## 0.2.6 (2026-04-19)
 
 - **Preview: root-cause fix for code blocks rendering without newlines.** `addDataLineAttrs` used the regex `/<(h[1-6]|p|pre|blockquote|table|ul|ol|li|hr)/g`. JavaScript regex alternation takes the *first* matching alternative, not the longest, so every `<pre>` tag was matched as `<p` (because `p` appears before `pre` in the list). The replacement then emitted `<p data-line="N"re>`, which the HTML parser silently collapses to a plain `<p>` tag with trailing garbage discarded \u2014 turning every fenced code block into a paragraph, losing `white-space: pre`, and collapsing all newlines into spaces. The earlier CSS rules (`white-space: pre-wrap`, `!important`, etc.) never took effect because the elements they targeted had already been corrupted from `<pre>` to `<p>` before reaching the DOM. Reorder alternations to put longer tokens first (`pre` before `p`) and add a `(?=[\s>])` lookahead so tag boundaries are respected.
