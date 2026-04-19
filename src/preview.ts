@@ -2110,7 +2110,16 @@ function shieldMathForMarkdown(body: string): {
     const idx = slots.length;
     slots.push(raw);
     const marker = `INKWELLMATHPLACEHOLDER${idx}ENDMATH`;
-    return inline ? `<span data-inkwell-math="${idx}">${marker}</span>` : marker;
+    if (inline) {
+      return `<span data-inkwell-math="${idx}">${marker}</span>`;
+    }
+    // Block math: wrap in a raw-HTML `<div>` with surrounding blank
+    // lines so markdown-it treats it as an HTML block and does not
+    // wrap it in `<p>`. KaTeX's display-mode renderer emits a
+    // block-level `<span class="katex-display">`; nesting that inside
+    // a `<p>` makes the browser auto-close the paragraph and breaks
+    // the centering / vertical spacing.
+    return `\n\n<div class="math-display" data-inkwell-math="${idx}">${marker}</div>\n\n`;
   };
 
   // Order matters: block forms first so inline `$` does not swallow

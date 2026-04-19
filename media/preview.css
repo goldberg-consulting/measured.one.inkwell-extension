@@ -97,25 +97,40 @@ pre {
     line-height: 1.45;
     margin: 1.2em 0;
     border: 1px solid var(--border);
-    /* Force whitespace preservation on code blocks. Without this, some
-       webview host stylesheets (VS Code's built-in content security
-       reset; highlight.js's markup choices) can degrade `<pre>` to
-       `white-space: normal`, collapsing newlines into spaces and
-       turning multi-line code into a single wrapped paragraph. Using
-       `pre-wrap` instead of `pre` lets long lines soft-wrap at the
-       preview column width instead of forcing a horizontal scrollbar. */
-    white-space: pre-wrap;
-    word-break: normal;
-    overflow-wrap: anywhere;
+    /* Force whitespace preservation on code blocks. Without !important
+       the host webview's default stylesheet (Cursor / VS Code injects a
+       reset that normalizes `<pre>` to `white-space: normal`) wins the
+       cascade and collapses every newline in the code block into a
+       single space. Use `pre-wrap` so long lines soft-wrap at the
+       preview column width instead of forcing a horizontal scrollbar,
+       and apply it with `!important` on both the `<pre>` wrapper and
+       any nested `<code>` / highlight.js span. */
+    white-space: pre-wrap !important;
+    word-break: normal !important;
+    overflow-wrap: anywhere !important;
     tab-size: 4;
 }
 
 pre code,
 pre code.hljs,
-pre > code {
-    white-space: inherit;
-    word-break: inherit;
-    overflow-wrap: inherit;
+pre > code,
+pre code span {
+    white-space: pre-wrap !important;
+    word-break: normal !important;
+    overflow-wrap: anywhere !important;
+}
+
+/* Block math wrapper from the markdown-it shield. KaTeX converts the
+   inner text to `<span class="katex-display">`; this outer div just
+   exists so markdown-it does not wrap the math in a `<p>`, which
+   would force the browser to auto-close the paragraph around the
+   block-level `katex-display` span and break its vertical rhythm. */
+.math-display {
+    margin: 1.2em 0;
+    overflow-x: auto;
+}
+.math-display .katex-display {
+    margin: 0;
 }
 
 pre code { background: none; padding: 0; font-size: 0.85em; border-radius: 0; }
