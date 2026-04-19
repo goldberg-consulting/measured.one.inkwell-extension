@@ -25,6 +25,14 @@
     /* Mermaid sizing defaults; overridden by frontmatter or per-block attrs. */
     --mermaid-max-width: 100%;
     --mermaid-max-height: none;
+    /* Heading, code, caption typography defaults. Frontmatter
+       inkwell.heading-font / heading-color / heading-weight / heading-scale
+       / code-font-size / caption-font-size override these. */
+    --heading-color: inherit;
+    --heading-weight: 700;
+    --heading-scale: 1;
+    --code-font-size: 0.85em;
+    --caption-font-size: 0.95em;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -64,17 +72,20 @@ body {
 
 h1, h2, h3, h4, h5, h6 {
     font-family: var(--heading-font);
-    font-weight: 700;
+    font-weight: var(--heading-weight);
+    color: var(--heading-color);
     margin-top: 1.8em;
     margin-bottom: 0.6em;
     line-height: 1.25;
     scroll-margin-top: 16px;
 }
 
-h1 { font-size: 1.6em; }
-h2 { font-size: 1.3em; }
-h3 { font-size: 1.1em; }
-h4 { font-size: 1em; font-style: italic; font-weight: 600; }
+h1 { font-size: calc(1.6em * var(--heading-scale)); }
+h2 { font-size: calc(1.3em * var(--heading-scale)); }
+h3 { font-size: calc(1.1em * var(--heading-scale)); }
+h4 { font-size: calc(1em * var(--heading-scale)); font-style: italic; font-weight: 600; }
+h5 { font-size: calc(0.95em * var(--heading-scale)); font-weight: 600; }
+h6 { font-size: calc(0.9em * var(--heading-scale)); font-weight: 600; color: var(--blockquote); }
 
 p { margin: var(--paragraph-spacing) 0; }
 
@@ -118,6 +129,7 @@ pre code span {
     white-space: pre-wrap !important;
     word-break: normal !important;
     overflow-wrap: anywhere !important;
+    font-size: var(--code-font-size);
 }
 
 /* Block math wrapper from the markdown-it shield. KaTeX converts the
@@ -200,7 +212,7 @@ body.table-style-plain tbody tr:last-child {
 
 /* Table captions. Default is below-table; caption-above flips it. */
 .table-caption {
-    font-size: 0.9em;
+    font-size: var(--caption-font-size);
     color: var(--blockquote);
     margin-top: 0.4em;
     margin-bottom: 1.5em;
@@ -245,7 +257,7 @@ img {
 }
 figure { margin: 1.5em 0; text-align: center; }
 figcaption {
-    font-size: 0.9em;
+    font-size: var(--caption-font-size);
     color: var(--blockquote);
     margin-top: 0.5em;
     font-style: italic;

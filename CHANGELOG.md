@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.9 (2026-04-19)
+
+- **Print button now renders a PDF.** `window.print()` inside a VS Code webview is unreliable (the sandbox often swallows the dialog silently), so the Print toolbar button now triggers the same Pandoc + XeLaTeX compile pipeline as the Compile button. The PDF shows in the PDF tab when it is ready.
+- **Heading typography controls.** `inkwell.heading-font`, `inkwell.heading-color`, `inkwell.heading-weight`, and `inkwell.heading-scale` apply to `h1` through `h6`. Defaults remain unchanged; `heading-scale` is a single multiplier so you can push every heading up or down together. Already-supported `mainfont` / `monofont` continue to control body and mono type.
+- **Code and caption font sizes.** `inkwell.code-font-size` (applies to `<pre><code>`) and `inkwell.caption-font-size` (applies to `figcaption` and `.table-caption`). Accepts any CSS length or the named sizes the existing `table-font-size` accepts.
+- **Section numbering styles.** `inkwell.section-numbering: decimal | legal | none`.
+  - `decimal` (default): `1`, `1.1`, `1.1.1`
+  - `legal` / `outline`: `1`, `1.b`, `1.b.iii`, `1.b.iii.(2)`, `1.b.iii.(2).(e)`
+  - `none`: no auto-numbering; the heading text renders on its own. Figure and table prefixes still number normally.
+
 ## 0.2.8 (2026-04-19)
 
 - **Preview: honor Pandoc `::: {#refs} :::` placeholder.** The rendered References section now lands at the author-controlled slot (Pandoc's `::: {#refs} :::` fenced div, as used by the rho / rmxaa / tufte templates) instead of being appended to the end of the document after every appendix. When no placeholder is present, we still append at the end.
