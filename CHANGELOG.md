@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.6 (2026-04-19)
+
+- **Preview: root-cause fix for code blocks rendering without newlines.** `addDataLineAttrs` used the regex `/<(h[1-6]|p|pre|blockquote|table|ul|ol|li|hr)/g`. JavaScript regex alternation takes the *first* matching alternative, not the longest, so every `<pre>` tag was matched as `<p` (because `p` appears before `pre` in the list). The replacement then emitted `<p data-line="N"re>`, which the HTML parser silently collapses to a plain `<p>` tag with trailing garbage discarded \u2014 turning every fenced code block into a paragraph, losing `white-space: pre`, and collapsing all newlines into spaces. The earlier CSS rules (`white-space: pre-wrap`, `!important`, etc.) never took effect because the elements they targeted had already been corrupted from `<pre>` to `<p>` before reaching the DOM. Reorder alternations to put longer tokens first (`pre` before `p`) and add a `(?=[\s>])` lookahead so tag boundaries are respected.
+
 ## 0.2.5 (2026-04-19)
 
 - **Preview: block math now renders as a proper centered display block.** The v0.2.4 math shield substituted `$$...$$` with a bare placeholder that markdown-it wrapped in a `<p>`. KaTeX's display-mode renderer emits a block-level `.katex-display` span, and nesting that inside a `<p>` forced the browser to auto-close the paragraph, which in turn broke the vertical rhythm and left the equation left-aligned where users expected it centered. Block math is now wrapped in `<div class="math-display">` (with surrounding blank lines so markdown-it treats it as an HTML block) and a matching CSS rule centers the output.
