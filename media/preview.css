@@ -398,6 +398,18 @@ em { font-style: italic; }
         line-height: var(--line-height, 1.4);
     }
 
+    /* Replace the decorative page-break marker with an actual page
+       break when the preview is printed through the browser. The
+       marker itself is not ink-worthy, but its position is: that is
+       where the author put `\newpage`. */
+    hr.page-break-marker {
+        border: none;
+        margin: 0;
+        page-break-after: always;
+        break-after: page;
+    }
+    hr.page-break-marker::after { content: none; }
+
     @page {
         size: var(--page-size, letter);
         margin: var(--page-margin-top, 1in) var(--page-margin-right, 1in)
