@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.10 (2026-04-19)
+
+- **Preview: stop regex transforms from eating the blank line after a `{#label}` attribute.** The body pre-processors used `\s*$` with the `/m` flag when stripping Pandoc attribute blocks (heading `{#sec:...}`, table caption `{#tbl:...}`, `:::` fenced-div refs slot, and the catch-all trailing-attrs sweep). JavaScript's `\s` matches `\n`, so a greedy `\s*$` consumed the blank line *after* the attribute and glued the next markdown block onto the previous one. Downstream, markdown-it saw a `<figcaption>...</figcaption>` on one line immediately followed by `## Heading` and `1. List item`, which triggers CommonMark's HTML-block rule: the heading and the list got swallowed into the HTML block and were rendered as literal text instead of as a heading and an ordered list. Replace `\s*$` with `[ \t]*$` (and similarly for the leading side where present) so only horizontal whitespace is consumed, preserving the blank line that markdown-it needs as a block separator.
+
 ## 0.2.9 (2026-04-19)
 
 - **Print button now renders a PDF.** `window.print()` inside a VS Code webview is unreliable (the sandbox often swallows the dialog silently), so the Print toolbar button now triggers the same Pandoc + XeLaTeX compile pipeline as the Compile button. The PDF shows in the PDF tab when it is ready.
