@@ -9,6 +9,14 @@
 
 \documentclass[$for(classoption)$$classoption$$sep$,$endfor$$if(classoption)$$else$9pt,twoside$endif$]{rmaa-rho-class/rmaa-rho}
 
+% Load spanish alongside english. rmaa-rho/rhobabel.sty contains
+% \iflanguage{spanish}{...}{...} branches that hard-error when the
+% language has not been declared to babel. On TinyTeX / BasicTeX this
+% otherwise crashes every rmxaa compile. See templates/rho/rho.latex
+% for the same fix applied to the rho template. english remains the
+% primary language (last option wins).
+\usepackage[spanish,english]{babel}
+
 % Pandoc citeproc manages the bibliography; suppress natbib's
 % author-year format check, which rejects citeproc's \bibitem entries.
 % The cls loads natbib[authoryear,numbers] and registers an

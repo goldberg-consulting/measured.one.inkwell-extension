@@ -21,6 +21,14 @@ export interface ToolchainStatus {
   mmdc: { installed: boolean; version?: string; path?: string };
   texDistribution?: "full" | "basic" | "tinytex" | "unknown";
   missingPackages: string[];
+  /** Path of the TEXMFROOT resolved via kpsewhich, when available. */
+  texRoot?: string;
+  /** True when the TEXMFROOT tree is writable by the current user. */
+  texRootWritable?: boolean;
+  /** Owner of TEXMFROOT (resolved via stat -f / stat -c). */
+  texRootOwner?: string;
+  /** The current process user, for comparison. */
+  currentUser?: string;
 }
 
 let _extensionPath = "";
@@ -60,6 +68,13 @@ const FALLBACK_PACKAGES = [
   "supertabular", "matlab-prettifier", "lipsum", "hardwrap",
   "units", "silence",
   "pbalance", "extsizes", "fixtounicode",
+  // Required by the rho / rmxaa templates even in English documents:
+  // rhobabel.sty calls \iflanguage{spanish} which hard-errors when
+  // the language is not declared to babel.
+  "babel-spanish", "hyphen-spanish",
+  // Hit on minimal TinyTeX installs during the default pandoc
+  // --template flow.
+  "xstring", "fix2col",
   "amsfonts", "amscls", "tools", "preprint", "sttools",
   "graphics", "oberdiek", "psnfss",
   "mathpazo", "palatino", "bera", "soul", "stix2-type1", "tex-gyre",
@@ -217,6 +232,11 @@ async function checkLatexPackages(kpsewhich: string | undefined): Promise<string
     } catch {}
   }
 
+  // Packages whose primary installed file does not match the default
+  // "<package>.sty" heuristic. Without these mappings, kpsewhich
+  // returns empty for the generated filename and the probe falsely
+  // reports the package as missing, which then triggers a tlmgr
+  // reinstall on every Check Toolchain run.
   const packageFiles: Record<string, string> = {
     "tufte-latex": "tufte-handout.cls",
     "bera": "beramono.sty",
@@ -232,6 +252,12 @@ async function checkLatexPackages(kpsewhich: string | undefined): Promise<string
     "oberdiek": "iflang.sty",
     "psnfss": "helvet.sty",
     "extsizes": "extarticle.cls",
+    "babel-spanish": "spanish.ldf",
+    // hyphen-spanish installs hyphenation patterns, not a .sty file.
+    // kpsewhich resolves the format-file-embedded pattern through the
+    // language.dat chain; the file that reliably shows up is loadhyph-es.tex.
+    "hyphen-spanish": "loadhyph-es.tex",
+    "fix2col": "fix2col.sty",
   };
 
   const missing: string[] = [];
@@ -256,6 +282,53 @@ async function checkLatexPackages(kpsewhich: string | undefined): Promise<string
   return missing;
 }
 
+/**
+ * Resolve TEXMFROOT, its owner, and whether the current user can write
+ * to it. A root-owned TEXMFROOT (common after curl|sudo sh installs of
+ * TinyTeX) silently breaks tlmgr: packages install into a writable
+ * location but texhash / mktexlsr fail to update the root ls-R index,
+ * so kpsewhich continues to report the newly-installed files as
+ * absent. Detecting the ownership mismatch up front lets us surface
+ * an actionable "Fix TinyTeX permissions" remediation instead of
+ * looping the user through a "tlmgr install ... retry compile" cycle
+ * that never resolves.
+ */
+async function inspectTexRoot(kpsewhich: string | undefined): Promise<{
+  texRoot?: string;
+  texRootWritable?: boolean;
+  texRootOwner?: string;
+  currentUser?: string;
+}> {
+  if (!kpsewhich) return {};
+  let texRoot: string | undefined;
+  try {
+    const { stdout } = await exec(kpsewhich, ["-var-value", "TEXMFROOT"], { timeout: 5000 });
+    texRoot = stdout.trim();
+  } catch {
+    return {};
+  }
+  if (!texRoot || !fs.existsSync(texRoot)) return { texRoot };
+
+  const currentUser = process.env.USER || os.userInfo().username;
+  let texRootOwner: string | undefined;
+  try {
+    const statArgs = isMac ? ["-f", "%Su", texRoot] : ["-c", "%U", texRoot];
+    const { stdout } = await exec("stat", statArgs, { timeout: 5000 });
+    texRootOwner = stdout.trim();
+  } catch {}
+
+  // fs.accessSync with W_OK on a dir is the cross-platform signal for
+  // "can this user add files here"; it returns true for the root user
+  // case we actually care about (user != owner).
+  let texRootWritable = false;
+  try {
+    fs.accessSync(texRoot, fs.constants.W_OK);
+    texRootWritable = true;
+  } catch {}
+
+  return { texRoot, texRootWritable, texRootOwner, currentUser };
+}
+
 export async function checkToolchain(): Promise<ToolchainStatus> {
   const [pandoc, xelatex, pdflatex, crossref, mmdc] = await Promise.all([
     probe("pandoc"),
@@ -269,6 +342,7 @@ export async function checkToolchain(): Promise<ToolchainStatus> {
   const missingPackages = xelatex.installed
     ? await checkLatexPackages(kpsewhich)
     : [];
+  const rootInfo = xelatex.installed ? await inspectTexRoot(kpsewhich) : {};
 
   return {
     pandoc,
@@ -278,6 +352,7 @@ export async function checkToolchain(): Promise<ToolchainStatus> {
     mmdc,
     texDistribution: detectDistribution(xelatex.path),
     missingPackages,
+    ...rootInfo,
   };
 }
 
@@ -334,6 +409,25 @@ export async function showToolchainStatus(): Promise<void> {
     lines.push(`LaTeX packages: ${missingCount} missing (${status.missingPackages.slice(0, 5).join(", ")}${missingCount > 5 ? ", ..." : ""})`);
   }
 
+  // Ownership check: if the TEXMFROOT is owned by a user other than
+  // the one running Inkwell and is not writable, packages installed
+  // via tlmgr cannot be registered in the ls-R index and will still
+  // be "not found" at compile time. This is almost always the result
+  // of a `curl ... | sudo sh` TinyTeX bootstrap and is the hardest
+  // failure to diagnose from the compile log alone.
+  const ownershipBroken =
+    status.xelatex.installed &&
+    status.texRoot &&
+    status.texRootOwner &&
+    status.currentUser &&
+    status.texRootOwner !== status.currentUser &&
+    status.texRootWritable === false;
+  if (ownershipBroken) {
+    lines.push(
+      `TEXMFROOT permission: ${status.texRoot} is owned by "${status.texRootOwner}" but you are "${status.currentUser}". tlmgr installs will not register in the file index.`,
+    );
+  }
+
   const coreReady =
     status.pandoc.installed &&
     status.xelatex.installed &&
@@ -341,7 +435,7 @@ export async function showToolchainStatus(): Promise<void> {
     status.crossref.installed;
   const allGood = coreReady && missingCount === 0;
 
-  if (allGood) {
+  if (allGood && !ownershipBroken) {
     const mmdcNote = status.mmdc.installed
       ? ""
       : "\n(mmdc not found; mermaid diagrams will render as code in PDFs)";
@@ -350,6 +444,29 @@ export async function showToolchainStatus(): Promise<void> {
       "OK"
     );
     return;
+  }
+
+  // Surface the ownership mismatch BEFORE the "install packages"
+  // prompt, because no amount of re-running tlmgr will fix the
+  // underlying index problem.
+  if (ownershipBroken) {
+    const fixCommand = `sudo chown -R "${status.currentUser}" "${status.texRoot}" && "${path.join(status.texRoot!, isMac ? "bin/universal-darwin" : "bin")}/texhash" || sudo texhash`;
+    const choice = await vscode.window.showErrorMessage(
+      `TEXMFROOT ownership mismatch: ${status.texRoot} is owned by "${status.texRootOwner}" but you are running as "${status.currentUser}". tlmgr installs succeed silently but newly-installed packages never register in the file index, so compile continues to fail with "file not found" errors even after you run "Install packages".`,
+      "Open terminal with fix command",
+      "Show details",
+      "Ignore",
+    );
+    if (choice === "Open terminal with fix command") {
+      const terminal = vscode.window.createTerminal("Inkwell: Fix TinyTeX permissions");
+      terminal.show();
+      terminal.sendText(fixCommand);
+      return;
+    } else if (choice === "Show details") {
+      showOwnershipDetails(status, fixCommand);
+      return;
+    }
+    // "Ignore": fall through to other remediation options.
   }
 
   // Core tools missing
@@ -440,6 +557,27 @@ export async function installLatexPackage(packageName: string): Promise<void> {
     return;
   }
   await installMissingPackages([normalized]);
+}
+
+function showOwnershipDetails(status: ToolchainStatus, fixCommand: string): void {
+  const doc: string[] = ["# Inkwell: TeX tree owned by a different user\n"];
+  doc.push(`**TEXMFROOT**: \`${status.texRoot}\``);
+  doc.push(`**Owner**: ${status.texRootOwner}`);
+  doc.push(`**Running as**: ${status.currentUser}`);
+  doc.push(`**User can write to the tree**: ${status.texRootWritable ? "yes" : "no"}\n`);
+  doc.push("## Why this breaks your compile\n");
+  doc.push(
+    "A TeX installation bootstrapped with `sudo` (most commonly `curl ... | sudo sh` for TinyTeX) ends up owned by root. `tlmgr install <pkg>` will still succeed when you run it with `sudo`, but the subsequent `texhash` / `mktexlsr` call cannot update the root ls-R index as a non-root user, so `kpsewhich` continues to report every newly-installed package as absent. Every compile then fails with `File '<pkg>.sty' not found` even though the file is sitting in the tree.",
+  );
+  doc.push("\n## Fix\n");
+  doc.push("Change the owner of the tree to your user, then regenerate the file index:\n");
+  doc.push("```bash");
+  doc.push(fixCommand);
+  doc.push("```\n");
+  doc.push("Re-run **Inkwell: Check / Install Toolchain** after running the fix to confirm the green state.");
+  vscode.workspace
+    .openTextDocument({ content: doc.join("\n"), language: "markdown" })
+    .then((d) => vscode.window.showTextDocument(d));
 }
 
 function showPackageDetails(status: ToolchainStatus): void {

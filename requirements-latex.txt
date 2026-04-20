@@ -8,6 +8,15 @@
 geometry
 hyperref
 babel
+# Spanish language files. Required by the rho and rmxaa templates even
+# when the document is authored in English: rhobabel.sty contains
+# \iflanguage{spanish}{...}{...} branches, and \iflanguage is a hard
+# error when the language is not declared to babel. babel-spanish
+# provides the language definition; hyphen-spanish prevents "No
+# hyphenation patterns were preloaded for Spanish" warnings from
+# turning into run-length pagination drift.
+babel-spanish
+hyphen-spanish
 iftex
 
 # layout and formatting
@@ -67,6 +76,14 @@ silence
 pbalance
 extsizes
 fixtounicode
+# Required by the default pandoc --template flow (the LaTeX that
+# pandoc emits for our markdown uses \xs@string operations on TinyTeX
+# minimal installs that otherwise report "File `xstring.sty' not
+# found"). fix2col is a defensive dependency for twocolumn templates
+# (rho, rmxaa) whose class files pull it in through the extarticle
+# chain; on minimal TinyTeX installs it is not present by default.
+xstring
+fix2col
 
 # bundles (provide multiple .sty files each)
 # amsfonts -> amssymb.sty, amsfonts.sty

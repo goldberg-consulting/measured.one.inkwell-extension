@@ -722,3 +722,57 @@ Do not convert these; Inkwell passes raw LaTeX through to the PDF engine:
 **Two-column table overflow.** Two-column templates automatically shrink tables to fit. If a table still overflows, reduce the number of columns or use abbreviations in headers.
 
 **Long code lines.** Code blocks automatically wrap long lines in the PDF. Use `code-font-size: footnotesize` or `code-font-size: scriptsize` if lines are still too wide.
+
+## Troubleshooting
+
+Run **Inkwell: Check / Install Toolchain** from the command palette first — it diagnoses all of the conditions below and surfaces one-click remediations for most of them. The list here is a reference for what those messages mean.
+
+### Compile fails with "You haven't defined the language 'spanish' yet"
+
+Affects the **rho** and **rmxaa** templates on TinyTeX / BasicTeX installs. Fixed in Inkwell 0.3.0+ by loading Spanish alongside English in the template wrappers. If you see this on an older version, upgrade the extension (`brew upgrade --cask inkwell`) or add `babel-spanish` and `hyphen-spanish` to your local `requirements-latex.txt` and run **Inkwell: Check / Install Toolchain**.
+
+### Compile fails with "File 'xstring.sty' not found" (or fixtounicode, fix2col, ...)
+
+Your TeX distribution is missing a package that a shipped template depends on. On a clean TinyTeX install these are not present by default; the full package list ships in `requirements-latex.txt`. Run **Inkwell: Check / Install Toolchain** → *Install packages with tlmgr*, or run the command directly:
+
+```bash
+sed 's/#.*//' <path-to-requirements-latex.txt> | awk 'NF' | xargs tlmgr install
+texhash || mktexlsr
+```
+
+### Compiled PDF shows "??" where cross-references should be
+
+Affects any document that uses `@fig:`, `@tbl:`, `@eq:`, `@sec:`, `\ref{…}`, `\pageref{LastPage}`, or `\tableofcontents`. Fixed in Inkwell 0.3.0+: the compile pipeline now runs the engine twice so LaTeX can resolve cross-references via `.aux`. If you still see `??` on an older version, compile twice in a row (the second run will resolve) or upgrade.
+
+### tlmgr install succeeds but compile still reports "file not found"
+
+Symptom of a root-owned TeX tree. Common after:
+
+- Bootstrapping TinyTeX with `curl … | sudo sh`
+- Copying a `~/Library/TinyTeX/` tree from another machine
+- Running an aborted `brew install --cask basictex` as root
+
+When the TEXMFROOT directory is owned by a user other than the one running Inkwell, `tlmgr install` as your user fails to update the `ls-R` file index — the packages are on disk but `kpsewhook` can't find them. The extension detects this in **Inkwell: Check / Install Toolchain** and offers a one-click fix. Manually:
+
+```bash
+sudo chown -R "$USER" "$(kpsewhich -var-value TEXMFROOT)"
+texhash
+```
+
+Re-run the toolchain check afterward to confirm.
+
+### Preview shows raw LaTeX syntax instead of rendered output
+
+Reload the editor window: `Cmd+Shift+P` → **Developer: Reload Window**. After a `brew upgrade --cask inkwell`, VS Code / Cursor keeps the old extension code loaded in memory until the window reloads.
+
+### I want to see the exact pandoc / xelatex invocation
+
+Open the **Inkwell** output channel (*View* > *Output* > *Inkwell* in the dropdown). Every compile logs the full `pandoc` argv, resolved `TEXINPUTS`, and `--resource-path` so you can reproduce the failure outside the extension without reading the bundle. Each engine pass is logged separately.
+
+### Mermaid diagrams show as code in the PDF
+
+Install the Mermaid CLI globally: `npm install -g @mermaid-js/mermaid-cli`. Inkwell shells out to `mmdc` to rasterize each diagram; without it, the fenced code survives to the PDF unrendered. **Inkwell: Check / Install Toolchain** flags this when it's missing.
+
+### Preview and PDF agree but differ from what I expect
+
+Preview is an HTML simulation of what LaTeX will produce. For structural correctness (refs, bibliography, numbering) preview and PDF should match post-compile. Visual differences (font, spacing, column breaks) are inherent to the two rendering engines — the PDF is authoritative for layout; the preview is authoritative for write-time feedback.
