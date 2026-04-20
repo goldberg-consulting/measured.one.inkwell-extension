@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.3.0 (2026-04-19)
+
+Reliability release. Addresses five classes of failure observed during automated PDF rebuilds on a clean TinyTeX install. Every one of these produced a failing compile or a silently corrupted PDF on machines without a full MacTeX.
+
+### Fixed
+
+- **rho and rmxaa templates: unconditional `\\iflanguage{spanish}` crashes on babel-english-only installs.** The rho class's `rhobabel.sty` and the rmxaa class's `rhobabel.sty` both contain ~20 `\\iflanguage{spanish}{...}{...}` branches. `\\iflanguage` is a hard error (not a silent `false`) when the language has not been declared to `babel`. The previous template wrappers loaded `\\usepackage[english]{babel}`, so the condition was always undefined unless the user's format file happened to have Spanish preloaded \u2014 which TinyTeX and BasicTeX do not. Load `[spanish,english]{babel}` in both template wrappers so the condition resolves, with `english` remaining the primary language. Add `babel-spanish` and `hyphen-spanish` to the shipped requirements list so the language is actually available when tlmgr is used for the initial package pass.
+- **Compile: two-pass engine resolution for cross-references.** The single-pass `pandoc --pdf-engine=...` flow ran the engine only once, which left `\\ref{...}`, `\\pageref{LastPage}`, `\\tableofcontents`, and pandoc-crossref's internal refs unresolved. Every rho / rmxaa PDF showed `Page 1 of ??` on a cold cache, and any \u2198`@fig:` / `@tbl:` / `@eq:` / `@sec:` reference fell through to a literal `??`. The pipeline now emits the template-processed `.tex` first, then runs the engine twice; raw-LaTeX `\\cite{...}` paths also get a biber / bibtex pass when the generated `.tex` contains a `\\bibliography{...}` or `\\addbibresource{...}` line.
+- **Missing TinyTeX packages.** Clean TinyTeX installs of the default / rho / rmxaa templates hit `File 'xstring.sty' not found` or `fixtounicode.sty` on first compile. Add `xstring`, `fix2col`, `babel-spanish`, `hyphen-spanish` to `requirements-latex.txt` and to the `toolchain.ts` fallback list. Map `babel-spanish`, `hyphen-spanish`, `fix2col` in the `kpsewhich` probe so the toolchain check correctly reports their install state instead of always reporting them missing.
+
+### Added
+
+- **Toolchain: TEXMFROOT ownership + writeability check.** `kpsewhich -var-value TEXMFROOT` is probed, and when it resolves to a directory owned by a user other than the current one AND not writable by the current user, the toolchain report surfaces the ownership mismatch and offers a one-click `sudo chown -R "$USER" "$TEXMFROOT"` remediation. This is the single hardest-to-diagnose failure mode for TinyTeX bootstrapped via `curl ... | sudo sh`: `tlmgr install` succeeds silently but `kpsewhich` never sees the new files because the `ls-R` index cannot be updated as a non-root user.
+- **Install script: ownership warning.** `scripts/install-inkwell-macos.sh` now runs the same `kpsewhich` ownership check post-install and prints an actionable warning with the exact `chown` command when the TeX tree is root-owned.
+- **Compile log: full pandoc argv.** The extension's Inkwell output channel now logs the exact `pandoc` argv (including `TEXINPUTS`, `--resource-path`, and every engine-pass command) in a form that can be pasted into a terminal to reproduce a failure outside the extension. Previously this required reading the minified bundle.
+- **`guide.md`: Troubleshooting section.** Documents the symptoms and remediations for the failure modes above, plus the preview-webview-not-refreshing case and how to find the compile invocation in the output channel.
+
+### Template coverage audit
+
+- **rho**: babel fix applied (`[spanish,english]{babel}`).
+- **rmxaa**: babel fix applied (wrapper previously loaded no babel at all).
+- **tufte, ludus, tmsce, inkwell.latex**: no `\\iflanguage` or babel issues.
+- **eth-report**: self-contained `[ngerman, english]{babel}` load; unaffected.
+- **kth-letter**: already uses `\\@ifpackageloaded{babel}` guards; unaffected.
+
 ## 0.2.10 (2026-04-19)
 
 - **Preview: stop regex transforms from eating the blank line after a `{#label}` attribute.** The body pre-processors used `\s*$` with the `/m` flag when stripping Pandoc attribute blocks (heading `{#sec:...}`, table caption `{#tbl:...}`, `:::` fenced-div refs slot, and the catch-all trailing-attrs sweep). JavaScript's `\s` matches `\n`, so a greedy `\s*$` consumed the blank line *after* the attribute and glued the next markdown block onto the previous one. Downstream, markdown-it saw a `<figcaption>...</figcaption>` on one line immediately followed by `## Heading` and `1. List item`, which triggers CommonMark's HTML-block rule: the heading and the list got swallowed into the HTML block and were rendered as literal text instead of as a heading and an ordered list. Replace `\s*$` with `[ \t]*$` (and similarly for the leading side where present) so only horizontal whitespace is consumed, preserving the blank line that markdown-it needs as a block separator.

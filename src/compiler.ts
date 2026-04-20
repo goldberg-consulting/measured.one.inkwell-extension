@@ -413,6 +413,15 @@ async function compilePandoc(
   const tmpSource = path.join(cacheDir, path.basename(sourceFile));
   fs.writeFileSync(tmpSource, injected, "utf-8");
 
+  // Two-stage compile:
+  //   1. pandoc  ->  .tex  (runs the template, pandoc-crossref, citeproc)
+  //   2. engine  ->  .pdf  (run twice so \ref / \pageref / \tableofcontents
+  //                         and pandoc-crossref's internal refs resolve)
+  // The single-pass `pandoc --pdf-engine=...` flow only ran the engine
+  // once, which produced ? marks and \pageref{LastPage} showing as
+  // "??" on every first compile. Two passes is the documented minimum
+  // for LaTeX cross-reference resolution.
+  const tmpTex = path.join(cacheDir, `${baseName}.tex`);
   const tmpOutput = path.join(cacheDir, `${baseName}.pdf`);
 
   const ext = path.extname(sourceFile).toLowerCase();
@@ -424,11 +433,10 @@ async function compilePandoc(
   const projectRoot = getInkwellProjectRoot(sourceFile);
   const resourcePath = [cacheDir, template.dir, sourceDir, projectRoot].join(":");
 
-  const args = [
+  const pandocArgs = [
     tmpSource,
     "-o",
-    tmpOutput,
-    `--pdf-engine=${engine}`,
+    tmpTex,
     "--standalone",
     `--template=${templateDst}`,
     `--from=${fromFormat}`,
@@ -444,26 +452,26 @@ async function compilePandoc(
 
   const preambleFile = writePreambleFile(rawText, cacheDir);
   if (preambleFile) {
-    args.push("-H", preambleFile);
+    pandocArgs.push("-H", preambleFile);
   }
 
   const crossref = await findBinary("pandoc-crossref");
   if (crossref) {
-    const citeprocIndex = args.indexOf("--citeproc");
+    const citeprocIndex = pandocArgs.indexOf("--citeproc");
     if (citeprocIndex >= 0) {
-      args.splice(citeprocIndex, 0, "--filter", crossref);
+      pandocArgs.splice(citeprocIndex, 0, "--filter", crossref);
     } else {
-      args.push("--filter", crossref);
+      pandocArgs.push("--filter", crossref);
     }
   }
 
   const bibFiles = findBibFiles(projectRoot);
   for (const bib of bibFiles) {
-    args.push("--bibliography", bib);
+    pandocArgs.push("--bibliography", bib);
   }
   const defaults = findDefaultsYaml(projectRoot);
   if (defaults) {
-    args.push("--defaults", defaults);
+    pandocArgs.push("--defaults", defaults);
   }
 
   copySiblingFiles(sourceDir, projectRoot, cacheDir);
@@ -492,23 +500,103 @@ async function compilePandoc(
     `[inkwell] cls in template dir: ${fs.existsSync(clsExpected)}`,
     `[inkwell] cls in cache dir: ${fs.existsSync(clsCached)}`,
     `[inkwell] engine: ${engine}`,
-    `[inkwell] pandoc args: ${args.join(" ")}`,
+    `[inkwell] pandoc argv: ${pandoc} ${pandocArgs.map((a) => (a.includes(" ") ? `"${a}"` : a)).join(" ")}`,
     `[inkwell] cache bib exists: ${fs.existsSync(cacheBib)}`,
     `[inkwell] cache dir contents: ${(() => { try { return fs.readdirSync(cacheDir).join(", "); } catch { return "error"; } })()}`,
     ...featureCheck.logLines,
   ].join("\n");
 
+  // Stage 1: pandoc -> .tex
   try {
-    const result = await exec(pandoc, args, {
+    const result = await exec(pandoc, pandocArgs, {
       cwd: sourceDir,
-      timeout: 120_000,
+      timeout: 60_000,
       env: texEnv,
     });
-    stdout = result.stdout;
-    stderr = result.stderr;
+    stdout += result.stdout;
+    stderr += result.stderr;
   } catch (err: any) {
-    if (err.stderr) stderr = err.stderr;
-    if (err.stdout) stdout = err.stdout;
+    if (err.stderr) stderr += err.stderr;
+    if (err.stdout) stdout += err.stdout;
+  }
+
+  const texExists = fs.existsSync(tmpTex);
+  let logContent = "";
+
+  // Stage 2: engine -> .pdf, run twice to resolve cross-references.
+  // Skip if pandoc failed to produce the .tex.
+  if (texExists) {
+    const engineArgs = [
+      "-interaction=nonstopmode",
+      "-halt-on-error",
+      `-output-directory=${cacheDir}`,
+      tmpTex,
+    ];
+
+    for (let pass = 0; pass < 2; pass++) {
+      stdout += `\n[inkwell] ${engine} pass ${pass + 1}: ${engine} ${engineArgs.join(" ")}\n`;
+      try {
+        const result = await exec(engine, engineArgs, {
+          cwd: sourceDir,
+          timeout: 90_000,
+          env: texEnv,
+        });
+        stdout += result.stdout;
+        stderr += result.stderr;
+      } catch (err: any) {
+        if (err.stdout) stdout += err.stdout;
+        if (err.stderr) stderr += err.stderr;
+        // First-pass failures are expected (undefined refs, missing
+        // aux entries). Continue to pass 2 in that case; it typically
+        // resolves. Only a pass-2 failure is a real compile error.
+        if (pass === 0) continue;
+      }
+    }
+
+    // Bibliography handling for the raw-\cite path. Pandoc's
+    // --citeproc inlines CSL entries directly, so in the typical
+    // Inkwell flow we have no \bibliography / \addbibresource in
+    // the generated .tex and biber/bibtex are unneeded. A user with
+    // raw LaTeX \cite commands still gets served: we detect the
+    // macro in the generated .tex and run biber/bibtex + one more
+    // engine pass in that case.
+    try {
+      const texContent = fs.readFileSync(tmpTex, "utf-8");
+      const hasBib = /\\(bibliography|addbibresource)\{/.test(texContent);
+      if (hasBib) {
+        const biber = await findBinary("biber");
+        const bibtex = await findBinary("bibtex");
+        const bibTool = biber || bibtex;
+        if (bibTool) {
+          try {
+            await exec(bibTool, [path.join(cacheDir, baseName)], {
+              cwd: cacheDir,
+              timeout: 30_000,
+              env: texEnv,
+            });
+          } catch (err: any) {
+            if (err.stderr) stderr += "\n" + err.stderr;
+          }
+          try {
+            const r = await exec(engine, engineArgs, {
+              cwd: sourceDir,
+              timeout: 90_000,
+              env: texEnv,
+            });
+            stdout += r.stdout;
+            stderr += r.stderr;
+          } catch (err: any) {
+            if (err.stderr) stderr += err.stderr;
+            if (err.stdout) stdout += err.stdout;
+          }
+        }
+      }
+    } catch {}
+
+    const logFile = path.join(cacheDir, `${baseName}.log`);
+    try {
+      logContent = fs.readFileSync(logFile, "utf-8");
+    } catch {}
   }
 
   const pdfExists = fs.existsSync(tmpOutput);
@@ -516,14 +604,17 @@ async function compilePandoc(
     fs.copyFileSync(tmpOutput, pdfOutput);
   }
 
-  const errors = [...featureCheck.warnings, ...parseErrors(stderr, stdout)];
+  const errors = [
+    ...featureCheck.warnings,
+    ...parseErrors(stderr + "\n" + logContent, stdout),
+  ];
   const duration = (Date.now() - start) / 1000;
 
   return {
     success: pdfExists,
     pdfPath: pdfExists ? pdfOutput : undefined,
     errors,
-    log: diagnosticLog + "\n\n" + stderr + "\n" + stdout,
+    log: diagnosticLog + "\n\n" + stderr + "\n" + stdout + (logContent ? "\n\n--- engine log ---\n" + logContent.slice(-8000) : ""),
     duration,
   };
 }

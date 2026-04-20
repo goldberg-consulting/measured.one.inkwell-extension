@@ -4,7 +4,17 @@
 % We add only what Pandoc requires for syntax highlighting and tables.
 
 \documentclass[$for(classoption)$$classoption$$sep$,$endfor$$if(classoption)$$else$9pt,a4paper,twoside$endif$]{rho-class/rho}
-\usepackage[english]{babel}
+% Load spanish alongside english. The rho class's rhobabel.sty calls
+% \iflanguage{spanish}{...}{...} in ~20 places; \iflanguage is a hard
+% error (not a silent false) when the referenced language has not been
+% declared. On TinyTeX / BasicTeX installs, where Spanish is not
+% preloaded into the format file, this otherwise crashes every rho
+% compile with "You haven't defined the language 'spanish' yet". Full
+% MacTeX users got lucky because babel-spanish ships with mactex. The
+% babel-spanish + hyphen-spanish packages must also be installed; they
+% live in requirements-latex.txt for tlmgr. english remains the primary
+% language (last option in the list wins).
+\usepackage[spanish,english]{babel}
 
 \setbool{rho-abstract}{$if(abstract)$true$else$false$endif$}
 \setbool{corres-info}{$if(corres)$true$else$$if(email)$true$else$$if(doi)$true$else$false$endif$$endif$$endif$}

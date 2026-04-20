@@ -96,6 +96,29 @@ else
   echo "Skipping tlmgr package pass (tlmgr or requirements file not found)."
 fi
 
+# Ownership check. A curl | sudo sh bootstrap of TinyTeX (or an aborted
+# BasicTeX install that left an intermediate root-owned state) leaves
+# the TeX tree owned by root. Subsequent tlmgr installs succeed as
+# root but the ls-R index update fails silently when the user later
+# tries to compile, producing the "File 'xstring.sty' not found" class
+# of errors even though the file sits right there on disk. Detect that
+# state now and offer a one-line remediation before the user ever
+# hits it from the extension.
+if has_cmd kpsewhich; then
+  TEX_ROOT="$(kpsewhich -var-value TEXMFROOT 2>/dev/null || true)"
+  if [[ -n "$TEX_ROOT" && -d "$TEX_ROOT" ]]; then
+    TEX_OWNER="$(stat -f '%Su' "$TEX_ROOT" 2>/dev/null || true)"
+    if [[ -n "$TEX_OWNER" && "$TEX_OWNER" != "$USER" ]]; then
+      echo ""
+      echo "WARNING: TEXMFROOT ($TEX_ROOT) is owned by '$TEX_OWNER' but you are '$USER'."
+      echo "This breaks 'tlmgr install' silently: packages install but never register in the file index."
+      echo "Run this to fix:"
+      echo "    sudo chown -R \"$USER\" \"$TEX_ROOT\" && \"$TEX_ROOT/bin/universal-darwin/texhash\""
+      echo ""
+    fi
+  fi
+fi
+
 echo ""
 echo "Inkwell setup complete."
 echo "Next steps:"
