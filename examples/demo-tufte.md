@@ -143,6 +143,8 @@ When a table or figure demands the full page width, the \texttt{fullwidth}
 environment extends into the margin area. This is useful for wide tables
 or panoramic figures that lose clarity when constrained.
 
+\end{fullwidth}
+
 | Dataset | $n$ | $\bar{x}$ | $\bar{y}$ | $s_x$ | $s_y$ | $r$ |
 |---------|-----|-----------|-----------|--------|--------|-------|
 | I       | 11  | 9.0       | 7.50      | 3.32   | 2.03   | 0.816 |
@@ -151,8 +153,6 @@ or panoramic figures that lose clarity when constrained.
 | IV      | 11  | 9.0       | 7.50      | 3.32   | 2.03   | 0.816 |
 
 : Summary statistics of the Anscombe quartet. {#tbl:anscombe-stats}
-
-\end{fullwidth}
 
 # Mathematical Notation {#sec:math}
 

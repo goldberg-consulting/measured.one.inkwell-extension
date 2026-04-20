@@ -2,7 +2,7 @@
   "name": "inkwell",
   "displayName": "Inkwell",
   "description": "Markdown to publication-quality PDF. Live preview, Pandoc + XeLaTeX compilation, runnable code blocks, and LaTeX template management.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "measure-one",
   "icon": "media/icon.png",
   "license": "SEE LICENSE IN LICENSE",
@@ -191,7 +191,7 @@
     "lint": "eslint src --ext ts",
     "test:regressions": "node scripts/check-template-regressions.mjs",
     "test:stability": "node scripts/check-shortcuts-and-commands.mjs",
-    "test:installer": "bash -n scripts/install-inkwell-macos.sh",
+    "test:installer": "bash -n scripts/install-inkwell-macos.sh && bash -n scripts/compile-demo.sh && bash -n scripts/compile-all-demos.sh",
     "verify": "npm run typecheck && npm run lint && npm run test:regressions && npm run test:stability && npm run test:installer"
   },
   "dependencies": {

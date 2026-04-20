@@ -1,0 +1,173 @@
+name: Compile demos
+
+# Regression compile of every shipped demo against a clean TinyTeX.
+# Catches the class of failures that only surface outside a Full MacTeX
+# install: templates that depend on babel-spanish, packages that ship
+# in mactex but not tinytex, cross-reference resolution that requires
+# two engine passes, etc.
+#
+# Runs on pull requests that touch a template, the requirements list,
+# or the compile pipeline, and on every push to main. Intentionally not
+# run on every PR to avoid a 10+ minute wait for unrelated changes.
+
+on:
+  pull_request:
+    paths:
+      - "templates/**"
+      - "requirements-latex.txt"
+      - "src/compiler.ts"
+      - "src/inject.ts"
+      - "scripts/compile-demo.sh"
+      - "scripts/compile-all-demos.sh"
+      - "examples/demo-*.md"
+      - ".github/workflows/compile-demos.yml"
+  push:
+    branches: [main]
+    paths:
+      - "templates/**"
+      - "requirements-latex.txt"
+      - "src/compiler.ts"
+      - "src/inject.ts"
+      - "scripts/compile-demo.sh"
+      - "scripts/compile-all-demos.sh"
+      - "examples/demo-*.md"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  compile-all-demos:
+    name: Compile every demo on TinyTeX
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install pandoc 3.x + pandoc-crossref
+        run: |
+          # Ubuntu 22.04's apt pandoc is 2.17 — below our minimum of
+          # 3.0 — and changes pandoc's --template handling enough that
+          # our compile pipeline's output differs from what a user on
+          # macOS with Homebrew pandoc 3.x produces. Install a pinned
+          # pandoc 3.x direct from the upstream release tarball so the
+          # CI matches what we actually target.
+          set -euo pipefail
+          PANDOC_VERSION="3.9"
+          curl -sL "https://github.com/jgm/pandoc/releases/download/${PANDOC_VERSION}/pandoc-${PANDOC_VERSION}-1-amd64.deb" -o /tmp/pandoc.deb
+          sudo dpkg -i /tmp/pandoc.deb
+          pandoc --version | head -1
+
+          # pandoc-crossref latest release binary.
+          crossref_url="$(curl -sL https://api.github.com/repos/lierdakil/pandoc-crossref/releases/latest \
+            | grep 'browser_download_url.*Linux-X64.tar.xz' | head -1 | cut -d '"' -f 4 || true)"
+          if [[ -n "$crossref_url" ]]; then
+            curl -sL "$crossref_url" -o /tmp/pandoc-crossref.tar.xz
+            mkdir -p /tmp/pc
+            tar -xJf /tmp/pandoc-crossref.tar.xz -C /tmp/pc
+            sudo mv /tmp/pc/pandoc-crossref /usr/local/bin/pandoc-crossref
+            sudo chmod +x /usr/local/bin/pandoc-crossref
+            pandoc-crossref --version | head -1
+          else
+            echo "Could not resolve pandoc-crossref release; proceeding without it."
+          fi
+
+      - name: Install TinyTeX
+        run: |
+          curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh
+          echo "$HOME/.TinyTeX/bin/x86_64-linux" >> "$GITHUB_PATH"
+
+      - name: Install required LaTeX packages
+        run: |
+          export PATH="$HOME/.TinyTeX/bin/x86_64-linux:$PATH"
+          tlmgr update --self
+          # Strip comments + blank lines from the requirements list and
+          # install in bulk. The `| xargs` pattern matches what the
+          # extension's toolchain setup does. `tlmgr install` tolerates
+          # a non-zero exit here: TinyTeX sometimes fails the final
+          # fmtutil-sys regeneration for luametatex/luajittex engines
+          # the minimal install does not ship, even though every
+          # package it downloaded is on disk. The kpsewhich spot-check
+          # below is what actually verifies the install succeeded.
+          sed 's/#.*//' requirements-latex.txt | awk 'NF' | xargs tlmgr install || true
+          texhash || mktexlsr || true
+          kpsewhich --version | head -1
+          # Sanity check: the packages introduced in v0.3.0 should be
+          # visible to kpsewhich after this step. The whole point of
+          # the CI regression is to catch the case where they are not.
+          missing=0
+          for probe in xstring.sty fix2col.sty svn-prov.sty english.ldf spanish.ldf loadhyph-es.tex; do
+            if kpsewhich "$probe" >/dev/null 2>&1; then
+              echo "OK   kpsewhich $probe"
+            else
+              echo "FAIL kpsewhich $probe (not in TinyTeX after tlmgr pass)"
+              missing=1
+            fi
+          done
+          if [[ "$missing" -ne 0 ]]; then
+            exit 1
+          fi
+
+      - name: Seed runtime-generated figures
+        run: |
+          # demo-tufte references .inkwell/figures/anscombe.pdf which
+          # is produced by a Python block in the demo. Under the
+          # extension, users run the block (Cmd+Alt+R) before
+          # compiling. In CI we skip the code-block runner and just
+          # generate the figures directly with matplotlib so the
+          # compile pipeline can be tested in isolation. Add new
+          # seed calls here when new demos introduce runtime-generated
+          # figures; alternatively, commit a placeholder under
+          # .inkwell/figures/ and exclude the file from .gitignore.
+          python3 -m pip install --quiet matplotlib numpy
+          mkdir -p .inkwell/figures
+          python3 - <<'PY'
+          import matplotlib
+          matplotlib.use("Agg")
+          import matplotlib.pyplot as plt
+          import numpy as np
+
+          # Anscombe's quartet. Minimal reproduction, not the demo's
+          # exact visual.
+          datasets = {
+              "I":  ([10,8,13,9,11,14,6,4,12,7,5], [8.04,6.95,7.58,8.81,8.33,9.96,7.24,4.26,10.84,4.82,5.68]),
+              "II": ([10,8,13,9,11,14,6,4,12,7,5], [9.14,8.14,8.74,8.77,9.26,8.10,6.13,3.10,9.13,7.26,4.74]),
+              "III":([10,8,13,9,11,14,6,4,12,7,5], [7.46,6.77,12.74,7.11,7.81,8.84,6.08,5.39,8.15,6.42,5.73]),
+              "IV": ([8,8,8,8,8,8,8,19,8,8,8],    [6.58,5.76,7.71,8.84,8.47,7.04,5.25,12.50,5.56,7.91,6.89]),
+          }
+          fig, axes = plt.subplots(2, 2, figsize=(6.5, 5.5))
+          for ax, (name, (x, y)) in zip(axes.flat, datasets.items()):
+              ax.scatter(x, y, s=22, alpha=0.8)
+              m, b = np.polyfit(x, y, 1)
+              xs = np.array(sorted(x))
+              ax.plot(xs, m*xs+b, linewidth=1)
+              ax.set_title(f"Dataset {name}")
+              ax.set_xlim(2, 20); ax.set_ylim(2, 14)
+          fig.tight_layout()
+          fig.savefig(".inkwell/figures/anscombe.pdf", bbox_inches="tight")
+          PY
+
+      - name: Compile every demo
+        run: |
+          export PATH="$HOME/.TinyTeX/bin/x86_64-linux:$PATH"
+          scripts/compile-all-demos.sh
+
+      - name: Upload PDFs on success
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiled-demos
+          path: examples/demo-*.pdf
+          if-no-files-found: warn
+
+      - name: Upload engine logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-logs
+          path: |
+            /tmp/inkwell-compile-*/*.log
+            /tmp/inkwell-compile-*/*.tex
+          if-no-files-found: warn

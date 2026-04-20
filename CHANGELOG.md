@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.1 (2026-04-19)
+
+Follow-up to v0.3.0. Completes items 5 (full toolchain check) and 7 (CI regression compile) from the reliability backlog.
+
+### Added
+
+- **Toolchain: version-floor checks.** `pandoc --version` and `pandoc-crossref --version` are now parsed and compared against tested minimums (pandoc \u2265 3.0.0, pandoc-crossref \u2265 0.3.0). Older versions produce a yellow warning in **Inkwell: Check / Install Toolchain** with a one-click `brew upgrade` remediation. Unknown versions do not trigger the warning.
+- **Toolchain: automatic ls-R refresh when packages appear missing.** The package probe now runs in two passes: first against whatever state the file index happens to be in, then (only if anything is missing) after a `texhash` / `mktexlsr` refresh. Packages that transition from missing to found after the refresh were only missing because the index was stale, not because they were actually absent. The status line reports "rescued after running texhash; file index was stale" when this happens, so the user sees the cause instead of being stuck in a "tlmgr install, compile, still fails" loop.
+- **Toolchain: "Rebuild file index (texhash)"** button in the package-install prompt. Opens a terminal with the right `texhash` command (falls back to `sudo texhash` for root-owned trees).
+- **CI: compile-demos workflow.** `.github/workflows/compile-demos.yml` runs on every PR that touches a template, the requirements list, or the compile pipeline. Boots a fresh Ubuntu runner, installs pandoc + pandoc-crossref + TinyTeX, applies `requirements-latex.txt` via `tlmgr install`, probes the critical v0.3.0-added packages via `kpsewhich` to catch regressions in the package list itself, then compiles every `examples/demo-*.md` through the same two-stage (pandoc -> .tex, engine x 2) pipeline the extension uses. PDFs are uploaded as a workflow artifact on success; `.tex` and `.log` files are uploaded on failure. This catches exactly the class of failures the v0.3.0 release report identified \u2014 missing TinyTeX packages, unresolved cross-refs, babel-language crashes \u2014 before they ship.
+- **`scripts/compile-demo.sh`** and **`scripts/compile-all-demos.sh`.** Standalone reimplementations of the extension's compile pipeline. Used by the CI workflow; also useful locally when a user wants to reproduce an extension compile failure from the shell or debug a template change without firing up Cursor.
+- **`npm run test:installer`** now bash-syntax-checks the new demo-compile scripts in addition to the macOS installer.
+
 ## 0.3.0 (2026-04-19)
 
 Reliability release. Addresses five classes of failure observed during automated PDF rebuilds on a clean TinyTeX install. Every one of these produced a failing compile or a silently corrupted PDF on machines without a full MacTeX.
