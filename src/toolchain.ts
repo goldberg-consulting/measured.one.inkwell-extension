@@ -29,6 +29,44 @@ export interface ToolchainStatus {
   texRootOwner?: string;
   /** The current process user, for comparison. */
   currentUser?: string;
+  /** Parsed SemVer-ish tuple for pandoc, e.g. [3, 9, 0]. */
+  pandocVersionParsed?: [number, number, number];
+  /** Parsed SemVer-ish tuple for pandoc-crossref. */
+  crossrefVersionParsed?: [number, number, number];
+  /** True when pandoc is old enough to be below the minimum floor. */
+  pandocBelowMinimum?: boolean;
+  /** True when pandoc-crossref is old enough to be below the minimum floor. */
+  crossrefBelowMinimum?: boolean;
+  /** When true, the file index was refreshed during checkToolchain and at least one package moved from missing to found. */
+  lsRRefreshed?: boolean;
+}
+
+/**
+ * Minimum versions Inkwell's compile pipeline has been tested against.
+ * Below these, compile may still work but specific features (smart
+ * typography, pandoc-crossref internal ref anchors, --citeproc output
+ * that matches the CSL block we extract) are not guaranteed to match
+ * what the extension expects.
+ */
+const PANDOC_MIN_VERSION: [number, number, number] = [3, 0, 0];
+const CROSSREF_MIN_VERSION: [number, number, number] = [0, 3, 0];
+
+function parseVersion(raw: string | undefined): [number, number, number] | undefined {
+  if (!raw) return undefined;
+  const m = raw.match(/(\d+)\.(\d+)(?:\.(\d+))?/);
+  if (!m) return undefined;
+  return [parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3] || "0", 10)];
+}
+
+function versionBelow(a: [number, number, number] | undefined, floor: [number, number, number]): boolean {
+  if (!a) return false; // unknown version: don't flag as old
+  if (a[0] !== floor[0]) return a[0] < floor[0];
+  if (a[1] !== floor[1]) return a[1] < floor[1];
+  return a[2] < floor[2];
+}
+
+function versionToString(v: [number, number, number]): string {
+  return `${v[0]}.${v[1]}.${v[2]}`;
 }
 
 let _extensionPath = "";
@@ -220,17 +258,38 @@ function buildTlmgrInstallCommand(
   return `${sudo}${tlmgr} install ${pkgList} && (${sudo}${texhash} || ${sudo}mktexlsr)`;
 }
 
-async function checkLatexPackages(kpsewhich: string | undefined): Promise<string[]> {
-  const requiredPackages = loadRequiredPackages();
-  if (!kpsewhich) return requiredPackages;
-
-  // Run texhash first to ensure the file database is current
-  const texhashDir = kpsewhich.replace(/\/kpsewhich$/, "/texhash");
-  if (fs.existsSync(texhashDir)) {
-    try {
-      await exec(texhashDir, [], { timeout: 30000 });
-    } catch {}
+async function runKpsewhichProbe(
+  kpsewhich: string,
+  requiredPackages: string[],
+  packageFiles: Record<string, string>,
+): Promise<string[]> {
+  const missing: string[] = [];
+  const batchSize = 20;
+  for (let i = 0; i < requiredPackages.length; i += batchSize) {
+    const batch = requiredPackages.slice(i, i + batchSize);
+    const results = await Promise.all(
+      batch.map(async (pkg) => {
+        const file = packageFiles[pkg] || `${pkg}.sty`;
+        try {
+          const { stdout } = await exec(kpsewhich, [file], { timeout: 5000 });
+          return stdout.trim() ? null : pkg;
+        } catch {
+          return pkg;
+        }
+      }),
+    );
+    for (const r of results) {
+      if (r) missing.push(r);
+    }
   }
+  return missing;
+}
+
+async function checkLatexPackages(
+  kpsewhich: string | undefined,
+): Promise<{ missing: string[]; refreshed: boolean }> {
+  const requiredPackages = loadRequiredPackages();
+  if (!kpsewhich) return { missing: requiredPackages, refreshed: false };
 
   // Packages whose primary installed file does not match the default
   // "<package>.sty" heuristic. Without these mappings, kpsewhich
@@ -260,26 +319,50 @@ async function checkLatexPackages(kpsewhich: string | undefined): Promise<string
     "fix2col": "fix2col.sty",
   };
 
-  const missing: string[] = [];
-  const batchSize = 20;
-  for (let i = 0; i < requiredPackages.length; i += batchSize) {
-    const batch = requiredPackages.slice(i, i + batchSize);
-    const results = await Promise.all(
-      batch.map(async (pkg) => {
-        const file = packageFiles[pkg] || `${pkg}.sty`;
-        try {
-          const { stdout } = await exec(kpsewhich, [file], { timeout: 5000 });
-          return stdout.trim() ? null : pkg;
-        } catch {
-          return pkg;
-        }
-      })
-    );
-    for (const r of results) {
-      if (r) missing.push(r);
-    }
+  // First probe — against whatever state the ls-R / file index happens
+  // to be in right now. If nothing is missing, skip the texhash pass.
+  const firstProbe = await runKpsewhichProbe(kpsewhich, requiredPackages, packageFiles);
+  if (firstProbe.length === 0) {
+    return { missing: [], refreshed: false };
   }
-  return missing;
+
+  // Stale ls-R recovery. tlmgr install silently fails to register new
+  // files in the file index when the tree is owned by a different
+  // user, or when the user never ran texhash after a manual
+  // package install. If any package shows as missing, run texhash
+  // once and re-probe; packages that transition from missing to
+  // found were only missing because the index was stale, not because
+  // they were actually absent. Most users never run texhash manually
+  // and get stuck in the "tlmgr install followed by compile still
+  // fails" loop.
+  const texhashPath = kpsewhich.replace(/\/kpsewhich$/, "/texhash");
+  const mktexlsrPath = kpsewhich.replace(/\/kpsewhich$/, "/mktexlsr");
+  const refreshTool = fs.existsSync(texhashPath)
+    ? texhashPath
+    : fs.existsSync(mktexlsrPath)
+    ? mktexlsrPath
+    : undefined;
+
+  if (!refreshTool) {
+    return { missing: firstProbe, refreshed: false };
+  }
+
+  let refreshSucceeded = false;
+  try {
+    await exec(refreshTool, [], { timeout: 30000 });
+    refreshSucceeded = true;
+  } catch {
+    // texhash can fail silently when the tree is not writable. The
+    // writeability check elsewhere will surface this.
+  }
+
+  if (!refreshSucceeded) {
+    return { missing: firstProbe, refreshed: false };
+  }
+
+  const secondProbe = await runKpsewhichProbe(kpsewhich, requiredPackages, packageFiles);
+  const rescuedCount = firstProbe.length - secondProbe.length;
+  return { missing: secondProbe, refreshed: rescuedCount > 0 };
 }
 
 /**
@@ -339,10 +422,13 @@ export async function checkToolchain(): Promise<ToolchainStatus> {
   ]);
 
   const kpsewhich = xelatex.installed ? await findKpsewhich() : undefined;
-  const missingPackages = xelatex.installed
+  const pkgResult = xelatex.installed
     ? await checkLatexPackages(kpsewhich)
-    : [];
+    : { missing: [], refreshed: false };
   const rootInfo = xelatex.installed ? await inspectTexRoot(kpsewhich) : {};
+
+  const pandocVersionParsed = parseVersion(pandoc.version);
+  const crossrefVersionParsed = parseVersion(crossref.version);
 
   return {
     pandoc,
@@ -351,7 +437,12 @@ export async function checkToolchain(): Promise<ToolchainStatus> {
     crossref,
     mmdc,
     texDistribution: detectDistribution(xelatex.path),
-    missingPackages,
+    missingPackages: pkgResult.missing,
+    lsRRefreshed: pkgResult.refreshed,
+    pandocVersionParsed,
+    crossrefVersionParsed,
+    pandocBelowMinimum: pandoc.installed && versionBelow(pandocVersionParsed, PANDOC_MIN_VERSION),
+    crossrefBelowMinimum: crossref.installed && versionBelow(crossrefVersionParsed, CROSSREF_MIN_VERSION),
     ...rootInfo,
   };
 }
@@ -369,7 +460,10 @@ export async function showToolchainStatus(): Promise<void> {
   const lines: string[] = [];
 
   if (status.pandoc.installed) {
-    lines.push(`Pandoc: ${status.pandoc.version || "installed"} (${status.pandoc.path})`);
+    const floorNote = status.pandocBelowMinimum
+      ? ` \u2014 below minimum ${versionToString(PANDOC_MIN_VERSION)}, upgrade recommended`
+      : "";
+    lines.push(`Pandoc: ${status.pandoc.version || "installed"} (${status.pandoc.path})${floorNote}`);
   } else {
     lines.push("Pandoc: not found");
   }
@@ -390,7 +484,10 @@ export async function showToolchainStatus(): Promise<void> {
   }
 
   if (status.crossref.installed) {
-    lines.push(`pandoc-crossref: ${status.crossref.version || "installed"} (${status.crossref.path})`);
+    const floorNote = status.crossrefBelowMinimum
+      ? ` \u2014 below minimum ${versionToString(CROSSREF_MIN_VERSION)}, upgrade recommended`
+      : "";
+    lines.push(`pandoc-crossref: ${status.crossref.version || "installed"} (${status.crossref.path})${floorNote}`);
   } else {
     lines.push("pandoc-crossref: not found (required for @fig:, @eq:, @tbl: cross-references)");
   }
@@ -404,7 +501,10 @@ export async function showToolchainStatus(): Promise<void> {
   const pkgCount = loadRequiredPackages().length;
   const missingCount = status.missingPackages.length;
   if (missingCount === 0 && status.xelatex.installed) {
-    lines.push(`LaTeX packages: all ${pkgCount} required packages found`);
+    const recoveryNote = status.lsRRefreshed
+      ? " (rescued after running texhash; file index was stale)"
+      : "";
+    lines.push(`LaTeX packages: all ${pkgCount} required packages found${recoveryNote}`);
   } else if (missingCount > 0) {
     lines.push(`LaTeX packages: ${missingCount} missing (${status.missingPackages.slice(0, 5).join(", ")}${missingCount > 5 ? ", ..." : ""})`);
   }
@@ -435,7 +535,10 @@ export async function showToolchainStatus(): Promise<void> {
     status.crossref.installed;
   const allGood = coreReady && missingCount === 0;
 
-  if (allGood && !ownershipBroken) {
+  const versionFloorBroken =
+    status.pandocBelowMinimum === true || status.crossrefBelowMinimum === true;
+
+  if (allGood && !ownershipBroken && !versionFloorBroken) {
     const mmdcNote = status.mmdc.installed
       ? ""
       : "\n(mmdc not found; mermaid diagrams will render as code in PDFs)";
@@ -467,6 +570,41 @@ export async function showToolchainStatus(): Promise<void> {
       return;
     }
     // "Ignore": fall through to other remediation options.
+  }
+
+  // Version-floor prompt.
+  if (versionFloorBroken) {
+    const stale: string[] = [];
+    if (status.pandocBelowMinimum) {
+      stale.push(
+        `pandoc ${status.pandoc.version || "(unknown)"} < ${versionToString(PANDOC_MIN_VERSION)}`,
+      );
+    }
+    if (status.crossrefBelowMinimum) {
+      stale.push(
+        `pandoc-crossref ${status.crossref.version || "(unknown)"} < ${versionToString(CROSSREF_MIN_VERSION)}`,
+      );
+    }
+    const buttons: string[] = [];
+    if (isMac) buttons.push("Upgrade with Homebrew");
+    buttons.push("Show instructions", "Ignore");
+    const choice = await vscode.window.showWarningMessage(
+      `Inkwell targets ${stale.join(", ")}. Older versions may work but are not tested against the extension's compile pipeline.`,
+      ...buttons,
+    );
+    if (choice === "Upgrade with Homebrew") {
+      const terminal = vscode.window.createTerminal("Inkwell: Upgrade pandoc");
+      terminal.show();
+      const upgrades: string[] = [];
+      if (status.pandocBelowMinimum) upgrades.push("pandoc");
+      if (status.crossrefBelowMinimum) upgrades.push("pandoc-crossref");
+      terminal.sendText(`brew upgrade ${upgrades.join(" ")} || brew install ${upgrades.join(" ")}`);
+      return;
+    } else if (choice === "Show instructions") {
+      showInstructions(status);
+      return;
+    }
+    // "Ignore" falls through.
   }
 
   // Core tools missing
@@ -512,10 +650,14 @@ export async function showToolchainStatus(): Promise<void> {
     const buttons: string[] = [];
     let message = `${missingCount} LaTeX package${missingCount > 1 ? "s" : ""} missing: ${status.missingPackages.join(", ")}`;
     if (isMac && !texAlreadyInstalled) {
-      message += '. Install Full MacTeX for the most reliable setup.';
+      message += ". Install Full MacTeX for the most reliable setup.";
       buttons.push("Install Full MacTeX (recommended)");
     }
-    buttons.push("Install packages with tlmgr", "Show details");
+    buttons.push(
+      "Install packages with tlmgr",
+      "Rebuild file index (texhash)",
+      "Show details",
+    );
 
     const choice = await vscode.window.showWarningMessage(message, ...buttons);
 
@@ -523,10 +665,27 @@ export async function showToolchainStatus(): Promise<void> {
       await installFullMacTeX(status);
     } else if (choice === "Install packages with tlmgr") {
       await installMissingPackages(status.missingPackages);
+    } else if (choice === "Rebuild file index (texhash)") {
+      await rebuildLsRIndex();
     } else if (choice === "Show details") {
       showPackageDetails(status);
     }
   }
+}
+
+async function rebuildLsRIndex(): Promise<void> {
+  const terminal = vscode.window.createTerminal("Inkwell: Rebuild file index");
+  terminal.show();
+  const texhash = await findTexhash();
+  if (!texhash) {
+    terminal.sendText('echo "texhash / mktexlsr not found on PATH. Install a TeX distribution first."');
+    return;
+  }
+  // Run without sudo first; if the tree is user-owned this works. If
+  // the tree is root-owned, ownership check will already have flagged
+  // it; still offer the sudo fallback on failure for users who declined
+  // the chown fix.
+  terminal.sendText(`${texhash} || sudo ${texhash}`);
 }
 
 async function installMissingPackages(packages: string[]): Promise<void> {

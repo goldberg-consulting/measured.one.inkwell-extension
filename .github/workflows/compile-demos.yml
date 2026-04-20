@@ -1,0 +1,117 @@
+name: Compile demos
+
+# Regression compile of every shipped demo against a clean TinyTeX.
+# Catches the class of failures that only surface outside a Full MacTeX
+# install: templates that depend on babel-spanish, packages that ship
+# in mactex but not tinytex, cross-reference resolution that requires
+# two engine passes, etc.
+#
+# Runs on pull requests that touch a template, the requirements list,
+# or the compile pipeline, and on every push to main. Intentionally not
+# run on every PR to avoid a 10+ minute wait for unrelated changes.
+
+on:
+  pull_request:
+    paths:
+      - "templates/**"
+      - "requirements-latex.txt"
+      - "src/compiler.ts"
+      - "src/inject.ts"
+      - "scripts/compile-demo.sh"
+      - "scripts/compile-all-demos.sh"
+      - "examples/demo-*.md"
+      - ".github/workflows/compile-demos.yml"
+  push:
+    branches: [main]
+    paths:
+      - "templates/**"
+      - "requirements-latex.txt"
+      - "src/compiler.ts"
+      - "src/inject.ts"
+      - "scripts/compile-demo.sh"
+      - "scripts/compile-all-demos.sh"
+      - "examples/demo-*.md"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  compile-all-demos:
+    name: Compile every demo on TinyTeX
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install pandoc + pandoc-crossref
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+          # pandoc-crossref is not in apt; download the release binary.
+          set -e
+          crossref_url="$(curl -sL https://api.github.com/repos/lierdakil/pandoc-crossref/releases/latest \
+            | grep 'browser_download_url.*Linux-X64.tar.xz' | head -1 | cut -d '"' -f 4 || true)"
+          if [[ -n "$crossref_url" ]]; then
+            curl -sL "$crossref_url" -o /tmp/pandoc-crossref.tar.xz
+            mkdir -p /tmp/pc
+            tar -xJf /tmp/pandoc-crossref.tar.xz -C /tmp/pc
+            sudo mv /tmp/pc/pandoc-crossref /usr/local/bin/pandoc-crossref
+            sudo chmod +x /usr/local/bin/pandoc-crossref
+          else
+            echo "Could not resolve pandoc-crossref release; proceeding without it."
+          fi
+          pandoc --version | head -1
+          pandoc-crossref --version 2>/dev/null || true
+
+      - name: Install TinyTeX
+        run: |
+          curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh
+          echo "$HOME/.TinyTeX/bin/x86_64-linux" >> "$GITHUB_PATH"
+
+      - name: Install required LaTeX packages
+        run: |
+          export PATH="$HOME/.TinyTeX/bin/x86_64-linux:$PATH"
+          tlmgr update --self
+          # Strip comments + blank lines from the requirements list and
+          # install in bulk. The `| xargs` pattern matches what the
+          # extension's toolchain setup does.
+          sed 's/#.*//' requirements-latex.txt | awk 'NF' | xargs tlmgr install
+          texhash || mktexlsr
+          kpsewhich --version | head -1
+          # Sanity check: the packages introduced in v0.3.0 should be
+          # visible to kpsewhich after this step. The whole point of
+          # the CI regression is to catch the case where they are not.
+          for probe in xstring.sty fix2col.sty spanish.ldf loadhyph-es.tex; do
+            if kpsewhich "$probe" >/dev/null 2>&1; then
+              echo "OK  kpsewhich $probe"
+            else
+              echo "FAIL kpsewhich $probe (not in TinyTeX after tlmgr pass)"
+              exit 1
+            fi
+          done
+
+      - name: Compile every demo
+        run: |
+          export PATH="$HOME/.TinyTeX/bin/x86_64-linux:$PATH"
+          scripts/compile-all-demos.sh
+
+      - name: Upload PDFs on success
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiled-demos
+          path: examples/demo-*.pdf
+          if-no-files-found: warn
+
+      - name: Upload engine logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-logs
+          path: |
+            /tmp/inkwell-compile-*/*.log
+            /tmp/inkwell-compile-*/*.tex
+          if-no-files-found: warn
