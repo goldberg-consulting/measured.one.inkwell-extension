@@ -46,12 +46,21 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Install pandoc + pandoc-crossref
+      - name: Install pandoc 3.x + pandoc-crossref
         run: |
-          sudo apt-get update
-          sudo apt-get install -y pandoc
-          # pandoc-crossref is not in apt; download the release binary.
-          set -e
+          # Ubuntu 22.04's apt pandoc is 2.17 — below our minimum of
+          # 3.0 — and changes pandoc's --template handling enough that
+          # our compile pipeline's output differs from what a user on
+          # macOS with Homebrew pandoc 3.x produces. Install a pinned
+          # pandoc 3.x direct from the upstream release tarball so the
+          # CI matches what we actually target.
+          set -euo pipefail
+          PANDOC_VERSION="3.9"
+          curl -sL "https://github.com/jgm/pandoc/releases/download/${PANDOC_VERSION}/pandoc-${PANDOC_VERSION}-1-amd64.deb" -o /tmp/pandoc.deb
+          sudo dpkg -i /tmp/pandoc.deb
+          pandoc --version | head -1
+
+          # pandoc-crossref latest release binary.
           crossref_url="$(curl -sL https://api.github.com/repos/lierdakil/pandoc-crossref/releases/latest \
             | grep 'browser_download_url.*Linux-X64.tar.xz' | head -1 | cut -d '"' -f 4 || true)"
           if [[ -n "$crossref_url" ]]; then
@@ -60,11 +69,10 @@ jobs:
             tar -xJf /tmp/pandoc-crossref.tar.xz -C /tmp/pc
             sudo mv /tmp/pc/pandoc-crossref /usr/local/bin/pandoc-crossref
             sudo chmod +x /usr/local/bin/pandoc-crossref
+            pandoc-crossref --version | head -1
           else
             echo "Could not resolve pandoc-crossref release; proceeding without it."
           fi
-          pandoc --version | head -1
-          pandoc-crossref --version 2>/dev/null || true
 
       - name: Install TinyTeX
         run: |
