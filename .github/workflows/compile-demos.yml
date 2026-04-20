@@ -90,7 +90,7 @@ jobs:
           # visible to kpsewhich after this step. The whole point of
           # the CI regression is to catch the case where they are not.
           missing=0
-          for probe in xstring.sty fix2col.sty spanish.ldf loadhyph-es.tex; do
+          for probe in xstring.sty fix2col.sty svn-prov.sty english.ldf spanish.ldf loadhyph-es.tex; do
             if kpsewhich "$probe" >/dev/null 2>&1; then
               echo "OK   kpsewhich $probe"
             else

@@ -8,6 +8,12 @@
 geometry
 hyperref
 babel
+# English language file. On a full TeX Live / MacTeX install this
+# ships with the base `babel` package. On a minimal TinyTeX install it
+# ships as a separate `babel-english` package, so rho / rmxaa / any
+# template that loads `\usepackage[english]{babel}` fails with
+# "Unknown option 'english'" until this is installed.
+babel-english
 # Spanish language files. Required by the rho and rmxaa templates even
 # when the document is authored in English: rhobabel.sty contains
 # \iflanguage{spanish}{...}{...} branches, and \iflanguage is a hard
@@ -76,6 +82,10 @@ silence
 pbalance
 extsizes
 fixtounicode
+# Required by `adforn` (rho's ornamental glyph package) which itself
+# pulls in `svn-prov.sty`. Minimal TinyTeX does not ship svn-prov in
+# the base install.
+svn-prov
 # Required by the default pandoc --template flow (the LaTeX that
 # pandoc emits for our markdown uses \xs@string operations on TinyTeX
 # minimal installs that otherwise report "File `xstring.sty' not

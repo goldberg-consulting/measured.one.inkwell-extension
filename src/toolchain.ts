@@ -106,6 +106,11 @@ const FALLBACK_PACKAGES = [
   "supertabular", "matlab-prettifier", "lipsum", "hardwrap",
   "units", "silence",
   "pbalance", "extsizes", "fixtounicode",
+  // english.ldf is bundled with `babel` on full MacTeX but ships as
+  // a separate `babel-english` package on minimal TinyTeX, where
+  // `\usepackage[english]{babel}` otherwise fails with
+  // "Unknown option 'english'".
+  "babel-english",
   // Required by the rho / rmxaa templates even in English documents:
   // rhobabel.sty calls \iflanguage{spanish} which hard-errors when
   // the language is not declared to babel.
@@ -113,6 +118,8 @@ const FALLBACK_PACKAGES = [
   // Hit on minimal TinyTeX installs during the default pandoc
   // --template flow.
   "xstring", "fix2col",
+  // Required by adforn (rho ornamental glyphs).
+  "svn-prov",
   "amsfonts", "amscls", "tools", "preprint", "sttools",
   "graphics", "oberdiek", "psnfss",
   "mathpazo", "palatino", "bera", "soul", "stix2-type1", "tex-gyre",
@@ -311,12 +318,14 @@ async function checkLatexPackages(
     "oberdiek": "iflang.sty",
     "psnfss": "helvet.sty",
     "extsizes": "extarticle.cls",
+    "babel-english": "english.ldf",
     "babel-spanish": "spanish.ldf",
     // hyphen-spanish installs hyphenation patterns, not a .sty file.
     // kpsewhich resolves the format-file-embedded pattern through the
     // language.dat chain; the file that reliably shows up is loadhyph-es.tex.
     "hyphen-spanish": "loadhyph-es.tex",
     "fix2col": "fix2col.sty",
+    "svn-prov": "svn-prov.sty",
   };
 
   // First probe — against whatever state the ls-R / file index happens
