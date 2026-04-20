@@ -110,6 +110,45 @@ jobs:
             exit 1
           fi
 
+      - name: Seed runtime-generated figures
+        run: |
+          # demo-tufte references .inkwell/figures/anscombe.pdf which
+          # is produced by a Python block in the demo. Under the
+          # extension, users run the block (Cmd+Alt+R) before
+          # compiling. In CI we skip the code-block runner and just
+          # generate the figures directly with matplotlib so the
+          # compile pipeline can be tested in isolation. Add new
+          # seed calls here when new demos introduce runtime-generated
+          # figures; alternatively, commit a placeholder under
+          # .inkwell/figures/ and exclude the file from .gitignore.
+          python3 -m pip install --quiet matplotlib numpy
+          mkdir -p .inkwell/figures
+          python3 - <<'PY'
+          import matplotlib
+          matplotlib.use("Agg")
+          import matplotlib.pyplot as plt
+          import numpy as np
+
+          # Anscombe's quartet. Minimal reproduction, not the demo's
+          # exact visual.
+          datasets = {
+              "I":  ([10,8,13,9,11,14,6,4,12,7,5], [8.04,6.95,7.58,8.81,8.33,9.96,7.24,4.26,10.84,4.82,5.68]),
+              "II": ([10,8,13,9,11,14,6,4,12,7,5], [9.14,8.14,8.74,8.77,9.26,8.10,6.13,3.10,9.13,7.26,4.74]),
+              "III":([10,8,13,9,11,14,6,4,12,7,5], [7.46,6.77,12.74,7.11,7.81,8.84,6.08,5.39,8.15,6.42,5.73]),
+              "IV": ([8,8,8,8,8,8,8,19,8,8,8],    [6.58,5.76,7.71,8.84,8.47,7.04,5.25,12.50,5.56,7.91,6.89]),
+          }
+          fig, axes = plt.subplots(2, 2, figsize=(6.5, 5.5))
+          for ax, (name, (x, y)) in zip(axes.flat, datasets.items()):
+              ax.scatter(x, y, s=22, alpha=0.8)
+              m, b = np.polyfit(x, y, 1)
+              xs = np.array(sorted(x))
+              ax.plot(xs, m*xs+b, linewidth=1)
+              ax.set_title(f"Dataset {name}")
+              ax.set_xlim(2, 20); ax.set_ylim(2, 14)
+          fig.tight_layout()
+          fig.savefig(".inkwell/figures/anscombe.pdf", bbox_inches="tight")
+          PY
+
       - name: Compile every demo
         run: |
           export PATH="$HOME/.TinyTeX/bin/x86_64-linux:$PATH"

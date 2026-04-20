@@ -38,7 +38,14 @@
     \usepackage[spanish,es-nodecimaldot,es-noindentfirst]{babel}
 }
 {
-    \usepackage[english]{babel}
+    % Load spanish alongside english so the rhobabel translation
+    % hooks below (each wrapped in \iflanguage{spanish}{...}{...})
+    % find the language declared. \iflanguage is a hard error on a
+    % language that babel has not seen, which otherwise crashes every
+    % rmxaa compile on TinyTeX / BasicTeX where Spanish is not
+    % preloaded into the format file. english remains the primary
+    % language (last option in the list wins).
+    \usepackage[spanish,english]{babel}
 }
 
 %----------------------------------------------------------

@@ -121,6 +121,13 @@ bera
 soul
 stix2-type1
 tex-gyre
+# cm-super provides Type 1 versions of Computer Modern that microtype
+# can expand. Without it, pdftex reports:
+#   "pdfTeX error (font expansion): auto expansion is only possible
+#    with scalable fonts"
+# and refuses to produce a PDF. Hit by the eth-report template on
+# minimal TinyTeX.
+cm-super
 
 # ETH report dependencies
 koma-script
