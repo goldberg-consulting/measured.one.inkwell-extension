@@ -499,12 +499,7 @@ inkwell:
 
 Features: TOC, list of figures/tables, numbered equations, runnable Python code blocks with inline output, citations, theorem environments.
 
-[Source](examples/demo-default.md) | [PDF](examples/demo-default.pdf)
-
-</td>
-<td width="50%">
-
-![Inkwell Default output](media/examples/demo-default.png)
+[Source](examples/demo-default.md)
 
 </td>
 </tr></table>
