@@ -19,7 +19,6 @@ inkwell:
   code-display: output
   tables: booktabs
   table-font-size: small
-  caption-style: above
   python-env: ./venv
 ---
 

@@ -49,7 +49,7 @@ inkwell:
   # code-font-size: small             # tiny, scriptsize, footnotesize, small, normalsize
   # tables: booktabs                  # booktabs, grid, plain
   # table-font-size: small
-  # python-env: ./venv
+  python-env: ./venv
 ---
 
 # Data-Ink and Visual Evidence {#sec:data-ink}
@@ -76,7 +76,7 @@ completely different when plotted.
 The quartet drives home a simple lesson: always plot your data.
 Summary statistics alone can mislead.
 
-```python
+```{python display="code"}
 import os
 import matplotlib
 matplotlib.use("Agg")
