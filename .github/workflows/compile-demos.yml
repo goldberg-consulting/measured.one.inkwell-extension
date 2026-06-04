@@ -82,12 +82,7 @@ jobs:
       - name: Install required LaTeX packages
         run: |
           export PATH="$HOME/.TinyTeX/bin/x86_64-linux:$PATH"
-          # Update tlmgr AND all installed packages. A fresh TinyTeX can ship a
-          # LaTeX kernel newer than some of its packages (amsthm/thmtools),
-          # which triggers kernel "First Aid" patches and a spurious
-          # "\c@lemma already defined" when the inkwell template declares its
-          # theorem environments. Syncing packages to the kernel resolves it.
-          tlmgr update --self --all
+          tlmgr update --self
           # Strip comments + blank lines from the requirements list and
           # install in bulk. The `| xargs` pattern matches what the
           # extension's toolchain setup does. `tlmgr install` tolerates
