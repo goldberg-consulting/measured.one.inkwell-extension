@@ -22,12 +22,6 @@ export function splitFrontmatter(text: string): SplitFrontmatter | undefined {
   return { fm: match[1].replace(/\r\n/g, "\n"), body: match[2] };
 }
 
-/** A top-level scalar value, e.g. `title: "..."`. Operates on LF frontmatter. */
-export function extractScalar(fm: string, key: string): string | undefined {
-  const m = fm.match(new RegExp(`^${key}:\\s*["']?(.+?)["']?\\s*$`, "m"));
-  return m ? m[1].trim() : undefined;
-}
-
 /**
  * The indented block beneath a `key:` line with nothing after the colon
  * (e.g. the `inkwell:` mapping). Returns the raw indented lines joined by

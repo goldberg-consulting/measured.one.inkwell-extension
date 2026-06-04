@@ -154,43 +154,6 @@ export function texBinSearchDirs(): string[] {
   ];
 }
 
-/**
- * Resolve an executable to an absolute path: check {@link texBinSearchDirs}
- * first, then fall back to the OS resolver (`which`/`where`) run with the
- * augmented TeX PATH so GUI-launched editors (which inherit a minimal PATH
- * from launchd) still find tools installed in a developer shell.
- */
-export function findExecutableSync(name: string): string | undefined {
-  for (const dir of texBinSearchDirs()) {
-    const candidate = path.join(dir, name);
-    if (fs.existsSync(candidate)) return candidate;
-  }
-  try {
-    const env = { ...process.env, PATH: buildTexInvocationPath() };
-    if (process.platform === "win32") {
-      const comspec = process.env.ComSpec || "cmd.exe";
-      const out = execFileSync(comspec, ["/d", "/s", "/c", `where ${name}`], {
-        encoding: "utf-8",
-        timeout: 5000,
-        stdio: "pipe",
-        env,
-      });
-      const line = out.trim().split(/\r?\n/)[0]?.trim();
-      return line && fs.existsSync(line) ? line : undefined;
-    }
-    const out = execFileSync("which", [name], {
-      encoding: "utf-8",
-      timeout: 5000,
-      stdio: "pipe",
-      env,
-    });
-    const resolved = out.trim().split(/\r?\n/)[0]?.trim();
-    return resolved && fs.existsSync(resolved) ? resolved : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 /** PATH for Pandoc / XeLaTeX / pdfLaTeX runs (TeX-heavy order, plus Node shims). */
 export function buildTexInvocationPath(): string {
   const base = ["/usr/local/bin", "/usr/bin"];

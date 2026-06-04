@@ -250,7 +250,6 @@ async function compileTeX(
         } catch (err: any) {
           if (err.stderr) stderr += "\n" + err.stderr;
           if (err.stdout) stdout = err.stdout;
-          if (pass === 0) continue;
         }
       }
     }
@@ -599,7 +598,6 @@ async function compilePandoc(
             } catch (err: any) {
               if (err.stderr) stderr += err.stderr;
               if (err.stdout) stdout += err.stdout;
-              if (pass === 0) continue;
             }
           }
         }
