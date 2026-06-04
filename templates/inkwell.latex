@@ -12,16 +12,22 @@ $if(linestretch)$\setstretch{$linestretch$}$else$\setstretch{1.4}$endif$
 \usepackage{amsmath,amssymb}
 \usepackage{mathtools}
 \usepackage{amsthm}
-\usepackage{thmtools}
-\declaretheoremstyle[headfont=\bfseries,bodyfont=\normalfont\itshape,spaceabove=12pt,spacebelow=12pt]{inkwell-plain}
-\declaretheoremstyle[headfont=\bfseries,bodyfont=\normalfont,spaceabove=12pt,spacebelow=12pt]{inkwell-def}
-\declaretheorem[style=inkwell-plain,numberwithin=section]{theorem}
-\declaretheorem[style=inkwell-plain,sibling=theorem]{lemma}
-\declaretheorem[style=inkwell-plain,sibling=theorem]{proposition}
-\declaretheorem[style=inkwell-plain,sibling=theorem]{corollary}
-\declaretheorem[style=inkwell-def,sibling=theorem]{definition}
-\declaretheorem[style=inkwell-def,numbered=no]{example}
-\declaretheorem[style=inkwell-def,numbered=no]{remark}
+% Theorem environments via plain amsthm. thmtools is intentionally avoided:
+% on some TeX distributions its \declaretheorem interacts with the kernel's
+% package "First Aid" and fails with "\c@lemma already defined". amsthm's
+% \newtheorem{lemma}[theorem] shares the theorem counter, so no counter is
+% ever defined twice.
+\newtheoremstyle{inkwell-plain}{12pt}{12pt}{\normalfont\itshape}{}{\bfseries}{.}{.5em}{}
+\newtheoremstyle{inkwell-def}{12pt}{12pt}{\normalfont}{}{\bfseries}{.}{.5em}{}
+\theoremstyle{inkwell-plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{inkwell-def}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem*{example}{Example}
+\newtheorem*{remark}{Remark}
 \usepackage{enumitem}
 \usepackage{array}
 \usepackage{booktabs}
