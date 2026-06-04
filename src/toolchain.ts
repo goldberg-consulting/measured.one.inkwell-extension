@@ -9,7 +9,7 @@ import { promisify } from "util";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { collectNodeToolBinDirs, findBinaryViaShell } from "./shell-env";
+import { buildTexInvocationPath, findBinaryViaShell, texBinSearchDirs } from "./shell-env";
 
 const exec = promisify(execFile);
 
@@ -129,33 +129,14 @@ const FALLBACK_PACKAGES = [
 const isMac = process.platform === "darwin";
 const isLinux = process.platform === "linux";
 
-function searchPaths(): string[] {
-  const home = os.homedir();
-  const npmGlobal = path.join(home, ".npm-global", "bin");
-  const nodeBins = collectNodeToolBinDirs();
-  const common = ["/usr/local/bin", "/usr/bin"];
-  if (isMac) {
-    return [
-      "/opt/homebrew/bin",
-      npmGlobal,
-      ...nodeBins,
-      ...common,
-      "/Library/TeX/texbin",
-      path.join(home, "Library/TinyTeX/bin/universal-darwin"),
-    ];
-  }
-  return [
-    npmGlobal,
-    ...nodeBins,
-    ...common,
-    `${home}/bin`,
-    `${home}/.TinyTeX/bin/x86_64-linux`,
-    `${home}/.TinyTeX/bin/aarch64-linux`,
-    "/usr/local/texlive/2024/bin/x86_64-linux",
-    "/usr/local/texlive/2025/bin/x86_64-linux",
-    "/usr/local/texlive/2026/bin/x86_64-linux",
-  ];
-}
+// Shared with the compile pipeline so the toolchain report and the actual
+// compile resolve binaries from the same set of directories.
+const searchPaths = texBinSearchDirs;
+
+// Augmented PATH for `which` fallbacks: a GUI-launched editor inherits a
+// minimal PATH from launchd, so a bare `which` would miss tools that live
+// in a developer shell's PATH.
+const WHICH_ENV = { ...process.env, PATH: buildTexInvocationPath() };
 
 async function probe(
   name: string
@@ -175,7 +156,7 @@ async function probe(
     }
   }
   try {
-    const { stdout: whichOut } = await exec("which", [name]);
+    const { stdout: whichOut } = await exec("which", [name], { env: WHICH_ENV });
     const p = whichOut.trim();
     if (p) {
       try {
@@ -230,7 +211,7 @@ async function findKpsewhich(): Promise<string | undefined> {
     if (fs.existsSync(candidate)) return candidate;
   }
   try {
-    const { stdout } = await exec("which", ["kpsewhich"]);
+    const { stdout } = await exec("which", ["kpsewhich"], { env: WHICH_ENV });
     const p = stdout.trim();
     if (p) return p;
   } catch {}
@@ -243,7 +224,7 @@ async function findBinary(name: string): Promise<string | undefined> {
     if (fs.existsSync(candidate)) return candidate;
   }
   try {
-    const { stdout } = await exec("which", [name]);
+    const { stdout } = await exec("which", [name], { env: WHICH_ENV });
     const p = stdout.trim();
     if (p) return p;
   } catch {}

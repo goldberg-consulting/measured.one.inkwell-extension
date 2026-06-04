@@ -36,6 +36,9 @@ inkwell:
 
 `;
 
+const DEFAULT_REQUIREMENTS =
+  "numpy\nmatplotlib\npandas\npolars\nscikit-learn\numap-learn\nseaborn\n";
+
 const GITIGNORE = `.inkwell/outputs/
 .inkwell/compiled/
 .inkwell/mermaid/
@@ -493,7 +496,7 @@ export async function setupWorkspace(): Promise<void> {
   if (envChoice?.label === "Yes") {
     const reqPath = path.join(baseDir, "requirements.txt");
     if (!fs.existsSync(reqPath)) {
-      fs.writeFileSync(reqPath, "numpy\nmatplotlib\npandas\npolars\nscikit-learn\numap-learn\nseaborn\n");
+      fs.writeFileSync(reqPath, DEFAULT_REQUIREMENTS);
       report.push("created requirements.txt");
     }
     const terminal = vscode.window.createTerminal("Inkwell Setup");
@@ -581,7 +584,7 @@ Write your content here. Cite sources with [@knuth1984] and use inline math like
   if (opts.pythonEnv) {
     const reqPath = path.join(opts.dir, "requirements.txt");
     if (!fs.existsSync(reqPath)) {
-      fs.writeFileSync(reqPath, "numpy\nmatplotlib\npandas\npolars\nscikit-learn\numap-learn\nseaborn\n");
+      fs.writeFileSync(reqPath, DEFAULT_REQUIREMENTS);
     }
   }
 
@@ -729,4 +732,3 @@ function ensureStarterFiles(projectRoot: string): string[] {
   }
   return created;
 }
-

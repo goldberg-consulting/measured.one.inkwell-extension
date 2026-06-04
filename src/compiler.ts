@@ -16,10 +16,12 @@ import { InkwellDiagnostics, CompileError } from "./diagnostics";
 import { getTemplateForDocument, copySupportingFiles, PdfEngine, ResolvedTemplate, collectAllFeatures } from "./templates";
 import { prepareForCompilation } from "./inject";
 import { writePreambleFile } from "./preamble";
-import { buildTexInvocationPath } from "./shell-env";
+import { buildTexInvocationPath, texBinSearchDirs } from "./shell-env";
 
 const exec = promisify(execFile);
 
+// Mirrored in scripts/compile-demo.sh (PANDOC_EXTS). check-template-regressions.mjs
+// fails the build if the two lists drift.
 const PANDOC_EXTENSIONS = [
   "raw_tex",
   "raw_attribute",
@@ -96,29 +98,19 @@ async function findBinary(name: string): Promise<string | undefined> {
   const cached = binaryCache.get(name);
   if (cached && Date.now() - cached.ts < BINARY_CACHE_TTL) return cached.result;
 
-  const common = [`/usr/local/bin/${name}`, `/usr/bin/${name}`];
-  const home = os.homedir();
-  const platformPaths = process.platform === "darwin"
-    ? [
-        `/opt/homebrew/bin/${name}`,
-        `/Library/TeX/texbin/${name}`,
-        `${home}/Library/TinyTeX/bin/universal-darwin/${name}`,
-        ...common,
-      ]
-    : [
-        ...common,
-        `${home}/.TinyTeX/bin/x86_64-linux/${name}`,
-        `${home}/.TinyTeX/bin/aarch64-linux/${name}`,
-      ];
-
-  for (const p of platformPaths) {
-    if (fs.existsSync(p)) {
-      binaryCache.set(name, { result: p, ts: Date.now() });
-      return p;
+  for (const dir of texBinSearchDirs()) {
+    const candidate = path.join(dir, name);
+    if (fs.existsSync(candidate)) {
+      binaryCache.set(name, { result: candidate, ts: Date.now() });
+      return candidate;
     }
   }
+  // Fall back to the OS resolver, but with the augmented TeX PATH so a
+  // GUI-launched editor (minimal launchd PATH) still resolves tools that
+  // the toolchain probe found. Without TEX_ENV here, "Check Toolchain"
+  // could report ready while compile fails with "binary not found".
   try {
-    const { stdout } = await exec("which", [name]);
+    const { stdout } = await exec("which", [name], { env: TEX_ENV });
     const trimmed = stdout.trim();
     if (trimmed) {
       binaryCache.set(name, { result: trimmed, ts: Date.now() });
@@ -128,6 +120,17 @@ async function findBinary(name: string): Promise<string | undefined> {
   return undefined;
 }
 
+// Compile serialization has three intentional layers, each at a distinct
+// entry point:
+//   1. This per-(document,output) lock coalesces identical concurrent
+//      compile() calls into one promise (e.g. preview button + onSave for
+//      the same file fire only one compile).
+//   2. extension.runCompile adds single-flight + latest-wins across the
+//      command / onSave / interval-timer triggers, so two *different*
+//      documents never compile concurrently.
+//   3. preview.handleCompile does the same for the webview compile button.
+// They are not redundant: the lock here only dedupes identical keys, while
+// the caller-side queues serialize distinct documents.
 const compileLocks = new Map<string, Promise<CompileResult>>();
 
 export function compile(
@@ -233,17 +236,22 @@ async function compileTeX(
       } catch (err: any) {
         if (err.stderr) stderr += "\n" + err.stderr;
       }
-      try {
-        const result = await exec(xelatex, args, {
-          cwd: sourceDir,
-          timeout: 120_000,
-          env: texEnv,
-        });
-        stdout = result.stdout;
-        stderr += "\n" + result.stderr;
-      } catch (err: any) {
-        if (err.stderr) stderr += "\n" + err.stderr;
-        if (err.stdout) stdout = err.stdout;
+      // Two passes after the bib tool: the first pulls in the .bbl, the
+      // second resolves the now-defined \cite labels and page references.
+      for (let pass = 0; pass < 2; pass++) {
+        try {
+          const result = await exec(xelatex, args, {
+            cwd: sourceDir,
+            timeout: 120_000,
+            env: texEnv,
+          });
+          stdout = result.stdout;
+          stderr += "\n" + result.stderr;
+        } catch (err: any) {
+          if (err.stderr) stderr += "\n" + err.stderr;
+          if (err.stdout) stdout = err.stdout;
+          if (pass === 0) continue;
+        }
       }
     }
   }
@@ -577,17 +585,22 @@ async function compilePandoc(
           } catch (err: any) {
             if (err.stderr) stderr += "\n" + err.stderr;
           }
-          try {
-            const r = await exec(engine, engineArgs, {
-              cwd: sourceDir,
-              timeout: 90_000,
-              env: texEnv,
-            });
-            stdout += r.stdout;
-            stderr += r.stderr;
-          } catch (err: any) {
-            if (err.stderr) stderr += err.stderr;
-            if (err.stdout) stdout += err.stdout;
+          // Two passes after the bib tool so the .bbl is pulled in and the
+          // resulting \cite / page references resolve in the same compile.
+          for (let pass = 0; pass < 2; pass++) {
+            try {
+              const r = await exec(engine, engineArgs, {
+                cwd: sourceDir,
+                timeout: 90_000,
+                env: texEnv,
+              });
+              stdout += r.stdout;
+              stderr += r.stderr;
+            } catch (err: any) {
+              if (err.stderr) stderr += err.stderr;
+              if (err.stdout) stdout += err.stdout;
+              if (pass === 0) continue;
+            }
           }
         }
       }
