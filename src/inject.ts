@@ -13,7 +13,7 @@ import * as path from "path";
 import * as fs from "fs";
 import * as crypto from "crypto";
 import { execFileSync } from "child_process";
-import { BlockResult, CodeBlock, DisplayMode, parseCodeBlocks, parseRunConfig, RunConfig } from "./runner";
+import { BlockResult, CodeBlock, DisplayMode, discoverArtifacts, parseCodeBlocks, parseQuotedAttrs, parseRunConfig, resolveVenvPython, RunConfig } from "./runner";
 import { buildCodeBlockPath, findBinaryViaShell } from "./shell-env";
 import { getInkwellOutputChannel } from "./inkwell-output";
 import {
@@ -350,16 +350,7 @@ export function gatherCachedResults(
       stdout = fs.readFileSync(path.join(blockDir, "stdout.txt"), "utf-8");
     } catch {}
 
-    const artifacts = new Map<string, string>();
-    try {
-      for (const entry of fs.readdirSync(blockDir)) {
-        if (entry === "stdout.txt" || entry === "stderr.txt" || entry.startsWith("block_")) continue;
-        if (fs.statSync(path.join(blockDir, entry)).isFile()) {
-          const name = path.basename(entry, path.extname(entry));
-          artifacts.set(name, path.join(blockDir, entry));
-        }
-      }
-    } catch {}
+    const artifacts = discoverArtifacts(blockDir);
 
     const cacheStatus: "hit" | "miss" =
       hasBlockDir && (stdout.trim().length > 0 || artifacts.size > 0) ? "hit" : "miss";
@@ -383,16 +374,9 @@ export function gatherCachedResults(
 const INLINE_EXPR_RE = /`\{python\}\s+([^`]+)`/g;
 
 function resolvePython(runConfig: RunConfig, docDir: string, projectRoot: string): string {
-  const envSpec = runConfig.pythonEnv;
-  if (envSpec) {
-    const home = process.env.HOME || "~";
-    for (const base of [projectRoot, docDir]) {
-      const resolved = path.resolve(base, envSpec.replace(/^~/, home));
-      for (const bin of ["bin/python3", "bin/python"]) {
-        const full = path.join(resolved, bin);
-        if (fs.existsSync(full)) return full;
-      }
-    }
+  if (runConfig.pythonEnv) {
+    const bin = resolveVenvPython(runConfig.pythonEnv, projectRoot, docDir);
+    if (bin) return bin;
   }
   return "python3";
 }
@@ -536,17 +520,6 @@ function mmdcAvailable(): boolean {
   return _mmdcAvailable;
 }
 
-function parseMermaidAttrs(raw: string | undefined): Record<string, string> {
-  if (!raw?.trim()) return {};
-  const attrs: Record<string, string> = {};
-  const re = /(\w+)="([^"]+)"/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(raw)) !== null) {
-    attrs[m[1]] = m[2];
-  }
-  return attrs;
-}
-
 /** `projectRoot` — Inkwell project directory containing `.inkwell/` (not the `.md` folder when nested). */
 export function renderMermaidBlocks(markdown: string, projectRoot: string): string {
   if (!mmdcAvailable()) return markdown;
@@ -566,7 +539,7 @@ export function renderMermaidBlocks(markdown: string, projectRoot: string): stri
   let offset = 0;
 
   for (const match of matches) {
-    const attrs = parseMermaidAttrs(match.attrsStr);
+    const attrs = parseQuotedAttrs(match.attrsStr || "");
     const hash = crypto
       .createHash("sha256")
       .update(match.source)

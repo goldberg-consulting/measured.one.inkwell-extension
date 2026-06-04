@@ -15,6 +15,7 @@ import { prepareForPreview } from "./inject";
 import { getInkwellOutputChannel } from "./inkwell-output";
 import { getInkwellOutputsDir, getInkwellProjectRoot } from "./config";
 import { renderCitations, CitationRenderResult } from "./citations";
+import { splitFrontmatter, extractIndentedBlock, extractIndentedValue } from "./frontmatter";
 
 const md = new MarkdownIt({
   html: true,
@@ -1662,11 +1663,11 @@ interface FrontmatterResult {
 type SectionNumberingStyle = "decimal" | "legal" | "none";
 
 function stripFrontmatter(text: string): FrontmatterResult {
-  const match = text.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
-  if (!match) return { body: text };
+  const split = splitFrontmatter(text);
+  if (!split) return { body: text };
 
-  const fm = match[1];
-  const body = match[2];
+  const fm = split.fm;
+  const body = split.body;
 
   const scalar = (key: string): string | undefined => {
     const m = fm.match(new RegExp(`^${key}:\\s*['"]?(.+?)['"]?\\s*$`, "m"));
@@ -1691,54 +1692,54 @@ function stripFrontmatter(text: string): FrontmatterResult {
       .filter(Boolean);
   };
 
-  const inkwellBlock = extractInkwellBlock(fm);
+  const inkwellBlock = extractIndentedBlock(fm, "inkwell");
   const tableStyleRaw = inkwellBlock
-    ? inkwellValue(inkwellBlock, "tables")
+    ? extractIndentedValue(inkwellBlock, "tables")
     : undefined;
   const tableStyle =
     tableStyleRaw === "booktabs" || tableStyleRaw === "grid" || tableStyleRaw === "plain"
       ? tableStyleRaw
       : undefined;
   const captionStyleRaw = inkwellBlock
-    ? inkwellValue(inkwellBlock, "caption-style")
+    ? extractIndentedValue(inkwellBlock, "caption-style")
     : undefined;
   const captionStyle =
     captionStyleRaw === "above" || captionStyleRaw === "below"
       ? captionStyleRaw
       : undefined;
   const tableStripe = inkwellBlock
-    ? inkwellValue(inkwellBlock, "table-stripe") === "true"
+    ? extractIndentedValue(inkwellBlock, "table-stripe") === "true"
     : false;
   const tableFontSize = inkwellBlock
-    ? inkwellValue(inkwellBlock, "table-font-size")
+    ? extractIndentedValue(inkwellBlock, "table-font-size")
     : undefined;
   const mermaidMaxWidth = inkwellBlock
-    ? inkwellValue(inkwellBlock, "mermaid-max-width")
+    ? extractIndentedValue(inkwellBlock, "mermaid-max-width")
     : undefined;
   const mermaidMaxHeight = inkwellBlock
-    ? inkwellValue(inkwellBlock, "mermaid-max-height")
+    ? extractIndentedValue(inkwellBlock, "mermaid-max-height")
     : undefined;
   const headingFont = inkwellBlock
-    ? inkwellValue(inkwellBlock, "heading-font")
+    ? extractIndentedValue(inkwellBlock, "heading-font")
     : undefined;
   const headingColor = inkwellBlock
-    ? inkwellValue(inkwellBlock, "heading-color")
+    ? extractIndentedValue(inkwellBlock, "heading-color")
     : undefined;
   const headingWeight = inkwellBlock
-    ? inkwellValue(inkwellBlock, "heading-weight")
+    ? extractIndentedValue(inkwellBlock, "heading-weight")
     : undefined;
   const headingScaleRaw = inkwellBlock
-    ? inkwellValue(inkwellBlock, "heading-scale")
+    ? extractIndentedValue(inkwellBlock, "heading-scale")
     : undefined;
   const headingScale = headingScaleRaw ? parseFloat(headingScaleRaw) : undefined;
   const codeFontSize = inkwellBlock
-    ? inkwellValue(inkwellBlock, "code-font-size")
+    ? extractIndentedValue(inkwellBlock, "code-font-size")
     : undefined;
   const captionFontSize = inkwellBlock
-    ? inkwellValue(inkwellBlock, "caption-font-size")
+    ? extractIndentedValue(inkwellBlock, "caption-font-size")
     : undefined;
   const sectionNumberingRaw = inkwellBlock
-    ? inkwellValue(inkwellBlock, "section-numbering")
+    ? extractIndentedValue(inkwellBlock, "section-numbering")
     : undefined;
   const sectionNumbering: SectionNumberingStyle =
     sectionNumberingRaw === "legal" || sectionNumberingRaw === "outline"
@@ -1787,26 +1788,6 @@ function stripFrontmatter(text: string): FrontmatterResult {
     csl: scalar("csl"),
     linkCitations,
   };
-}
-
-function extractInkwellBlock(fm: string): string | undefined {
-  const m = fm.match(/^inkwell:\s*$/m);
-  if (!m) return undefined;
-  const start = m.index! + m[0].length;
-  const lines = fm.substring(start).split("\n");
-  const block: string[] = [];
-  for (const line of lines) {
-    if (line.match(/^\S/) && line.trim()) break;
-    block.push(line);
-  }
-  return block.join("\n");
-}
-
-function inkwellValue(block: string, key: string): string | undefined {
-  const m = block.match(
-    new RegExp(`^\\s+${key}:\\s*["']?([^"'\\n]+?)["']?\\s*$`, "m"),
-  );
-  return m ? m[1].trim() : undefined;
 }
 
 function addDataLineAttrs(html: string): string {

@@ -8,6 +8,7 @@ import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
 import { findInkwellRoot } from "./config";
+import { splitFrontmatter } from "./frontmatter";
 
 export type PdfEngine = "xelatex" | "pdflatex" | "lualatex";
 
@@ -203,7 +204,15 @@ export function resolveTemplate(
   return all.get(templateId);
 }
 
-const outputChannel = vscode.window.createOutputChannel("Inkwell Templates");
+// Lazily created so merely importing this module (e.g. from the compiler)
+// does not register an output channel before the extension is even active.
+let _outputChannel: vscode.OutputChannel | undefined;
+function outputChannel(): vscode.OutputChannel {
+  if (!_outputChannel) {
+    _outputChannel = vscode.window.createOutputChannel("Inkwell Templates");
+  }
+  return _outputChannel;
+}
 
 // Resolution order: frontmatter template field > manifest.json > built-in default.
 // This lets per-document overrides coexist with a project-level default.
@@ -216,12 +225,12 @@ export function getTemplateForDocument(
   if (fmTemplate) {
     const resolved = resolveTemplate(fmTemplate, document.uri);
     if (resolved) {
-      outputChannel.appendLine(
+      outputChannel().appendLine(
         `[template] ${path.basename(document.fileName)}: using frontmatter template "${fmTemplate}"`
       );
       return resolved;
     }
-    outputChannel.appendLine(
+    outputChannel().appendLine(
       `[template] ${path.basename(document.fileName)}: frontmatter says "${fmTemplate}" but template not found, falling through`
     );
   }
@@ -235,7 +244,7 @@ export function getTemplateForDocument(
       if (manifest.template) {
         const resolved = resolveTemplate(manifest.template, document.uri);
         if (resolved) {
-          outputChannel.appendLine(
+          outputChannel().appendLine(
             `[template] ${path.basename(document.fileName)}: using manifest template "${manifest.template}" (${manifestPath})`
           );
           return resolved;
@@ -244,7 +253,7 @@ export function getTemplateForDocument(
     } catch {}
   }
 
-  outputChannel.appendLine(
+  outputChannel().appendLine(
     `[template] ${path.basename(document.fileName)}: using built-in default`
   );
   const fallback = resolveTemplate("inkwell", document.uri);
@@ -257,9 +266,11 @@ export function getTemplateForDocument(
 }
 
 function extractFrontmatterTemplate(text: string): string | undefined {
-  const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  if (!match) return undefined;
-  const templateMatch = match[1].match(/^template:\s*['"]?([^#'"}\r\n]+?)['"]?\s*$/m);
+  const fm = splitFrontmatter(text);
+  if (!fm) return undefined;
+  // Keep the comment-stripping value pattern: a bare `template: foo  # note`
+  // should resolve to `foo`, which a generic scalar parser would not strip.
+  const templateMatch = fm.fm.match(/^template:\s*['"]?([^#'"}\n]+?)['"]?\s*$/m);
   return templateMatch ? templateMatch[1].trim() : undefined;
 }
 

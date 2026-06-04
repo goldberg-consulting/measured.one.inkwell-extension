@@ -6,6 +6,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { splitFrontmatter, extractIndentedBlock, extractIndentedValue } from "./frontmatter";
 
 export interface InkwellStyle {
   "code-bg"?: string;
@@ -22,73 +23,49 @@ export interface InkwellStyle {
 }
 
 export function parseInkwellStyle(text: string): InkwellStyle {
-  const match = text.match(/^---\n([\s\S]*?)\n---/);
-  if (!match) return {};
+  const fm = splitFrontmatter(text);
+  if (!fm) return {};
 
-  const yaml = match[1];
   const style: InkwellStyle = {};
 
-  const inkwellBlock = extractYamlBlock(yaml, "inkwell");
+  const inkwellBlock = extractIndentedBlock(fm.fm, "inkwell");
   if (!inkwellBlock) return style;
 
-  const codeBg = extractValue(inkwellBlock, "code-bg");
+  const codeBg = extractIndentedValue(inkwellBlock, "code-bg");
   if (codeBg) style["code-bg"] = codeBg;
 
-  const codeBorder = extractValue(inkwellBlock, "code-border");
+  const codeBorder = extractIndentedValue(inkwellBlock, "code-border");
   if (codeBorder === "true") style["code-border"] = true;
 
-  const codeFontSize = extractValue(inkwellBlock, "code-font-size");
+  const codeFontSize = extractIndentedValue(inkwellBlock, "code-font-size");
   if (codeFontSize) style["code-font-size"] = codeFontSize;
 
-  const codeRounded = extractValue(inkwellBlock, "code-rounded");
+  const codeRounded = extractIndentedValue(inkwellBlock, "code-rounded");
   if (codeRounded === "true") style["code-rounded"] = true;
 
-  const tables = extractValue(inkwellBlock, "tables");
+  const tables = extractIndentedValue(inkwellBlock, "tables");
   if (tables === "booktabs" || tables === "grid" || tables === "plain") {
     style.tables = tables;
   }
 
-  const tableFontSize = extractValue(inkwellBlock, "table-font-size");
+  const tableFontSize = extractIndentedValue(inkwellBlock, "table-font-size");
   if (tableFontSize) style["table-font-size"] = tableFontSize;
 
-  const tableStripe = extractValue(inkwellBlock, "table-stripe");
+  const tableStripe = extractIndentedValue(inkwellBlock, "table-stripe");
   if (tableStripe === "true") style["table-stripe"] = true;
 
-  const hangingIndent = extractValue(inkwellBlock, "hanging-indent");
+  const hangingIndent = extractIndentedValue(inkwellBlock, "hanging-indent");
   if (hangingIndent === "true") style["hanging-indent"] = true;
 
-  const columns = extractValue(inkwellBlock, "columns");
+  const columns = extractIndentedValue(inkwellBlock, "columns");
   if (columns) style.columns = parseInt(columns, 10) || undefined;
 
-  const captionStyle = extractValue(inkwellBlock, "caption-style");
+  const captionStyle = extractIndentedValue(inkwellBlock, "caption-style");
   if (captionStyle === "above" || captionStyle === "below") {
     style["caption-style"] = captionStyle;
   }
 
   return style;
-}
-
-function extractYamlBlock(yaml: string, key: string): string | undefined {
-  const pattern = new RegExp(`^${key}:\\s*$`, "m");
-  const match = yaml.match(pattern);
-  if (!match) return undefined;
-
-  const start = match.index! + match[0].length;
-  const lines = yaml.substring(start).split("\n");
-  const block: string[] = [];
-
-  for (const line of lines) {
-    if (line.match(/^\S/) && line.trim()) break;
-    block.push(line);
-  }
-
-  return block.join("\n");
-}
-
-function extractValue(block: string, key: string): string | undefined {
-  const pattern = new RegExp(`^\\s+${key}:\\s*["']?([^"'\\n]+?)["']?\\s*$`, "m");
-  const match = block.match(pattern);
-  return match ? match[1].trim() : undefined;
 }
 
 function parseHexColor(hex: string): { r: number; g: number; b: number } | undefined {
@@ -109,6 +86,8 @@ function parseHexColor(hex: string): { r: number; g: number; b: number } | undef
   }
   return undefined;
 }
+
+const VALID_LATEX_FONT_SIZES = ["tiny", "scriptsize", "footnotesize", "small", "normalsize"];
 
 const NAMED_COLORS: Record<string, string> = {
   "light-gray": "245,245,245",
@@ -146,7 +125,7 @@ export function generatePreamble(style: InkwellStyle): string {
       lines.push("\\usepackage{mdframed}");
       lines.push("\\renewenvironment{Shaded}{%");
       lines.push("  \\begin{mdframed}[backgroundcolor=inkwell-shade," +
-        "linewidth=" + (style["code-border"] ? "0.4pt" : "0pt") + "," +
+        "linewidth=0.4pt," +
         "linecolor=black!20," +
         "innerleftmargin=8pt,innerrightmargin=8pt," +
         "innertopmargin=6pt,innerbottommargin=6pt," +
@@ -155,8 +134,7 @@ export function generatePreamble(style: InkwellStyle): string {
 
     if (style["code-font-size"]) {
       const size = style["code-font-size"];
-      const valid = ["tiny", "scriptsize", "footnotesize", "small", "normalsize"];
-      if (valid.includes(size)) {
+      if (VALID_LATEX_FONT_SIZES.includes(size)) {
         lines.push(`\\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\\\\{\\},fontsize=\\${size}}`);
       }
     }
@@ -174,8 +152,7 @@ export function generatePreamble(style: InkwellStyle): string {
 
     if (style["table-font-size"]) {
       const size = style["table-font-size"];
-      const valid = ["tiny", "scriptsize", "footnotesize", "small", "normalsize"];
-      if (valid.includes(size)) {
+      if (VALID_LATEX_FONT_SIZES.includes(size)) {
         lines.push(`\\AtBeginEnvironment{longtable}{\\${size}}`);
         lines.push(`\\AtBeginEnvironment{tabular}{\\${size}}`);
         lines.push("\\usepackage{etoolbox}");

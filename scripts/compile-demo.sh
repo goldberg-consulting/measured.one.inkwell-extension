@@ -129,7 +129,9 @@ if [[ -d "$REPO_ROOT/.inkwell/references" ]]; then
   cp -R "$REPO_ROOT/.inkwell/references/." "$WORK/.inkwell/references/"
 fi
 
-# Pandoc extensions that the extension enables.
+# Pandoc extensions that the extension enables. Mirrored from
+# src/compiler.ts (PANDOC_EXTENSIONS); check-template-regressions.mjs fails
+# the build if the two drift.
 PANDOC_EXTS="raw_tex+raw_attribute+tex_math_dollars+citations+footnotes+yaml_metadata_block+implicit_figures+link_attributes+fenced_divs+bracketed_spans+pipe_tables+smart"
 
 CROSSREF_BIN=""

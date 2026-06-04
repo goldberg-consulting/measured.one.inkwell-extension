@@ -9,6 +9,7 @@ import * as fs from "fs";
 import { execFile, ChildProcess } from "child_process";
 import { getBlockHash, loadCache, saveCache } from "./cache";
 import { getInkwellOutputsDir, getInkwellProjectRoot, resolveBlockFilePath } from "./config";
+import { splitFrontmatter, extractIndentedBlock, extractIndentedValue } from "./frontmatter";
 
 export class RunCancellation {
   private _cancelled = false;
@@ -102,29 +103,24 @@ const BLOCK_PATTERN = /^```\{(\w+)([^}]*)\}\s*\n([\s\S]*?)^```/gm;
 
 export function parseRunConfig(markdown: string): RunConfig {
   const config: RunConfig = {};
-  const fmMatch = markdown.match(/^---\n([\s\S]*?)\n---/);
-  if (!fmMatch) return config;
+  const fm = splitFrontmatter(markdown);
+  if (!fm) return config;
 
-  const fm = fmMatch[1];
-  const inkwellBlock = fm.match(/^inkwell:\s*\n((?:[ \t]+.*\n?)*)/m);
-  if (!inkwellBlock) return config;
+  const block = extractIndentedBlock(fm.fm, "inkwell");
+  if (!block) return config;
 
-  const block = inkwellBlock[1] || "";
-  const pyMatch = block.match(/^\s+python-env:\s*["']?(.+?)["']?\s*$/m);
-  if (pyMatch) config.pythonEnv = pyMatch[1].trim();
+  const pyEnv = extractIndentedValue(block, "python-env");
+  if (pyEnv) config.pythonEnv = pyEnv;
 
-  const rMatch = block.match(/^\s+r-env:\s*["']?(.+?)["']?\s*$/m);
-  if (rMatch) config.rEnv = rMatch[1].trim();
+  const rEnv = extractIndentedValue(block, "r-env");
+  if (rEnv) config.rEnv = rEnv;
 
-  const nodeMatch = block.match(/^\s+node-env:\s*["']?(.+?)["']?\s*$/m);
-  if (nodeMatch) config.nodeEnv = nodeMatch[1].trim();
+  const nodeEnv = extractIndentedValue(block, "node-env");
+  if (nodeEnv) config.nodeEnv = nodeEnv;
 
-  const displayMatch = block.match(/^\s+code-display:\s*["']?(\w+)["']?\s*$/m);
-  if (displayMatch) {
-    const val = displayMatch[1].trim() as DisplayMode;
-    if (["output", "both", "code", "none"].includes(val)) {
-      config.defaultDisplay = val;
-    }
+  const display = extractIndentedValue(block, "code-display");
+  if (display && ["output", "both", "code", "none"].includes(display)) {
+    config.defaultDisplay = display as DisplayMode;
   }
 
   return config;
@@ -147,7 +143,7 @@ export function parseCodeBlocks(markdown: string): CodeBlock[] {
     const startLine = markdown.substring(0, charOffset).split("\n").length;
     const endLine = startLine + raw.split("\n").length - 1;
 
-    const attrs = parseAttrs(attrsStr);
+    const attrs = parseQuotedAttrs(attrsStr);
 
     const display = (attrs.display as DisplayMode) || undefined;
     const noCache = attrs.cache === "false" || attrs.cache === "no";
@@ -172,7 +168,8 @@ export function parseCodeBlocks(markdown: string): CodeBlock[] {
   return blocks;
 }
 
-function parseAttrs(str: string): Record<string, string> {
+/** Parse `key="value"` attribute pairs from a fenced-block info string. */
+export function parseQuotedAttrs(str: string): Record<string, string> {
   const attrs: Record<string, string> = {};
   const pattern = /(\w+)="([^"]+)"/g;
   let m: RegExpExecArray | null;
@@ -180,6 +177,28 @@ function parseAttrs(str: string): Record<string, string> {
     attrs[m[1]] = m[2];
   }
   return attrs;
+}
+
+/** The python binary inside a venv directory, preferring python3. */
+export function venvPythonBin(venvDir: string): string | undefined {
+  const p3 = path.join(venvDir, "bin", "python3");
+  const p = path.join(venvDir, "bin", "python");
+  return fs.existsSync(p3) ? p3 : fs.existsSync(p) ? p : undefined;
+}
+
+/** Resolve a `python-env` spec (relative to project root or document dir) to its python binary. */
+export function resolveVenvPython(
+  envSpec: string,
+  projectRoot: string,
+  docDir: string,
+): string | undefined {
+  const home = process.env.HOME || "~";
+  const spec = envSpec.replace(/^~/, home);
+  for (const base of [projectRoot, docDir]) {
+    const bin = venvPythonBin(path.resolve(base, spec));
+    if (bin) return bin;
+  }
+  return undefined;
 }
 
 export interface ResolvedInterpreter {
@@ -231,9 +250,7 @@ function resolveInterpreter(
     const isNode = langKey === "node" || langKey === "javascript";
 
     if (isPython) {
-      const bin = path.join(resolved, "bin", "python3");
-      const binAlt = path.join(resolved, "bin", "python");
-      const interpreter = fs.existsSync(bin) ? bin : fs.existsSync(binAlt) ? binAlt : undefined;
+      const interpreter = venvPythonBin(resolved);
       if (!interpreter) {
         return {
           cmd: defaultCmd, args: defaultArgs, envVars: {},
@@ -407,7 +424,7 @@ export async function runBlock(
   };
 }
 
-function discoverArtifacts(outputDir: string): Map<string, string> {
+export function discoverArtifacts(outputDir: string): Map<string, string> {
   const artifacts = new Map<string, string>();
   const skip = new Set(["stdout.txt", "stderr.txt"]);
 

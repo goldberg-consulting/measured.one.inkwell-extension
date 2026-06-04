@@ -116,6 +116,81 @@ export function buildCodeBlockPath(): string {
   ]);
 }
 
+/**
+ * Ordered directories to search when locating a TeX/Pandoc/Node binary by
+ * absolute path. This is the single source of truth shared by the toolchain
+ * probe and the compile pipeline's binary resolver, so the "Check Toolchain"
+ * report and the actual compile can never disagree about where a tool lives.
+ * Discovery order prefers Homebrew, then user-local Node/TeX, then system and
+ * TeX Live trees.
+ */
+export function texBinSearchDirs(): string[] {
+  const home = os.homedir();
+  const npmGlobal = path.join(home, ".npm-global", "bin");
+  const nodeTools = collectNodeToolBinDirs();
+  const common = ["/usr/local/bin", "/usr/bin"];
+
+  if (process.platform === "darwin") {
+    return [
+      "/opt/homebrew/bin",
+      npmGlobal,
+      ...nodeTools,
+      ...common,
+      "/Library/TeX/texbin",
+      path.join(home, "Library/TinyTeX/bin/universal-darwin"),
+    ];
+  }
+
+  return [
+    npmGlobal,
+    ...nodeTools,
+    ...common,
+    path.join(home, "bin"),
+    `${home}/.TinyTeX/bin/x86_64-linux`,
+    `${home}/.TinyTeX/bin/aarch64-linux`,
+    "/usr/local/texlive/2024/bin/x86_64-linux",
+    "/usr/local/texlive/2025/bin/x86_64-linux",
+    "/usr/local/texlive/2026/bin/x86_64-linux",
+  ];
+}
+
+/**
+ * Resolve an executable to an absolute path: check {@link texBinSearchDirs}
+ * first, then fall back to the OS resolver (`which`/`where`) run with the
+ * augmented TeX PATH so GUI-launched editors (which inherit a minimal PATH
+ * from launchd) still find tools installed in a developer shell.
+ */
+export function findExecutableSync(name: string): string | undefined {
+  for (const dir of texBinSearchDirs()) {
+    const candidate = path.join(dir, name);
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  try {
+    const env = { ...process.env, PATH: buildTexInvocationPath() };
+    if (process.platform === "win32") {
+      const comspec = process.env.ComSpec || "cmd.exe";
+      const out = execFileSync(comspec, ["/d", "/s", "/c", `where ${name}`], {
+        encoding: "utf-8",
+        timeout: 5000,
+        stdio: "pipe",
+        env,
+      });
+      const line = out.trim().split(/\r?\n/)[0]?.trim();
+      return line && fs.existsSync(line) ? line : undefined;
+    }
+    const out = execFileSync("which", [name], {
+      encoding: "utf-8",
+      timeout: 5000,
+      stdio: "pipe",
+      env,
+    });
+    const resolved = out.trim().split(/\r?\n/)[0]?.trim();
+    return resolved && fs.existsSync(resolved) ? resolved : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** PATH for Pandoc / XeLaTeX / pdfLaTeX runs (TeX-heavy order, plus Node shims). */
 export function buildTexInvocationPath(): string {
   const base = ["/usr/local/bin", "/usr/bin"];
