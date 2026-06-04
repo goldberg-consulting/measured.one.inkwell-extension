@@ -497,7 +497,7 @@ inkwell:
   tables: booktabs
 ```
 
-Features: TOC, list of figures/tables, numbered equations, runnable Python code blocks with inline output, citations, theorem environments.
+Features: TOC, numbered equations, runnable Python code blocks with inline output, figures, tables, and citations.
 
 [Source](examples/demo-default.md)
 
