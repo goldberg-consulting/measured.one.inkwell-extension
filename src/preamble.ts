@@ -177,9 +177,12 @@ export function generatePreamble(style: InkwellStyle): string {
 
   if (style["caption-style"] === "above") {
     lines.push("");
-    lines.push("\\usepackage{floatrow}");
-    lines.push("\\floatsetup[table]{capposition=top}");
-    lines.push("\\floatsetup[figure]{capposition=top}");
+    lines.push("% Inkwell caption position (above floats). Uses the caption");
+    lines.push("% package (loaded by the built-in templates); floatrow is avoided");
+    lines.push("% because it is incompatible with the float package the templates load.");
+    lines.push("\\usepackage{caption}");
+    lines.push("\\captionsetup[table]{position=top}");
+    lines.push("\\captionsetup[figure]{position=top}");
   }
 
   return lines.join("\n");
