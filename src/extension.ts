@@ -4,7 +4,7 @@
 
 import * as vscode from "vscode";
 import { InkwellPreviewProvider } from "./preview";
-import { compile, exportPDF, isCompilable } from "./compiler";
+import { compile, exportPDF, isCompilable, reportCompileFailure } from "./compiler";
 import { InkwellDiagnostics } from "./diagnostics";
 import { selectTemplateCommand } from "./templates";
 import { findInkwellRoot, getInkwellOutputsDir, getInkwellProjectRoot, saveManifestField } from "./config";
@@ -205,6 +205,12 @@ function setupAutoCompileTimer(): void {
   }, seconds * 1000);
 }
 
+// Last failure shown per document, so auto-compile (onSave / interval)
+// does not re-raise an identical notification on every save while the
+// user is already looking at the error. A success or a different error
+// resets it.
+const lastFailureNotified = new Map<string, string>();
+
 async function runCompile(document: vscode.TextDocument): Promise<void> {
   if (compileInFlight) {
     queuedCompile = document;
@@ -220,16 +226,25 @@ async function runCompile(document: vscode.TextDocument): Promise<void> {
       try {
         const result = await compile(current);
         diagnostics.report(current.uri, result.errors);
+        const key = current.uri.toString();
         if (result.success && result.pdfPath) {
+          lastFailureNotified.delete(key);
           vscode.window.setStatusBarMessage(
             `Inkwell: PDF compiled (${result.duration.toFixed(1)}s)`,
             5000
           );
-        } else if (result.errors.length > 0) {
+        } else {
           vscode.window.setStatusBarMessage(
-            `Inkwell: ${result.errors.length} error(s)`,
+            `Inkwell: compilation failed (${result.errors.filter(e => e.severity === "error").length || 1} error(s))`,
             5000
           );
+          const failureKey = result.errors.find(e => e.severity === "error")?.message || "unknown";
+          if (lastFailureNotified.get(key) !== failureKey) {
+            lastFailureNotified.set(key, failureKey);
+            // Deliberately not awaited: the notification stays up until
+            // the user acts on it, and the queue must keep draining.
+            void reportCompileFailure(current, result);
+          }
         }
       } catch (err) {
         console.error("Inkwell compile error:", err);

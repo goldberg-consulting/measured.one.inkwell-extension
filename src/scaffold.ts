@@ -276,6 +276,24 @@ classoption:
   - justified
   - a4paper
 `,
+  "tufte-book-vdqi": `template: tufte-book-vdqi
+subtitle: "With a VDQI Title and Contents Page"
+edition: "First edition"
+publisher: "Publisher Name"
+top-level-division: chapter
+classoption:
+  - justified
+toc: true
+lof: true
+copyright: true
+copyright-holder: "Copyright Holder"
+license: "Licensed for private circulation."
+dedication: |
+  Dedicated to readers who appreciate evidence and quiet pages.
+epigraphs:
+  - text: "Above all else show the data."
+    author: "Edward R. Tufte"
+`,
   "eth-report": `template: eth-report
 papertype: "Working Paper"
 headingstitle: "Short Title"
@@ -485,6 +503,14 @@ export async function setupWorkspace(): Promise<void> {
     report.push(`copied examples: ${demos.length} files`);
   }
 
+  const missingBundled = missingBundledContent();
+  if (missingBundled.length) {
+    vscode.window.showWarningMessage(
+      `Inkwell: this installation is missing bundled content (${missingBundled.join(", ")}). ` +
+      "Examples and the guide were not copied. Reinstall from a full VSIX or the marketplace to get them."
+    );
+  }
+
   const envChoice = await vscode.window.showQuickPick(
     [
       { label: "Yes", detail: "Create a Python venv and requirements.txt" },
@@ -616,6 +642,18 @@ const STARTER_FILES: Array<{ rel: string; content: string }> = [
   { rel: ".inkwell/references/refs.bib", content: STARTER_BIB },
   { rel: ".inkwell/figures/.gitkeep", content: "" },
 ];
+
+/**
+ * Names of content that should ship with every Inkwell install but is
+ * absent from this one (e.g. a VSIX built with an over-aggressive
+ * .vscodeignore). Used to warn instead of silently skipping copies.
+ */
+function missingBundledContent(): string[] {
+  const missing: string[] = [];
+  if (!fs.existsSync(path.join(__dirname, "..", "guide.md"))) missing.push("guide.md");
+  if (!fs.existsSync(path.join(__dirname, "..", "examples"))) missing.push("examples/");
+  return missing;
+}
 
 function copyGuide(projectRoot: string): boolean {
   const src = path.join(__dirname, "..", "guide.md");

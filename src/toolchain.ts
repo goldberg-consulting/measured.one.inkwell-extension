@@ -273,45 +273,80 @@ async function runKpsewhichProbe(
   return missing;
 }
 
+// Packages whose primary installed file does not match the default
+// "<package>.sty" heuristic. Without these mappings, kpsewhich
+// returns empty for the generated filename and the probe falsely
+// reports the package as missing, which then triggers a tlmgr
+// reinstall on every Check Toolchain run.
+const PACKAGE_FILES: Record<string, string> = {
+  "tufte-latex": "tufte-handout.cls",
+  "bera": "beramono.sty",
+  "palatino": "pplr8r.tfm",
+  "tex-gyre": "qplr.tfm",
+  "stix2-type1": "stix2.sty",
+  "amsfonts": "amssymb.sty",
+  "amscls": "amsthm.sty",
+  "tools": "array.sty",
+  "preprint": "authblk.sty",
+  "sttools": "flushend.sty",
+  "graphics": "rotating.sty",
+  "oberdiek": "iflang.sty",
+  "psnfss": "helvet.sty",
+  "extsizes": "extarticle.cls",
+  "babel-english": "english.ldf",
+  "babel-spanish": "spanish.ldf",
+  // hyphen-spanish installs hyphenation patterns, not a .sty file.
+  // kpsewhich resolves the format-file-embedded pattern through the
+  // language.dat chain; the file that reliably shows up is loadhyph-es.tex.
+  "hyphen-spanish": "loadhyph-es.tex",
+  "fix2col": "fix2col.sty",
+  "svn-prov": "svn-prov.sty",
+  // epstopdf-pkg ships epstopdf.sty (on-the-fly EPS conversion under
+  // pdflatex). Needed by templates that embed .eps assets (kth-letter).
+  "epstopdf-pkg": "epstopdf.sty",
+};
+
+// Files that belong to a tlmgr package whose name differs from the
+// file's basename. Inverse of PACKAGE_FILES, plus extras for files that
+// the kpsewhich probe never checks but that show up in "File `X' not
+// found" compile errors. Used by the missing-package quick-fix so we
+// suggest a tlmgr name that actually exists.
+const FILE_TO_PACKAGE: Record<string, string> = {
+  ...Object.fromEntries(
+    Object.entries(PACKAGE_FILES).map(([pkg, file]) => [file, pkg])
+  ),
+  "longtable.sty": "tools",
+  "multicol.sty": "tools",
+  "calc.sty": "tools",
+  "balance.sty": "preprint",
+  "stfloats.sty": "sttools",
+  "graphicx.sty": "graphics",
+  "mathpazo.sty": "psnfss",
+  "times.sty": "psnfss",
+  "tufte-book.cls": "tufte-latex",
+  "scrartcl.cls": "koma-script",
+  "scrreprt.cls": "koma-script",
+  "scrbook.cls": "koma-script",
+};
+
+/**
+ * Best-effort mapping from a missing TeX file (as reported in a
+ * "File `X' not found" error) to the tlmgr package that provides it.
+ */
+export function tlmgrPackageForFile(filename: string): string {
+  const base = path.basename(filename);
+  return FILE_TO_PACKAGE[base] || base.replace(/\.(sty|cls|ldf|def|clo|fd|cfg|bst)$/, "");
+}
+
 async function checkLatexPackages(
   kpsewhich: string | undefined,
 ): Promise<{ missing: string[]; refreshed: boolean }> {
   const requiredPackages = loadRequiredPackages();
   if (!kpsewhich) return { missing: requiredPackages, refreshed: false };
 
-  // Packages whose primary installed file does not match the default
-  // "<package>.sty" heuristic. Without these mappings, kpsewhich
-  // returns empty for the generated filename and the probe falsely
-  // reports the package as missing, which then triggers a tlmgr
-  // reinstall on every Check Toolchain run.
-  const packageFiles: Record<string, string> = {
-    "tufte-latex": "tufte-handout.cls",
-    "bera": "beramono.sty",
-    "palatino": "pplr8r.tfm",
-    "tex-gyre": "qplr.tfm",
-    "stix2-type1": "stix2.sty",
-    "amsfonts": "amssymb.sty",
-    "amscls": "amsthm.sty",
-    "tools": "array.sty",
-    "preprint": "authblk.sty",
-    "sttools": "flushend.sty",
-    "graphics": "rotating.sty",
-    "oberdiek": "iflang.sty",
-    "psnfss": "helvet.sty",
-    "extsizes": "extarticle.cls",
-    "babel-english": "english.ldf",
-    "babel-spanish": "spanish.ldf",
-    // hyphen-spanish installs hyphenation patterns, not a .sty file.
-    // kpsewhich resolves the format-file-embedded pattern through the
-    // language.dat chain; the file that reliably shows up is loadhyph-es.tex.
-    "hyphen-spanish": "loadhyph-es.tex",
-    "fix2col": "fix2col.sty",
-    "svn-prov": "svn-prov.sty",
-  };
-
   // First probe — against whatever state the ls-R / file index happens
   // to be in right now. If nothing is missing, skip the texhash pass.
-  const firstProbe = await runKpsewhichProbe(kpsewhich, requiredPackages, packageFiles);
+  const firstProbe = await runKpsewhichProbe(kpsewhich, requiredPackages, PACKAGE_FILES);
   if (firstProbe.length === 0) {
     return { missing: [], refreshed: false };
   }
@@ -350,7 +385,7 @@ async function checkLatexPackages(
     return { missing: firstProbe, refreshed: false };
   }
 
-  const secondProbe = await runKpsewhichProbe(kpsewhich, requiredPackages, packageFiles);
+  const secondProbe = await runKpsewhichProbe(kpsewhich, requiredPackages, PACKAGE_FILES);
   const rescuedCount = firstProbe.length - secondProbe.length;
   return { missing: secondProbe, refreshed: rescuedCount > 0 };
 }

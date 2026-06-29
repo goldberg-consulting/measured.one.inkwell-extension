@@ -1,0 +1,33 @@
+{
+  "name": "Tufte Book VDQI",
+  "description": "Edward Tufte-inspired book layout using tufte-book, with a VDQI-style title page and custom table of contents. Set title, author, edition/date, publisher, toc, top-level-division: chapter, epigraphs, dedication, and copyright metadata in YAML frontmatter.",
+  "documentclass": "tufte-book",
+  "engine": "pdflatex",
+  "features": [
+    {
+      "pattern": "\\\\part\\{",
+      "syntax": "\\part{Title}",
+      "description": "Book part division with VDQI-style contents entry"
+    },
+    {
+      "pattern": "\\\\newthought\\{",
+      "syntax": "\\newthought{Text}",
+      "description": "Small-caps paragraph opener (tufte-book class)"
+    },
+    {
+      "pattern": ":::.*\\.aside",
+      "syntax": "::: {.aside}",
+      "description": "Margin note via fenced div"
+    },
+    {
+      "pattern": "\\\\begin\\{fullwidth\\}",
+      "syntax": "\\begin{fullwidth}",
+      "description": "Full-width block extending into the margin"
+    },
+    {
+      "pattern": "\\\\begin\\{marginfigure\\}",
+      "syntax": "\\begin{marginfigure}",
+      "description": "Figure placed in the margin"
+    }
+  ]
+}

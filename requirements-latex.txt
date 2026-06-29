@@ -143,5 +143,13 @@ textcase
 subcaption
 tabularx
 
+# EPS support. The kth-letter template embeds an .eps logo; under
+# pdflatex this requires epstopdf.sty (epstopdf-pkg) plus the epstopdf
+# conversion script. The script also needs Ghostscript on PATH (ships
+# with MacTeX; `brew install ghostscript` / `apt install ghostscript`
+# otherwise).
+epstopdf-pkg
+epstopdf
+
 # document classes
 tufte-latex

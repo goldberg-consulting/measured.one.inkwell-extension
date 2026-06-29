@@ -17,6 +17,8 @@ import { getTemplateForDocument, copySupportingFiles, PdfEngine, ResolvedTemplat
 import { prepareForCompilation } from "./inject";
 import { writePreambleFile } from "./preamble";
 import { buildTexInvocationPath, texBinSearchDirs } from "./shell-env";
+import { tlmgrPackageForFile } from "./toolchain";
+import { getInkwellOutputChannel } from "./inkwell-output";
 
 const exec = promisify(execFile);
 
@@ -401,14 +403,25 @@ async function compilePandoc(
   fs.copyFileSync(template.pandocTemplate, templateDst);
   copySupportingFiles(template, cacheDir);
 
-  const preferredEngine: PdfEngine = template.manifest.engine || "xelatex";
-  const engine = await findBinary(preferredEngine) || await findBinary("xelatex");
+  // The manifest engine is a hard requirement, never a preference.
+  // pdflatex-only templates (tufte, rho, rmxaa, tmsce, eth-report,
+  // kth-letter) use inputenc/fontenc and break under XeLaTeX, while the
+  // default template needs fontspec and breaks under pdfLaTeX. Silently
+  // substituting one for the other produces cryptic LaTeX errors deep in
+  // the log instead of an actionable message here.
+  const requiredEngine: PdfEngine = template.manifest.engine || "xelatex";
+  const engine = await findBinary(requiredEngine);
   if (!engine) {
     return {
       success: false,
       pdfPath: undefined,
-      errors: [{ line: undefined, message: `PDF engine not found (tried ${preferredEngine}, xelatex)`, severity: "error" }],
-      log: "",
+      errors: [{
+        line: undefined,
+        message: `The "${template.manifest.name}" template requires ${requiredEngine}, which is not installed. ` +
+          `Run "Inkwell: Check / Install Toolchain (Pandoc, XeLaTeX)" to install it.`,
+        severity: "error",
+      }],
+      log: `[inkwell] template "${template.id}" requires PDF engine "${requiredEngine}" (from template.json), but no ${requiredEngine} binary was found on PATH or in known TeX locations.`,
       duration: (Date.now() - start) / 1000,
     };
   }
@@ -617,17 +630,41 @@ async function compilePandoc(
 
   const errors = [
     ...featureCheck.warnings,
-    ...parseErrors(stderr + "\n" + logContent, stdout),
+    ...parseErrors(stderr + "\n" + logContent, stdout, { generatedTex: true }),
   ];
   const duration = (Date.now() - start) / 1000;
 
+  const logFile = path.join(cacheDir, `${baseName}.log`);
   return {
     success: pdfExists,
     pdfPath: pdfExists ? pdfOutput : undefined,
     errors,
-    log: diagnosticLog + "\n\n" + stderr + "\n" + stdout + (logContent ? "\n\n--- engine log ---\n" + logContent.slice(-8000) : ""),
+    log: diagnosticLog +
+      `\n[inkwell] full engine log: ${logFile}` +
+      "\n\n" + stderr + "\n" + stdout +
+      (logContent ? "\n\n--- engine log (excerpt) ---\n" + extractEngineLogExcerpt(logContent) : ""),
     duration,
   };
+}
+
+/**
+ * TeX writes its fatal error near the first "!" line, often early in a
+ * long log; the old tail-slice routinely cut it off, leaving the
+ * visible log without the actual failure. Show the first error block
+ * (with leading context) plus the tail summary instead.
+ */
+function extractEngineLogExcerpt(logContent: string): string {
+  const MAX = 12_000;
+  if (logContent.length <= MAX) return logContent;
+
+  const lines = logContent.split("\n");
+  const firstError = lines.findIndex((l) => l.startsWith("!"));
+  if (firstError === -1) return logContent.slice(-8000);
+
+  const from = Math.max(0, firstError - 10);
+  const errorBlock = lines.slice(from, firstError + 120).join("\n");
+  const tail = logContent.slice(-2000);
+  return errorBlock + "\n\n[... log truncated; full log path is listed above ...]\n\n" + tail;
 }
 
 export async function exportPDF(
@@ -658,11 +695,56 @@ export async function exportPDF(
   if (result.success) {
     vscode.window.showInformationMessage(`PDF saved to ${target.fsPath}`);
   } else {
-    vscode.window.showErrorMessage("PDF compilation failed.");
+    await reportCompileFailure(document, result);
   }
 }
 
-function parseErrors(stderr: string, stdout: string): CompileError[] {
+/**
+ * Shared failure UX for non-preview compiles: write the full log to the
+ * "Inkwell LaTeX" output channel and show a notification that names the
+ * first real error, with actions to open the log or fix the toolchain.
+ */
+export async function reportCompileFailure(
+  document: vscode.TextDocument,
+  result: CompileResult
+): Promise<void> {
+  const channel = getInkwellOutputChannel();
+  channel.appendLine(`\n=== Compile failed: ${path.basename(document.uri.fsPath)} (${new Date().toLocaleTimeString()}) ===`);
+  channel.appendLine(result.log || "(no log output)");
+
+  const firstError = result.errors.find((e) => e.severity === "error");
+  const summary = firstError
+    ? firstError.message
+    : "Compilation failed — see the log for details.";
+
+  const toolchainProblem = /not (found|installed)/i.test(summary) || firstError?.missingPackage;
+  const actions = toolchainProblem ? ["Show Log", "Check Toolchain"] : ["Show Log"];
+
+  const choice = await vscode.window.showErrorMessage(`Inkwell: ${summary}`, ...actions);
+  if (choice === "Show Log") {
+    channel.show(true);
+  } else if (choice === "Check Toolchain") {
+    vscode.commands.executeCommand("inkwell.setupToolchain");
+  }
+}
+
+export interface ParseOptions {
+  /**
+   * True when the LaTeX engine compiled a *generated* .tex file (the
+   * Pandoc pipeline). Engine line numbers then refer to the generated
+   * LaTeX, not the markdown the user is editing, so attaching them to
+   * editor diagnostics would underline unrelated lines. We fold the
+   * number into the message text instead.
+   */
+  generatedTex: boolean;
+}
+
+// Exported for scripts/check-error-parsing.mjs.
+export function parseErrors(
+  stderr: string,
+  stdout: string,
+  opts: ParseOptions = { generatedTex: false }
+): CompileError[] {
   const combined = stderr + "\n" + stdout;
   const errors: CompileError[] = [];
   const lines = combined.split("\n");
@@ -670,50 +752,199 @@ function parseErrors(stderr: string, stdout: string): CompileError[] {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    const missing = parseMissingPackage(line);
-    if (missing) {
-      errors.push(missing);
-      continue;
-    }
-
-    const pandocErr = parsePandocError(line);
-    if (pandocErr) {
-      errors.push(pandocErr);
-      continue;
-    }
-
-    const latexErr = parseLatexError(line, lines, i);
-    if (latexErr) {
-      errors.push(latexErr);
-      continue;
-    }
-
-    const warning = parseLatexWarning(line, lines, i);
-    if (warning) {
-      errors.push(warning);
-    }
+    const err =
+      parseMissingFile(line) ||
+      parsePandocDiagnostic(line) ||
+      parseLatexError(line, lines, i, opts) ||
+      parseLatexWarning(line, lines, i, opts);
+    if (err) errors.push(err);
   }
 
-  return errors;
+  return dedupeErrors(errors);
 }
 
-function parsePandocError(line: string): CompileError | undefined {
-  const match = line.match(/\.md:(\d+):\d+:?\s*(.+)/);
-  if (!match) return undefined;
+/** Drop repeats: multi-pass compiles emit identical errors per pass. */
+function dedupeErrors(errors: CompileError[]): CompileError[] {
+  const seen = new Set<string>();
+  const out: CompileError[] = [];
+  for (const e of errors) {
+    const key = `${e.severity}::${e.line ?? ""}::${e.message}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(e);
+  }
+  return out;
+}
+
+const IMAGE_EXTS = /\.(png|jpe?g|pdf|eps|svg|gif|tiff?)$/i;
+const TEX_PACKAGE_EXTS = /\.(sty|cls|ldf|def|fd|clo|bst|cfg)$/i;
+
+/**
+ * "File `X' not found" covers several distinct user problems. Classify
+ * by extension so each gets guidance pointing at the actual fix.
+ */
+function parseMissingFile(line: string): CompileError | undefined {
+  const patterns = [
+    /[Ff]ile [`']([^'`]+)[`'] not found/,
+    /Encoding file [`']([^'`]+)[`'] not found/,
+    /Unable to load picture or PDF file [`']([^'`]+)[`']/,
+  ];
+  let filename: string | undefined;
+  for (const pat of patterns) {
+    const m = line.match(pat);
+    if (m) {
+      filename = m[1];
+      break;
+    }
+  }
+  if (!filename) return undefined;
+
+  if (TEX_PACKAGE_EXTS.test(filename)) {
+    const pkg = tlmgrPackageForFile(filename);
+    const what = filename.endsWith(".cls") ? "document class" : "LaTeX package";
+    return {
+      line: undefined,
+      message: `Missing ${what}: ${filename} is not installed. Install the "${pkg}" package via tlmgr (quick fix available), or run "Inkwell: Check / Install Toolchain" to install everything at once.`,
+      severity: "error",
+      missingPackage: pkg,
+    };
+  }
+
+  if (IMAGE_EXTS.test(filename)) {
+    return {
+      line: undefined,
+      message: `Image not found: ${filename}. Check the path — it is resolved relative to the document, the project root, and .inkwell/figures. If the image comes from a code block, run the code blocks first (Inkwell: Run Code Blocks).`,
+      severity: "error",
+    };
+  }
+
+  if (filename.endsWith(".bib")) {
+    return {
+      line: undefined,
+      message: `Bibliography file not found: ${filename}. Set "bibliography:" in the YAML frontmatter or place a .bib file in the project root, references/, or .inkwell/references/.`,
+      severity: "error",
+    };
+  }
+
   return {
-    line: parseInt(match[1], 10),
-    message: match[2].trim(),
+    line: undefined,
+    message: `File not found during compilation: ${filename}`,
     severity: "error",
   };
+}
+
+/** Errors and warnings emitted by Pandoc itself (stage 1). */
+function parsePandocDiagnostic(line: string): CompileError | undefined {
+  const positioned = line.match(/\.md:(\d+):\d+:?\s*(.+)/);
+  if (positioned) {
+    return {
+      line: parseInt(positioned[1], 10),
+      message: positioned[2].trim(),
+      severity: "error",
+    };
+  }
+
+  const citation = line.match(/\[WARNING\] Citation '([^']+)' not found/i)
+    || line.match(/citeproc: reference ([^\s]+) not found/i);
+  if (citation) {
+    return {
+      line: undefined,
+      message: `Citation @${citation[1]} not found in the bibliography. Add the entry to your .bib file or fix the citation key.`,
+      severity: "warning",
+    };
+  }
+
+  const resource = line.match(/Could not fetch resource '?([^'\s]+)'?/i);
+  if (resource) {
+    return {
+      line: undefined,
+      message: `Pandoc could not find "${resource[1]}". Check the path relative to the document or project root.`,
+      severity: "error",
+    };
+  }
+
+  const missingInput = line.match(/pandoc: ([^:]+): openBinaryFile: does not exist/);
+  if (missingInput) {
+    const f = missingInput[1].trim();
+    const hint = f.endsWith(".bib")
+      ? ' Set "bibliography:" in the frontmatter or place the file in .inkwell/references/.'
+      : "";
+    return {
+      line: undefined,
+      message: `File does not exist: ${f}.${hint}`,
+      severity: "error",
+    };
+  }
+
+  if (/YAML parse exception/i.test(line)) {
+    return {
+      line: undefined,
+      message: `Invalid YAML frontmatter: ${line.replace(/.*YAML parse exception/i, "YAML parse exception").trim()}. Check indentation and quoting in the metadata block at the top of the document.`,
+      severity: "error",
+    };
+  }
+
+  return undefined;
+}
+
+/**
+ * Rewrites raw TeX errors into messages that say what to do about
+ * them. Anything unrecognized passes through verbatim.
+ */
+function enrichLatexMessage(
+  msg: string,
+  context: string[],
+  index: number
+): string {
+  if (msg.startsWith("Undefined control sequence")) {
+    // The offending macro is the tail of the "l.<n> ..." context line.
+    const end = Math.min(index + 6, context.length);
+    for (let j = index; j < end; j++) {
+      const m = context[j].match(/^l\.\d+.*?(\\[a-zA-Z@]+)\s*$/);
+      if (m) {
+        return `Undefined control sequence ${m[1]} — either a typo, or it needs a package/template that is not loaded.`;
+      }
+    }
+    return "Undefined control sequence — a LaTeX command is used that no loaded package defines. See the compile log for the exact macro.";
+  }
+
+  if (msg.includes("fontspec") && /[Ff]ont/.test(msg)) {
+    // fontspec wraps its messages; the font name may be on a
+    // continuation line prefixed with "(fontspec)".
+    let fontName = msg.match(/"([^"]+)"/)?.[1];
+    if (!fontName) {
+      const end = Math.min(index + 6, context.length);
+      for (let j = index + 1; j < end; j++) {
+        const m = context[j].match(/"([^"]+)"/);
+        if (m) {
+          fontName = m[1];
+          break;
+        }
+      }
+    }
+    const which = fontName ? `"${fontName}"` : "requested by the template or frontmatter";
+    return `Font ${which} is not installed on this system. Install the font, or change mainfont/sansfont/monofont in the YAML frontmatter.`;
+  }
+
+  if (msg.includes("inputenc Error") && msg.includes("Unicode")) {
+    return `${msg} — this template compiles with pdfLaTeX, which cannot typeset this Unicode character. Replace the character, or switch to a XeLaTeX-based template (e.g. the default "inkwell" template).`;
+  }
+
+  if (msg.startsWith("Emergency stop") || msg.startsWith("Fatal error occurred")) {
+    return "LaTeX stopped before producing a PDF — usually caused by an earlier error above (missing file or package). See the compile log.";
+  }
+
+  return msg;
 }
 
 function parseLatexError(
   line: string,
   context: string[],
-  index: number
+  index: number,
+  opts: ParseOptions
 ): CompileError | undefined {
   if (!line.startsWith("!")) return undefined;
-  const msg = line.slice(1).trim();
+  const msg = enrichLatexMessage(line.slice(1).trim(), context, index);
 
   let lineNum: number | undefined;
   const end = Math.min(index + 5, context.length);
@@ -725,19 +956,28 @@ function parseLatexError(
     }
   }
 
+  if (opts.generatedTex && lineNum !== undefined) {
+    return {
+      line: undefined,
+      message: `${msg} (at line ${lineNum} of the generated LaTeX, not your markdown — see the compile log)`,
+      severity: "error",
+    };
+  }
+
   return { line: lineNum, message: msg, severity: "error" };
 }
 
 function parseLatexWarning(
   line: string,
   context: string[],
-  index: number
+  index: number,
+  opts: ParseOptions
 ): CompileError | undefined {
   const trimmed = line.trim();
 
   if (trimmed.startsWith("Overfull") || trimmed.startsWith("Underfull")) {
     return {
-      line: extractWarningLineNumber(trimmed),
+      line: opts.generatedTex ? undefined : extractWarningLineNumber(trimmed),
       message: trimmed,
       severity: "warning",
     };
@@ -766,7 +1006,7 @@ function parseLatexWarning(
       }
     }
     return {
-      line: extractWarningLineNumber(msg),
+      line: opts.generatedTex ? undefined : extractWarningLineNumber(msg),
       message: msg,
       severity: "warning",
     };
@@ -780,28 +1020,6 @@ function extractWarningLineNumber(text: string): number | undefined {
   for (const pat of patterns) {
     const m = text.match(pat);
     if (m) return parseInt(m[1], 10);
-  }
-  return undefined;
-}
-
-function parseMissingPackage(line: string): CompileError | undefined {
-  const patterns = [
-    /File [`']([^'`]+\.sty)[`'] not found/,
-    /Encoding file [`']([^'`]+)[`'] not found/,
-    /file ['`]([^'`]+\.sty)['`'] not found/i,
-  ];
-  for (const pat of patterns) {
-    const m = line.match(pat);
-    if (m) {
-      const filename = m[1];
-      const packageName = filename.replace(".sty", "");
-      return {
-        line: undefined,
-        message: `Missing file: ${filename}`,
-        severity: "error",
-        missingPackage: packageName,
-      };
-    }
   }
   return undefined;
 }

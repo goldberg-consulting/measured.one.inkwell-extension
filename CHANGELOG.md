@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.2 (2026-06-29)
+
+Tufte book template release. Adds a long-form `tufte-book` wrapper and ensures the new demo ships through normal workspace setup and Homebrew VSIX installs.
+
+### Added
+
+- **Tufte Book VDQI template.** New built-in `tufte-book-vdqi` template using the CTAN `tufte-book` class with a VDQI-style title page, custom contents styling, front matter, parts, chapters, margin notes, full-width blocks, margin figures, and Pandoc citeproc compatibility.
+- **Long-form demo book.** Added `examples/demo-tufte-book-vdqi.md`, a multi-part, multi-chapter demo that compiles to a full book and documents the current single-master-document authoring model (`top-level-division: chapter`).
+- **Scaffold support.** `New Project` now has template-specific YAML defaults for `tufte-book-vdqi`; `Setup Workspace` carries the new demo through the existing `.inkwell/examples/` copy path and can seed the new bundled template into `.inkwell/templates/`.
+
+### Release
+
+- **Homebrew-ready package bump.** Bumped the extension to `0.3.2` so the release workflow can upload `inkwell-0.3.2.vsix` and update the Homebrew cask version and SHA.
+
 ## 0.3.1 (2026-04-19)
 
 Follow-up to v0.3.0. Completes items 5 (full toolchain check) and 7 (CI regression compile) from the reliability backlog.
