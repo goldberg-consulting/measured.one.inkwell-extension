@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.3.3 (2026-07-01)
+
+Correctness release for the Tufte templates, driven by an empirical review of v0.3.2. Two user-invisible bugs (documents compiled without errors but produced wrong output) are fixed, plus documentation and packaging gaps.
+
+### Fixed
+
+- **Book chapters silently compiled as sections.** `top-level-division` is a Pandoc CLI option, not metadata, so the frontmatter field the tufte-book-vdqi template relies on was ignored: `#` headings became `\section`, no chapter pages were produced, and the VDQI contents styling never applied. `compilePandoc` now parses `top-level-division: chapter|part|section` from frontmatter and forwards it as `--top-level-division=...`; `scripts/compile-demo.sh` mirrors the behavior so CI compiles what the extension compiles.
+- **Figure references rendered as "??" (or blank) in both Tufte templates.** Two stacked causes: pandoc-crossref injects `\usepackage{caption}`/`subcaption`, which replace the tufte classes' margin-caption machinery; and amsmath appends `\let\label\ltx@label` to `\@arrayparboxrestore`, reverting the tufte float label deferral inside minipages so labels were written with an empty figure number. Both wrappers now spoof caption/subcaption as already loaded (with a no-op `\captionsetup`) and re-route `\ltx@label` into the tufte label store inside `figure`/`table` environments. `@fig:` references resolve with correct numbers and hyperlink anchors.
+- **`::: {.aside}` fenced divs never produced margin notes.** Pandoc's LaTeX writer unwraps unknown divs, so the advertised syntax silently rendered as body text. Removed the false advertising from the demo, template manifests, guide, and README; `\marginnote{}` / `\sidenote{}` / Markdown footnotes are the documented margin-note syntax.
+- **Pandoc 3.x missing-citation warnings were silently dropped.** The parser now matches the real `[WARNING] Citeproc: citation X not found` format (older pandoc 2.x formats still recognized). The `Could not fetch resource` message no longer captures the trailing colon into the filename. Both covered by new error-parsing regression tests.
+- **Nonfunctional index feature removed** from the tufte-book-vdqi wrapper (`$if(index)$\makeindex/\printindex`): the pipeline never runs `makeindex`, so it could only render an empty index.
+- **Scaffold stub for tufte-book-vdqi no longer enables `lof`** by default; a fresh book has no figures and rendered an empty List of Figures page.
+
+### Documentation and packaging
+
+- README: `brew trust` instructions for newer Homebrew versions, current `.vsix` naming, reload-after-install note, nine-template table with Tufte Book VDQI, new example sections (Tufte Book VDQI, ETH Report), fixed broken KTH Letter links, regenerated all template screenshots from freshly compiled PDFs.
+- guide.md: full Tufte Book VDQI template reference; new troubleshooting entries (untrusted tap, stale examples, stale seeded templates shadowing built-ins); corrected Tufte margin-note guidance.
+- Tracked `examples/demo-tufte.pdf` and `examples/demo-eth-report.pdf` so README links resolve and VSIX contents don't depend on the packaging machine's local artifacts.
+- New project skill (`.cursor/skills/inkwell-troubleshooting/`) and rules (`troubleshooting.mdc`, updated `tufte-format.mdc`) encoding the diagnostic workflow and template invariants.
+
 ## 0.3.2 (2026-06-29)
 
 Tufte book template release. Adds a long-form `tufte-book` wrapper and ensures the new demo ships through normal workspace setup and Homebrew VSIX installs.

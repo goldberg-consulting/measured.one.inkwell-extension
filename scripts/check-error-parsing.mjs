@@ -82,6 +82,20 @@ const cases = [
       errs.some((e) => e.severity === "warning" && e.message.includes("@knuth1984")),
   },
   {
+    name: "pandoc 3.x citeproc citation warning format is parsed",
+    log: "[WARNING] Citeproc: citation missingkey not found",
+    opts: GEN,
+    expect: (errs) =>
+      errs.some((e) => e.severity === "warning" && e.message.includes("@missingkey")),
+  },
+  {
+    name: "could-not-fetch-resource strips trailing colon from filename",
+    log: "[WARNING] Could not fetch resource missing.png: replacing image with description",
+    opts: GEN,
+    expect: (errs) =>
+      errs.some((e) => e.message.includes('"missing.png"') && !e.message.includes('"missing.png:"')),
+  },
+  {
     name: "fontspec missing font names the font",
     log: [
       "! Package fontspec Error: The font \"Lato\" cannot be",

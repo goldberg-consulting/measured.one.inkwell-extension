@@ -10,9 +10,9 @@
       "description": "Small-caps paragraph opener (tufte-handout class)"
     },
     {
-      "pattern": ":::.*\\.aside",
-      "syntax": "::: {.aside}",
-      "description": "Margin note via fenced div (tufte template aside environment)"
+      "pattern": "\\\\marginnote\\{",
+      "syntax": "\\marginnote{Text}",
+      "description": "Unnumbered margin note (tufte-handout class)"
     },
     {
       "pattern": ":::.*\\.fullwidth",

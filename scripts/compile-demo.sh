@@ -157,6 +157,23 @@ if [[ -n "$CROSSREF_BIN" ]]; then
 fi
 PANDOC_ARGS+=(--citeproc)
 
+# Mirror the extension: forward frontmatter `top-level-division:` as a CLI
+# flag (Pandoc ignores it as plain metadata). Needed by book templates so
+# `#` headings become \chapter.
+DIVISION="$(awk '
+  /^---$/ { fm = !fm; next }
+  fm && $1 == "top-level-division:" {
+    v = $2
+    gsub(/^[\"\x27]/, "", v)
+    gsub(/[\"\x27]$/, "", v)
+    if (v == "chapter" || v == "part" || v == "section") print v
+    exit
+  }
+' "$SRC_ABS")"
+if [[ -n "$DIVISION" ]]; then
+  PANDOC_ARGS+=(--top-level-division="$DIVISION")
+fi
+
 # Add all bib files from the project.
 shopt -s nullglob
 for bib in "$REPO_ROOT"/*.bib "$REPO_ROOT/references/"*.bib "$REPO_ROOT/.inkwell/references/"*.bib; do

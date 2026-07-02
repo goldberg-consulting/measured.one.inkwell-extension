@@ -26,6 +26,13 @@ brew tap goldberg-consulting/inkwell
 brew install --cask inkwell
 ```
 
+Newer Homebrew versions refuse casks from untrusted third-party taps. If you see `Refusing to load cask ... from untrusted tap`, trust the tap first:
+
+```bash
+brew trust goldberg-consulting/inkwell
+brew install --cask inkwell   # or: brew upgrade --cask inkwell
+```
+
 Then add Mermaid CLI for diagram support in PDFs:
 
 ```bash
@@ -62,9 +69,11 @@ Or search for **Inkwell** in the editor extensions pane.
 Download the latest `.vsix` from [Releases](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases), then:
 
 ```bash
-cursor --install-extension inkwell-0.2.0.vsix --force
-# or: code --install-extension inkwell-0.2.0.vsix --force
+cursor --install-extension inkwell-<version>.vsix --force
+# or: code --install-extension inkwell-<version>.vsix --force
 ```
+
+After installing or upgrading, reload the editor window (`Cmd+Shift+P` > **Developer: Reload Window**) — the old extension code stays loaded in memory until you do.
 
 Or in the editor: `Cmd+Shift+P` > **Extensions: Install from VSIX...** and select the file.
 
@@ -157,7 +166,7 @@ See the **[Syntax Guide](guide.md)** for the complete reference on YAML frontmat
 1. `Cmd+Shift+P` > **Inkwell: New Project**
 2. Select a folder for your project
 3. Name your document (this becomes the main `.md` filename)
-4. Pick a template (Default, Tufte, Rho, TMSCE, Ludus, RMxAA, or KTH Letter)
+4. Pick a template (Default, Tufte Handout, Tufte Book VDQI, Rho, TMSCE, Ludus, RMxAA, ETH Report, or KTH Letter)
 5. Choose whether to set up a Python virtual environment (recommended if your document will have code blocks)
 6. Inkwell creates the project with starter files, example scripts, bibliography, and a syntax guide at `.inkwell/guide.md`
 7. Write your markdown in the generated `.md` file
@@ -354,12 +363,13 @@ All extension-managed resources live under a single `.inkwell/` directory at the
 
 ## Templates
 
-Inkwell ships with eight templates. Each template includes a Pandoc `.latex` wrapper that compiles with the template's native document class. Templates declare their preferred PDF engine (`xelatex` or `pdflatex`) in `template.json`; Inkwell selects the right one automatically.
+Inkwell ships with nine templates. Each template includes a Pandoc `.latex` wrapper that compiles with the template's native document class. Templates declare their preferred PDF engine (`xelatex` or `pdflatex`) in `template.json`; Inkwell selects the right one automatically.
 
 | Template | Class | Engine | Description |
 |----------|-------|--------|-------------|
 | **Inkwell Default** | `article` | xelatex | Clean article with theorem environments, code highlighting, title page |
 | **Tufte Handout** | `tufte-handout` | pdflatex | Edward Tufte-inspired layout with wide margins, sidenotes, and margin figures |
+| **Tufte Book VDQI** | `tufte-book` | pdflatex | Full book layout with VDQI-style title page, parts, chapters, and front matter |
 | **Rho Academic** | `rho` | pdflatex | Two-column academic article with colored headers, abstract box, footer metadata |
 | **TMSCE** | `tmsce` | pdflatex | Transactions on Mathematical Sciences and Computational Engineering |
 | **Ludus Academik** | `ludusofficial` | xelatex | Ludus Academik Journal (themed, two-column) |
@@ -502,6 +512,11 @@ Features: TOC, numbered equations, runnable Python code blocks with inline outpu
 [Source](examples/demo-default.md)
 
 </td>
+<td width="50%">
+
+![Inkwell Default output](media/examples/demo-default.png)
+
+</td>
 </tr></table>
 
 ---
@@ -527,14 +542,53 @@ classoption:
 bibliography: .inkwell/references/refs.bib
 ```
 
-Features: margin notes via `\marginnote{}` or `\sidenote{}`, margin figures via `\begin{marginfigure}`, full-width sections via `\begin{fullwidth}`, `\newthought` for paragraph openers, Palatino typography. Use raw LaTeX for these; fenced divs (`::: {.aside}`, `::: {.fullwidth}`) are unreliable.
+Features: margin notes via `\marginnote{}` or `\sidenote{}`, margin figures via `\begin{marginfigure}`, full-width sections via `\begin{fullwidth}`, `\newthought` for paragraph openers, Palatino typography. Use raw LaTeX for these; fenced divs (`::: {.aside}`, `::: {.fullwidth}`) are silently unwrapped by Pandoc and do not work.
 
 [Source](examples/demo-tufte.md) | [PDF](examples/demo-tufte.pdf)
 
 </td>
 <td width="50%">
 
-*Screenshot pending. Compile `examples/demo-tufte.md` to see the output.*
+![Tufte Handout output](media/examples/demo-tufte.png)
+
+</td>
+</tr></table>
+
+---
+
+### Tufte Book VDQI
+
+Full-length book layout using the `tufte-book` class, with a title page and table of contents styled after *The Visual Display of Quantitative Information*.
+
+<table><tr>
+<td width="50%">
+
+```yaml
+template: tufte-book-vdqi
+title: "A Tufte-Style Book"
+subtitle: "With a VDQI Title and Contents Page"
+author: "Inkwell"
+edition: "First edition"
+publisher: "Measured One Press"
+top-level-division: chapter
+toc: true
+lof: true
+copyright: true
+dedication: |
+  Dedicated to readers who prefer evidence.
+epigraphs:
+  - text: "Above all else show the data."
+    author: "Edward R. Tufte"
+```
+
+Features: VDQI-style title page (author top, title above center, publisher at the foot), epigraph/copyright/dedication front matter, `\part{...}` divisions, chapters from `#` headings (`top-level-division: chapter`), plus all Tufte Handout margin features.
+
+[Source](examples/demo-tufte-book-vdqi.md) | [PDF](examples/demo-tufte-book-vdqi.pdf)
+
+</td>
+<td width="50%">
+
+![Tufte Book VDQI output](media/examples/demo-tufte-book-vdqi.png)
 
 </td>
 </tr></table>
@@ -566,12 +620,48 @@ closing: "Kind regards,"
 
 Features: KTH branded letterhead with school logo, institutional footer with address and contact details, page numbering, recipient address block, section headings, tables (booktabs), code blocks with syntax highlighting, math (amsmath), graphics, and hyperlinks.
 
-[Source](examples/demo-kth-letter.md) | [PDF](examples/demo-kth-letter.pdf)
+*(No bundled demo file — start from the YAML above or scaffold with **New Project** and pick KTH Letter.)*
+
+</td>
+</tr></table>
+
+---
+
+### ETH Report
+
+ETH Zürich IVT working paper with title page, abstract, keywords, and suggested-citation block.
+
+<table><tr>
+<td width="50%">
+
+```yaml
+template: eth-report
+papertype: "Working Paper"
+title: "Signal Decomposition Methods
+        for Urban Traffic Flow Analysis"
+subtitle: "A Computational Approach"
+eth-authors:
+  - name: "Author One"
+    department: "Department"
+    institution: "ETH Zürich"
+    address: "CH-8093 Zurich"
+    email: "author@ethz.ch"
+reportdate: "March 2026"
+reportnumber: "1042"
+keywords: "keyword1, keyword2"
+toc: true
+lof: true
+lot: true
+```
+
+Features: KOMA-Script working-paper title page, report number and date, abstract with keywords, TOC/LOF/LOT front matter, suggested-citation block.
+
+[Source](examples/demo-eth-report.md) | [PDF](examples/demo-eth-report.pdf)
 
 </td>
 <td width="50%">
 
-*Screenshot pending. Compile `examples/demo-kth-letter.md` to see the output.*
+![ETH Report output](media/examples/demo-eth-report.png)
 
 </td>
 </tr></table>

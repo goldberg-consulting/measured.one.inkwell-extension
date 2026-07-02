@@ -284,7 +284,7 @@ top-level-division: chapter
 classoption:
   - justified
 toc: true
-lof: true
+# lof: true                # enable once the book has figures
 copyright: true
 copyright-holder: "Copyright Holder"
 license: "Licensed for private circulation."

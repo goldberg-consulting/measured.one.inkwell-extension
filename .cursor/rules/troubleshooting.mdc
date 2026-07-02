@@ -1,0 +1,26 @@
+---
+description: Diagnostic invariants for debugging Inkwell compiles, templates, and installs
+globs: "templates/**,examples/**,scripts/compile-*.sh,src/compiler.ts,src/toolchain.ts"
+alwaysApply: false
+---
+
+# Troubleshooting Inkwell
+
+For the full diagnostic workflow, read `.cursor/skills/inkwell-troubleshooting/SKILL.md`.
+
+## Reproduce before editing
+
+- Reproduce failures with `scripts/compile-demo.sh <file> --keep-work` (exit 1 = pandoc, exit 2 = engine), never by reading the minified bundle. Inspect the preserved workdir's `.tex` / `.log` / `.aux`.
+- The running extension loads from `~/.cursor/extensions/measure-one.inkwell-<version>/`, not this repo. "Works in the script, fails in the editor" almost always means a stale installed copy or a shadowing template in `~/.inkwell/templates/` or `.inkwell/templates/`.
+
+## Invariants that must survive edits
+
+- `PANDOC_EXTENSIONS` (src/compiler.ts) and `PANDOC_EXTS` (scripts/compile-demo.sh) must stay identical; `npm run test:regressions` enforces it. The same applies to the `top-level-division` forwarding both implement.
+- Tufte wrappers (`templates/tufte/`, `templates/tufte-book-vdqi/`) carry two load-bearing guards: the caption/subcaption spoof (pandoc-crossref injection breaks tufte margin captions) and the `\ltx@label` re-route inside floats (amsmath breaks the class's label deferral). Removing either silently regresses figure refs to "??"/blank.
+- `template.json` `engine` is a hard requirement, not a preference — don't add fallback logic.
+
+## After any template or compiler change
+
+```bash
+npm run verify && scripts/compile-all-demos.sh
+```

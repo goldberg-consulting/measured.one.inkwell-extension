@@ -1,12 +1,16 @@
 ---
 description: Tufte template formatting conventions for margin notes, sidenotes, full-width sections, and margin figures
-globs: "examples/demo-tufte*,templates/tufte/**"
+globs: "examples/demo-tufte*,templates/tufte/**,templates/tufte-book-vdqi/**"
 alwaysApply: false
 ---
 
 # Tufte Template Formatting
 
-The `tufte-handout` class provides margin notes, sidenotes, margin figures, and full-width sections. Some of these require raw LaTeX because Pandoc's fenced div conversion is unreliable for complex content.
+The `tufte-handout` (template `tufte`) and `tufte-book` (template `tufte-book-vdqi`) classes provide margin notes, sidenotes, margin figures, and full-width sections. Some of these require raw LaTeX because Pandoc's fenced div conversion is unreliable for complex content.
+
+## Book structure (tufte-book-vdqi only)
+
+One markdown file is the whole book. Frontmatter must set `top-level-division: chapter` so `#` headings become `\chapter`; raw `\part{Title}` between chapters creates part divisions. Table captions with `{#tbl:...}` attributes must NOT sit inside raw `\begin{fullwidth}` blocks — pandoc passes the attribute through as literal text and LaTeX fails on the `#`.
 
 ## Margin text
 
@@ -17,7 +21,7 @@ The data-ink ratio\sidenote{Tufte introduced this concept in 1983.} measures
 the proportion of ink devoted to non-redundant data display.
 ```
 
-The `::: {.aside}` fenced div works for short text but breaks with paragraphs or math. Prefer raw LaTeX.
+Never use `::: {.aside}` fenced divs: Pandoc's LaTeX writer unwraps unknown divs, so the content silently renders as body text (the wrapper's `aside` environment is never emitted). Markdown footnotes (`^[Note.]`) work as numbered sidenotes.
 
 ## Full-width sections
 
@@ -58,5 +62,5 @@ Renders the opening phrase in small caps. Use at the start of major sections.
 ## What to avoid
 
 - Multi-paragraph content inside `\sidenote{}` or `\marginnote{}`
-- Fenced divs (`::: {.fullwidth}`, `::: {.aside}`) for anything beyond simple text
+- Fenced divs (`::: {.fullwidth}`, `::: {.aside}`) — they are unwrapped by Pandoc and lose their meaning
 - `\begin{figure*}` (use `\begin{fullwidth}` with a standard figure inside)

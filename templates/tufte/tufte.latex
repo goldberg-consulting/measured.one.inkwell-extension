@@ -120,6 +120,36 @@
 \@ifundefined{c@none}{\newcounter{none}}{}
 \makeatother
 
+% pandoc-crossref injects `\usepackage{caption}` + `subcaption` unless it
+% believes they are already loaded. The caption package replaces the tufte
+% classes' custom margin-caption machinery and breaks \label/\ref for
+% figures (references render as "??"). Pretend both are loaded and no-op
+% \captionsetup so the injected configuration lines are harmless.
+\makeatletter
+\expandafter\def\csname ver@caption.sty\endcsname{9999/12/31}
+\expandafter\def\csname ver@subcaption.sty\endcsname{9999/12/31}
+\makeatother
+\newcommand\captionsetup[2][]{}
+
+% amsmath appends `\let\label\ltx@label` to \@arrayparboxrestore, which runs
+% at the start of every minipage. The tufte float machinery redirects \label
+% into a deferred store, then collects the float body in a minipage -- so
+% amsmath silently reverts the redirect and the label is written inline with
+% a stale/empty \@currentlabel (figure refs print as nothing). Re-route
+% \ltx@label into the tufte store for the duration of each float; the
+% environment group restores it afterwards.
+\makeatletter
+\newcommand{\@inkwell@deferlabel}[1]{\@tufte@label{#1}}
+\AtBeginDocument{%
+  \@ifundefined{@tufte@label}{}{%
+    \AddToHook{env/figure/begin}{\let\ltx@label\@inkwell@deferlabel}%
+    \AddToHook{env/figure*/begin}{\let\ltx@label\@inkwell@deferlabel}%
+    \AddToHook{env/table/begin}{\let\ltx@label\@inkwell@deferlabel}%
+    \AddToHook{env/table*/begin}{\let\ltx@label\@inkwell@deferlabel}%
+  }%
+}
+\makeatother
+
 $for(header-includes)$
 $header-includes$
 $endfor$

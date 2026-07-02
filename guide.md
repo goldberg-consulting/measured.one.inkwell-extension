@@ -30,7 +30,7 @@ lot: true                          # list of tables
 Set `template:` to use a journal template. Omit it (or set `template: default`) for the default article layout.
 
 ```yaml
-template: tufte    # or: rho, rmxaa, ludus, tmsce, kth-letter, default
+template: tufte    # or: tufte-book-vdqi, rho, rmxaa, ludus, tmsce, eth-report, kth-letter, default
 ```
 
 ### The `inkwell:` styling namespace
@@ -456,15 +456,9 @@ Additional fields: `subtitle`, `linkcolor`, `citecolor`, `urlcolor`.
 
 #### Margin notes
 
-Use `::: {.aside}` fenced divs for margin notes:
+Use raw LaTeX for margin notes — `\marginnote{Short note.}` (unnumbered) or `\sidenote{Numbered note.}` (numbered). Markdown footnotes (`^[Note text.]`) also render as numbered sidenotes.
 
-```markdown
-::: {.aside}
-This text appears in the margin alongside the main column.
-:::
-```
-
-For inline margin notes, use raw LaTeX: `\marginnote{Short note.}` or `\sidenote{Numbered note.}`.
+Fenced divs (`::: {.aside}`) do **not** work for margin notes: Pandoc's LaTeX writer unwraps unknown divs, so the content silently renders as ordinary body text.
 
 #### Margin figures
 
@@ -498,6 +492,37 @@ Use `\newthought{Opening words}` to start a paragraph with small-caps, following
 ```markdown
 \newthought{The central argument} of this section is that...
 ```
+
+### Tufte Book VDQI (pdfLaTeX)
+
+Full book layout using the `tufte-book` class with a VDQI-style title page and contents. One markdown file is the whole book: with `top-level-division: chapter`, every top-level `#` heading becomes a chapter, and raw `\part{Title}` lines between chapters create part divisions in the contents.
+
+```yaml
+template: tufte-book-vdqi
+title: "Book Title"
+subtitle: "Optional Subtitle"
+author: "Author Name"
+edition: "First edition"        # printed in small caps on the title page
+publisher: "Publisher Name"     # printed at the foot of the title page
+top-level-division: chapter     # required: '#' headings become chapters
+classoption:
+  - justified
+toc: true                       # table of contents (VDQI style)
+lof: true                       # list of figures
+lot: true                       # list of tables
+copyright: true                 # copyright page in the front matter
+copyright-holder: "Holder"      # defaults to the author
+license: "License text."        # optional paragraph on the copyright page
+dedication: |
+  Optional dedication page text.
+epigraphs:                      # optional epigraph page before the title
+  - text: "Epigraph text."
+    author: "Attribution"
+```
+
+All Tufte Handout margin features work here too: `\marginnote{...}`, Markdown footnotes as numbered sidenotes, `\begin{marginfigure}`, `\begin{fullwidth}`, and `\newthought{...}`.
+
+There is no multi-file chapter assembly yet — draft the book as a single master markdown document so Pandoc sees the whole table of contents, cross-references, and citations in one pass.
 
 ### KTH Letter (pdfLaTeX)
 
@@ -764,6 +789,14 @@ Re-run the toolchain check afterward to confirm.
 ### Preview shows raw LaTeX syntax instead of rendered output
 
 Reload the editor window: `Cmd+Shift+P` → **Developer: Reload Window**. After a `brew upgrade --cask inkwell`, VS Code / Cursor keeps the old extension code loaded in memory until the window reloads.
+
+### `brew install --cask inkwell` refuses to load the cask
+
+Newer Homebrew versions require third-party taps with casks to be explicitly trusted. Run `brew trust goldberg-consulting/inkwell`, then repeat the install or upgrade.
+
+### A template or example added in a new release doesn't show up
+
+Three common causes. First, the installed extension may be stale — check `Cmd+Shift+P` → **Extensions: Show Installed Extensions** for the Inkwell version, upgrade (`brew upgrade --cask inkwell` or reinstall the `.vsix`), and reload the window. Second, **Setup Workspace** copies examples into `.inkwell/examples/` only when the file is *missing* — it never overwrites. Delete the stale copy under `.inkwell/examples/` and re-run **Inkwell: Setup Workspace**. Third, if you previously seeded templates into `.inkwell/templates/`, those copies permanently shadow the extension's built-ins — a template bug fixed in a newer release stays broken until you delete the stale folder under `.inkwell/templates/` (or `~/.inkwell/templates/`).
 
 ### I want to see the exact pandoc / xelatex invocation
 

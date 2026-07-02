@@ -140,10 +140,8 @@ that needs it. This is especially useful for source notes, short definitions,
 and small clarifications. The extension's code and citation pipeline follow the
 same Markdown workflow as the other templates [@knuth1984].
 
-::: {.aside}
-Fenced `aside` blocks become Tufte margin notes for short, single-paragraph
-comments.
-:::
+\marginnote{Use \texttt{\textbackslash marginnote} for short, unnumbered
+margin comments beside the sentence that needs them.}
 
 Longer arguments still belong in the main text. The margin is best treated as a
 parallel channel, not a second essay.

@@ -12,6 +12,7 @@ import * as crypto from "crypto";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { findBibFiles, findDefaultsYaml, getInkwellProjectRoot } from "./config";
+import { splitFrontmatter } from "./frontmatter";
 import { InkwellDiagnostics, CompileError } from "./diagnostics";
 import { getTemplateForDocument, copySupportingFiles, PdfEngine, ResolvedTemplate, collectAllFeatures } from "./templates";
 import { prepareForCompilation } from "./inject";
@@ -470,6 +471,15 @@ async function compilePandoc(
     "--citeproc",
   ];
 
+  // `top-level-division` is a Pandoc *option*, not a template variable, so
+  // a frontmatter `top-level-division: chapter` is silently ignored unless
+  // forwarded as a CLI flag. Book/report templates (tufte-book-vdqi) need
+  // it for `#` headings to become \chapter instead of \section.
+  const division = extractTopLevelDivision(rawText);
+  if (division) {
+    pandocArgs.push(`--top-level-division=${division}`);
+  }
+
   const preambleFile = writePreambleFile(rawText, cacheDir);
   if (preambleFile) {
     pandocArgs.push("-H", preambleFile);
@@ -645,6 +655,17 @@ async function compilePandoc(
       (logContent ? "\n\n--- engine log (excerpt) ---\n" + extractEngineLogExcerpt(logContent) : ""),
     duration,
   };
+}
+
+/**
+ * Frontmatter `top-level-division: chapter|part|section`, validated so a
+ * typo can't inject an arbitrary CLI argument into the pandoc invocation.
+ */
+function extractTopLevelDivision(text: string): string | undefined {
+  const fm = splitFrontmatter(text);
+  if (!fm) return undefined;
+  const m = fm.fm.match(/^top-level-division:\s*['"]?(chapter|part|section)['"]?\s*(?:#.*)?$/m);
+  return m ? m[1] : undefined;
 }
 
 /**
@@ -844,7 +865,10 @@ function parsePandocDiagnostic(line: string): CompileError | undefined {
     };
   }
 
-  const citation = line.match(/\[WARNING\] Citation '([^']+)' not found/i)
+  // Pandoc 3.x: "[WARNING] Citeproc: citation X not found". Older
+  // formats kept for pandoc 2.x installs.
+  const citation = line.match(/Citeproc: citation ([^\s]+) not found/i)
+    || line.match(/\[WARNING\] Citation '([^']+)' not found/i)
     || line.match(/citeproc: reference ([^\s]+) not found/i);
   if (citation) {
     return {
@@ -854,7 +878,7 @@ function parsePandocDiagnostic(line: string): CompileError | undefined {
     };
   }
 
-  const resource = line.match(/Could not fetch resource '?([^'\s]+)'?/i);
+  const resource = line.match(/Could not fetch resource '?([^'\s]+?)'?:?(?:\s|$)/i);
   if (resource) {
     return {
       line: undefined,
