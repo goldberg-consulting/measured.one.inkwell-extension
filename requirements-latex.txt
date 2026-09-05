@@ -158,6 +158,10 @@ epstopdf
 # file for its bubble-diagram helpers.
 fontawesome
 raleway
+# raleway's .sty defaults to the LY1 font encoding; ly1 provides
+# ly1enc.def, which full TeX Live ships but minimal TinyTeX does not
+# ("Encoding file 'ly1enc.def' not found" at \ProcessOptions).
+ly1
 paracol
 smartdiagram
 tikz-3dplot

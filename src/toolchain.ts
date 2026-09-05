@@ -121,9 +121,11 @@ const FALLBACK_PACKAGES = [
   // Required by adforn (rho ornamental glyphs).
   "svn-prov",
   // hipster-cv template: TikZ sidebar/timeline, FontAwesome icons,
-  // Raleway body font, paracol two-column layout, and the
-  // smartdiagram / tikz-3dplot helpers its style file loads.
-  "fontawesome", "raleway", "paracol", "smartdiagram", "tikz-3dplot", "pgf",
+  // Raleway body font (whose .sty defaults to the LY1 encoding — ly1
+  // supplies ly1enc.def on minimal installs), paracol two-column
+  // layout, and the smartdiagram / tikz-3dplot helpers its style
+  // file loads.
+  "fontawesome", "raleway", "ly1", "paracol", "smartdiagram", "tikz-3dplot", "pgf",
   "amsfonts", "amscls", "tools", "preprint", "sttools",
   "graphics", "oberdiek", "psnfss",
   "mathpazo", "palatino", "bera", "soul", "stix2-type1", "tex-gyre",
