@@ -1,0 +1,28 @@
+{
+  "name": "Hipster CV",
+  "description": "Two-column resume/CV with a shaded sidebar (photo, about, languages, contact bubbles), a full-width name banner, and timeline entries with company logos. Sidebar is driven by YAML frontmatter; the markdown body fills the main column. Based on the simplehipstercv class.",
+  "documentclass": "simplehipstercv",
+  "engine": "pdflatex",
+  "features": [
+    {
+      "pattern": "\\\\begin\\{cventries\\}",
+      "syntax": "\\begin{cventries} ... \\end{cventries}",
+      "description": "Timeline table of CV entries with a continuous rule (hipster-cv template)"
+    },
+    {
+      "pattern": "\\\\cvevent\\{",
+      "syntax": "\\cvevent{dates}{role}{organization}{location}{description}{logo}",
+      "description": "Timeline entry row with role, organization, and optional logo (hipster-cv template)"
+    },
+    {
+      "pattern": "\\\\begin\\{cvyears\\}",
+      "syntax": "\\begin{cvyears} ... \\end{cvyears}",
+      "description": "Year-indexed list for education, patents, or publications (hipster-cv template)"
+    },
+    {
+      "pattern": "\\\\cvyear\\{",
+      "syntax": "\\cvyear{year}{description}",
+      "description": "Year-indexed row inside a cvyears block (hipster-cv template)"
+    }
+  ]
+}

@@ -151,5 +151,17 @@ tabularx
 epstopdf-pkg
 epstopdf
 
+# hipster-cv template dependencies. The simplehipstercv class draws its
+# sidebar, timeline, and info bubbles with TikZ (pgf) and FontAwesome
+# icons, sets the body in Raleway, and lays out the two columns with
+# paracol. smartdiagram and tikz-3dplot are loaded by the class's style
+# file for its bubble-diagram helpers.
+fontawesome
+raleway
+paracol
+smartdiagram
+tikz-3dplot
+pgf
+
 # document classes
 tufte-latex
