@@ -4,6 +4,15 @@
 
 Inkwell lets you stay in markdown, stay in your editor, and still get publication-quality PDFs out the other end. Your analysis scripts run in place, their outputs land in the document, and the whole thing compiles to LaTeX without you ever opening a `.tex` file. Or open one. It handles those too.
 
+**Quick install (macOS):**
+
+```bash
+brew tap goldberg-consulting/inkwell
+brew install --cask inkwell   # extension + Pandoc + pandoc-crossref + MacTeX
+```
+
+Then reload your editor (`Cmd+Shift+P` → **Developer: Reload Window**). Upgrades are `brew upgrade --cask inkwell`. See [Installation](#installation) for the trusted-tap note, TinyTeX and manual alternatives, and Linux setup.
+
 ## How it works
 
 1. **Write** in markdown with YAML frontmatter for metadata and styling
@@ -43,6 +52,12 @@ The cask installs:
 - **Inkwell** extension in Cursor or VS Code (auto-detected)
 - **Pandoc** and **pandoc-crossref** (formula dependencies)
 - **MacTeX** (cask dependency, skipped if already installed)
+
+Upgrading to a new release is one command — the release workflow bumps the tap automatically whenever a version ships:
+
+```bash
+brew upgrade --cask inkwell
+```
 
 **Alternative: `brew bundle`** from the repo root uses the [`Brewfile`](Brewfile) for the same result.
 
