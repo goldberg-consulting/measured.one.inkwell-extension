@@ -678,6 +678,12 @@ export async function renderCitations(
   let cslFile: string | undefined;
   if (opts.csl) {
     cslFile = findCslFile(opts.projectRoot, opts.csl);
+  } else {
+    // Parity with the compile pipeline: without a declared csl the PDF
+    // uses the bundled numeric style ([1,2,3]), so the preview should
+    // render the same numbers rather than Chicago author-date.
+    const bundled = path.join(__dirname, "..", "csl", "inkwell-numeric.csl");
+    if (fs.existsSync(bundled)) cslFile = bundled;
   }
 
   const linkCitations = opts.linkCitations !== false;

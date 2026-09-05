@@ -11,12 +11,12 @@ import * as os from "os";
 import * as crypto from "crypto";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { findBibFiles, findDefaultsYaml, getInkwellProjectRoot } from "./config";
-import { splitFrontmatter } from "./frontmatter";
+import { findBibFiles, findCslFile, findDefaultsYaml, getInkwellProjectRoot } from "./config";
+import { splitFrontmatter, extractIndentedBlock } from "./frontmatter";
 import { InkwellDiagnostics, CompileError } from "./diagnostics";
 import { getTemplateForDocument, copySupportingFiles, PdfEngine, ResolvedTemplate, collectAllFeatures } from "./templates";
 import { prepareForCompilation } from "./inject";
-import { writePreambleFile } from "./preamble";
+import { generatePreambleText, injectPreambleIntoTemplate, writePreambleFile } from "./preamble";
 import { buildTexInvocationPath, texBinSearchDirs } from "./shell-env";
 import { tlmgrPackageForFile } from "./toolchain";
 import { getInkwellOutputChannel } from "./inkwell-output";
@@ -44,6 +44,20 @@ const TEX_ENV = {
   ...process.env,
   PATH: buildTexInvocationPath(),
 };
+
+// Bundled pipeline assets. __dirname is <extension-root>/out at runtime
+// (both the tsc tree and the esbuild bundle), so these resolve to the
+// extension's top-level filters/ and csl/ directories.
+const SECTION_BIBS_FILTER = path.join(__dirname, "..", "filters", "section-bibliographies.lua");
+const DEFAULT_NUMERIC_CSL = path.join(__dirname, "..", "csl", "inkwell-numeric.csl");
+
+function safeReadFile(file: string): string {
+  try {
+    return fs.readFileSync(file, "utf-8");
+  } catch {
+    return "";
+  }
+}
 
 export interface CompileResult {
   success: boolean;
@@ -405,11 +419,11 @@ async function compilePandoc(
   copySupportingFiles(template, cacheDir);
 
   // The manifest engine is a hard requirement, never a preference.
-  // pdflatex-only templates (tufte, rho, rmxaa, tmsce, eth-report,
-  // kth-letter) use inputenc/fontenc and break under XeLaTeX, while the
-  // default template needs fontspec and breaks under pdfLaTeX. Silently
-  // substituting one for the other produces cryptic LaTeX errors deep in
-  // the log instead of an actionable message here.
+  // pdflatex-only templates (tufte, rho, rmxaa, tmsce, kth-letter,
+  // hipster-cv) use inputenc/fontenc and break under XeLaTeX, while
+  // fontspec templates (default, eth-report) break under pdfLaTeX.
+  // Silently substituting one for the other produces cryptic LaTeX
+  // errors deep in the log instead of an actionable message here.
   const requiredEngine: PdfEngine = template.manifest.engine || "xelatex";
   const engine = await findBinary(requiredEngine);
   if (!engine) {
@@ -429,7 +443,17 @@ async function compilePandoc(
 
   const rawText = document.getText();
   const featureCheck = checkTemplateFeatures(rawText, template, document.uri);
-  const { injected } = prepareForCompilation(rawText, sourceFile);
+  const pipelineWarnings: CompileError[] = [];
+  const { injected, unresolvedVars } = prepareForCompilation(rawText, sourceFile);
+  for (const key of unresolvedVars) {
+    const token = `{{${key}}}`;
+    const idx = rawText.indexOf(token);
+    pipelineWarnings.push({
+      line: idx >= 0 ? rawText.slice(0, idx).split("\n").length : undefined,
+      message: `Unresolved placeholder ${token} — no code block exported "${key}" (via ::inkwell or vars.json), so it will appear literally in the PDF. Run the code blocks (Cmd+Alt+R) or fix the key.`,
+      severity: "warning",
+    });
+  }
 
   const tmpSource = path.join(cacheDir, path.basename(sourceFile));
   fs.writeFileSync(tmpSource, injected, "utf-8");
@@ -468,7 +492,6 @@ async function compilePandoc(
     "colorlinks=true",
     "-V",
     "numbersections=true",
-    "--citeproc",
   ];
 
   // `top-level-division` is a Pandoc *option*, not a template variable, so
@@ -480,28 +503,122 @@ async function compilePandoc(
     pandocArgs.push(`--top-level-division=${division}`);
   }
 
-  const preambleFile = writePreambleFile(rawText, cacheDir);
-  if (preambleFile) {
-    pandocArgs.push("-H", preambleFile);
-  }
-
-  const crossref = await findBinary("pandoc-crossref");
-  if (crossref) {
-    const citeprocIndex = pandocArgs.indexOf("--citeproc");
-    if (citeprocIndex >= 0) {
-      pandocArgs.splice(citeprocIndex, 0, "--filter", crossref);
+  // Generated preamble: merged into the template copy rather than passed
+  // via -H. Pandoc fills the header-includes template variable from -H
+  // files and then ignores the document's own header-includes metadata,
+  // so the old -H path silently dropped user preamble commands (fonts,
+  // spacing, citation overrides) whenever any inkwell: style key was
+  // set. See preamble.ts for the merge contract.
+  const preambleText = generatePreambleText(rawText);
+  let preambleMode = "none";
+  if (preambleText) {
+    const templateText = fs.readFileSync(templateDst, "utf-8");
+    const injection = injectPreambleIntoTemplate(templateText, preambleText);
+    if (injection.injected) {
+      fs.writeFileSync(templateDst, injection.text, "utf-8");
+      preambleMode = "merged into template copy";
     } else {
-      pandocArgs.push("--filter", crossref);
+      const preambleFile = writePreambleFile(rawText, cacheDir);
+      if (preambleFile) {
+        pandocArgs.push("-H", preambleFile);
+        preambleMode = "-H fallback (no header-includes marker in template; document header-includes will be overridden)";
+      }
     }
   }
 
-  const bibFiles = findBibFiles(projectRoot);
+  // Filter order matters: pandoc-crossref must consume @fig:/@tbl:/@sec:
+  // citations before citation rendering sees them.
+  const crossref = await findBinary("pandoc-crossref");
+  if (crossref) {
+    pandocArgs.push("--filter", crossref);
+  }
+
+  // Citation rendering. `bibliography-scope: section` swaps --citeproc
+  // for the bundled Lua filter, which runs citeproc per top-level
+  // section (configurable via `section-bibs-level`) so each chapter or
+  // section carries its own reference list. Passing both would render
+  // every citation and bibliography twice.
+  const bibScope = extractBibliographyScope(rawText);
+  let citationMode = "document (--citeproc)";
+  if (bibScope === "section" && fs.existsSync(SECTION_BIBS_FILTER)) {
+    pandocArgs.push("--lua-filter", SECTION_BIBS_FILTER);
+    citationMode = "section (per-section reference lists)";
+  } else {
+    if (bibScope === "section") {
+      pipelineWarnings.push({
+        line: undefined,
+        message: "bibliography-scope: section requested, but the bundled section-bibliographies.lua filter is missing; falling back to one document-level bibliography.",
+        severity: "warning",
+      });
+    }
+    pandocArgs.push("--citeproc");
+  }
+
+  // Explicit --bibliography flags override the document's own
+  // `bibliography:` metadata (pandoc: command line beats document), so
+  // discovery alone silently broke any document that declared its own
+  // file outside the scanned locations — citations stopped resolving
+  // without an error. Forward the declared files as flags too, ahead of
+  // the discovered ones, and warn when a declared file does not exist.
+  const declaredBibs = extractDocumentBibliographies(rawText);
+  const resolvedDeclared: string[] = [];
+  for (const declared of declaredBibs) {
+    const candidates = path.isAbsolute(declared)
+      ? [path.normalize(declared)]
+      : [path.resolve(sourceDir, declared), path.resolve(projectRoot, declared)];
+    const hit = candidates.find((c) => fs.existsSync(c));
+    if (hit) {
+      resolvedDeclared.push(hit);
+    } else {
+      const idx = rawText.indexOf(declared);
+      pipelineWarnings.push({
+        line: idx >= 0 ? rawText.slice(0, idx).split("\n").length : undefined,
+        message: `Declared bibliography not found: ${declared} (checked the document directory and the project root). Its citations will not resolve.`,
+        severity: "warning",
+      });
+    }
+  }
+  const bibFiles = [...new Set([...resolvedDeclared, ...findBibFiles(projectRoot)])];
   for (const bib of bibFiles) {
     pandocArgs.push("--bibliography", bib);
   }
   const defaults = findDefaultsYaml(projectRoot);
   if (defaults) {
     pandocArgs.push("--defaults", defaults);
+  }
+
+  // Citation style. Priority: frontmatter `csl:` > defaults.yaml `csl:` >
+  // the bundled numeric style ([1,2,3] with a numbered reference list).
+  // Without the bundled default, pandoc falls back to Chicago author-date.
+  let cslMode = "bundled numeric default";
+  const declaredCsl = extractDeclaredCsl(rawText);
+  if (declaredCsl) {
+    const resolvedCsl =
+      findCslFile(projectRoot, declaredCsl) ??
+      [path.resolve(sourceDir, declaredCsl)].find((c) => fs.existsSync(c));
+    if (resolvedCsl) {
+      pandocArgs.push("--csl", resolvedCsl);
+      cslMode = resolvedCsl;
+    } else {
+      // Could be a pandoc data-dir style name; only a path-looking value
+      // that resolves nowhere is worth a warning. Passing no flag lets
+      // pandoc try the metadata value itself.
+      cslMode = `declared "${declaredCsl}" (not found by Inkwell; left to pandoc)`;
+      if (declaredCsl.endsWith(".csl")) {
+        const idx = rawText.indexOf(declaredCsl);
+        pipelineWarnings.push({
+          line: idx >= 0 ? rawText.slice(0, idx).split("\n").length : undefined,
+          message: `Declared csl file not found: ${declaredCsl} (checked .inkwell/csl/, csl/, the project root, references/, and the document directory).`,
+          severity: "warning",
+        });
+      }
+    }
+  } else if (defaults && /^csl:/m.test(safeReadFile(defaults))) {
+    cslMode = "from defaults.yaml";
+  } else if (fs.existsSync(DEFAULT_NUMERIC_CSL)) {
+    pandocArgs.push("--csl", DEFAULT_NUMERIC_CSL);
+  } else {
+    cslMode = "pandoc default (bundled numeric style missing)";
   }
 
   copySiblingFiles(sourceDir, projectRoot, cacheDir);
@@ -530,6 +647,10 @@ async function compilePandoc(
     `[inkwell] cls in template dir: ${fs.existsSync(clsExpected)}`,
     `[inkwell] cls in cache dir: ${fs.existsSync(clsCached)}`,
     `[inkwell] engine: ${engine}`,
+    `[inkwell] generated preamble: ${preambleMode}`,
+    `[inkwell] bibliographies: ${bibFiles.length ? bibFiles.join(", ") : "none"}`,
+    `[inkwell] bibliography scope: ${citationMode}`,
+    `[inkwell] csl: ${cslMode}`,
     `[inkwell] pandoc argv: ${pandoc} ${pandocArgs.map((a) => (a.includes(" ") ? `"${a}"` : a)).join(" ")}`,
     `[inkwell] cache bib exists: ${fs.existsSync(cacheBib)}`,
     `[inkwell] cache dir contents: ${(() => { try { return fs.readdirSync(cacheDir).join(", "); } catch { return "error"; } })()}`,
@@ -640,6 +761,7 @@ async function compilePandoc(
 
   const errors = [
     ...featureCheck.warnings,
+    ...pipelineWarnings,
     ...parseErrors(stderr + "\n" + logContent, stdout, { generatedTex: true }),
   ];
   const duration = (Date.now() - start) / 1000;
@@ -655,6 +777,49 @@ async function compilePandoc(
       (logContent ? "\n\n--- engine log (excerpt) ---\n" + extractEngineLogExcerpt(logContent) : ""),
     duration,
   };
+}
+
+/**
+ * Frontmatter `bibliography:` — a scalar path or a list of paths. Exported
+ * to the pipeline as explicit --bibliography flags because pandoc lets
+ * command-line flags beat document metadata: without forwarding, the
+ * discovery flags would override the document's own declaration.
+ */
+function extractDocumentBibliographies(text: string): string[] {
+  const fm = splitFrontmatter(text);
+  if (!fm) return [];
+
+  const scalar = fm.fm.match(/^bibliography:[ \t]*["']?([^"'\n#]+?)["']?[ \t]*(?:#.*)?$/m);
+  if (scalar) return [scalar[1].trim()];
+
+  const block = extractIndentedBlock(fm.fm, "bibliography");
+  if (!block) return [];
+  const out: string[] = [];
+  for (const line of block.split("\n")) {
+    const m = line.match(/^[ \t]*-[ \t]*["']?([^"'\n#]+?)["']?[ \t]*$/);
+    if (m) out.push(m[1].trim());
+  }
+  return out;
+}
+
+/**
+ * Frontmatter `bibliography-scope: document|section`. `section` swaps
+ * --citeproc for the bundled per-section Lua filter; anything else (or
+ * absence) keeps the single document-level bibliography.
+ */
+function extractBibliographyScope(text: string): "section" | undefined {
+  const fm = splitFrontmatter(text);
+  if (!fm) return undefined;
+  const m = fm.fm.match(/^bibliography-scope:\s*['"]?(document|section)['"]?\s*(?:#.*)?$/m);
+  return m && m[1] === "section" ? "section" : undefined;
+}
+
+/** Frontmatter `csl:` scalar (a path or a pandoc data-dir style name). */
+function extractDeclaredCsl(text: string): string | undefined {
+  const fm = splitFrontmatter(text);
+  if (!fm) return undefined;
+  const m = fm.fm.match(/^csl:[ \t]*["']?([^"'\n#]+?)["']?[ \t]*(?:#.*)?$/m);
+  return m ? m[1].trim() : undefined;
 }
 
 /**

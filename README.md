@@ -166,7 +166,7 @@ See the **[Syntax Guide](guide.md)** for the complete reference on YAML frontmat
 1. `Cmd+Shift+P` > **Inkwell: New Project**
 2. Select a folder for your project
 3. Name your document (this becomes the main `.md` filename)
-4. Pick a template (Default, Tufte Handout, Tufte Book VDQI, Rho, TMSCE, Ludus, RMxAA, ETH Report, or KTH Letter)
+4. Pick a template (Default, Tufte Handout, Tufte Book VDQI, Rho, TMSCE, Ludus, RMxAA, ETH Report, KTH Letter, or Hipster CV)
 5. Choose whether to set up a Python virtual environment (recommended if your document will have code blocks)
 6. Inkwell creates the project with starter files, example scripts, bibliography, and a syntax guide at `.inkwell/guide.md`
 7. Write your markdown in the generated `.md` file
@@ -215,6 +215,8 @@ Detailed build logs are available in the **Output** panel (`Cmd+Shift+U`). Selec
 - Pass/fail status with elapsed time
 - LaTeX errors and warnings with line numbers
 - Missing package names (with quick-fix code actions in the editor)
+- Unresolved `{{key}}` binding placeholders and missing declared bibliography files, as warnings with source lines — before the PDF ships with literal braces or dropped citations
+- How the generated preamble was applied (merged into the template, or `-H` fallback) and which bibliography files were passed
 - Full Pandoc and LaTeX log output for debugging
 
 ### Runnable code blocks
@@ -300,6 +302,8 @@ $\hat\beta = `{python} f"{float(slope):.1f}"`$.
 
 Re-run the code blocks (`Cmd+Alt+R`) after adding or changing `::inkwell` exports so the variable store picks up the new values.
 
+**Binding safety.** Blocks can also export many values at once by writing a `vars.json` artifact (`output="vars"`); its values must be flat scalars — strings, numbers, booleans. Objects and arrays are skipped with a log message instead of silently rendering as `[object Object]`. Any `{{key}}` that survives substitution — a typo, a stale payload, or blocks that were never run — produces a compile warning pointing at the offending line, so a dead binding can't ship as literal braces.
+
 ### Mermaid diagrams
 
 Fenced mermaid blocks compile to figures with full cross-reference support. The preview panel renders them client-side via mermaid.js; PDF compilation uses `mmdc` (mermaid-cli) to produce high-resolution PNG images that Pandoc embeds directly in the LaTeX output.
@@ -330,6 +334,12 @@ link-citations: true
 
 Cite with standard Pandoc syntax: `[@knuth1984]`, `[@harris2020; @hunter2007]`. Inkwell runs `--citeproc` automatically. A formatted bibliography appears wherever you place a `## References` heading.
 
+**Numeric citations by default.** Without a declared style, citations render through Inkwell's bundled numeric CSL: bracketed, comma-grouped (`[@a; @b; @c]` becomes **[1,2,3]**), with a numbered reference list in order of first citation. Both the PDF and the live preview use it. Declare `csl:` in frontmatter (or in `defaults.yaml`) to use any other CSL style — author-date, IEEE, Vancouver, a journal's own file.
+
+**Section-level or document-level bibliographies.** The default is one reference list for the whole document. Set `bibliography-scope: section` and every top-level section (chapters in book templates) gets its own reference list at its end — place a `## References` heading at the end of each citing chapter, exactly like the document-level convention. Citation numbers restart per section. `section-bibs-level: 2` moves the split to a deeper heading level. See the [Tufte Book demo](examples/demo-tufte-book-vdqi.md) for a working per-chapter setup.
+
+The declared `bibliography:` (one file or a list) resolves against the document's directory, then the project root, and is always honored — Inkwell also auto-discovers `.bib` files in the project root, `references/`, and `.inkwell/references/` and passes everything to Pandoc together, so nested documents with their own bibliographies work. A declared file that doesn't exist raises a compile warning naming the path instead of leaving citations silently unresolved.
+
 ### Table of contents, list of figures, list of tables
 
 ```yaml
@@ -357,13 +367,17 @@ inkwell:
   columns: 2
 ```
 
+`inkwell:` styles compose with your own `header-includes:` block — Inkwell merges its generated preamble into the template ahead of your commands, so custom LaTeX always renders and wins any conflict. (Previously, setting any `inkwell:` style key silently discarded the document's `header-includes`.)
+
+Document typography also passes through frontmatter: `fontsize`, `geometry`, `linestretch`, and `mainfont` / `sansfont` / `monofont` work on the XeLaTeX templates, including ETH Report — whose class hardcodes 12 pt, its own margins, and one-half spacing, all three now overridable per document.
+
 ### Self-contained `.inkwell/` workspace
 
 All extension-managed resources live under a single `.inkwell/` directory at the **project root**: scripts, figures, references, examples, per-document output caches (`.inkwell/outputs/<doc-key>/`), compiled staging (`.inkwell/compiled/`), shared mermaid cache, and templates. Markdown can live in subfolders; with a **single-folder workspace** opened at the repo root, Inkwell uses that root’s `.inkwell/` (not a nested `.inkwell` next to the file). **Multi-Inkwell monorepos:** open each subproject as its own workspace folder (multi-root), or only the root that should own `.inkwell/`. The scaffold creates the full structure via **New Project** or **Setup Workspace**. Re-running Setup Workspace backfills new files from extension updates.
 
 ## Templates
 
-Inkwell ships with nine templates. Each template includes a Pandoc `.latex` wrapper that compiles with the template's native document class. Templates declare their preferred PDF engine (`xelatex` or `pdflatex`) in `template.json`; Inkwell selects the right one automatically.
+Inkwell ships with ten templates. Each template includes a Pandoc `.latex` wrapper that compiles with the template's native document class. Templates declare their preferred PDF engine (`xelatex` or `pdflatex`) in `template.json`; Inkwell selects the right one automatically.
 
 | Template | Class | Engine | Description |
 |----------|-------|--------|-------------|
@@ -375,7 +389,8 @@ Inkwell ships with nine templates. Each template includes a Pandoc `.latex` wrap
 | **Ludus Academik** | `ludusofficial` | xelatex | Ludus Academik Journal (themed, two-column) |
 | **RMxAA** | `rmaa-rho` | pdflatex | Revista Mexicana de Astronomia y Astrofisica (v4.6, two-column) |
 | **KTH Letter** | `kth-letter` | pdflatex | Official KTH (Royal Institute of Technology) letterhead |
-| **ETH Report** | `standard` (KOMA) | pdflatex | ETH Zürich IVT working paper with title page, abstract, keywords |
+| **ETH Report** | `standard` (KOMA) | xelatex | ETH Zürich IVT working paper with title page, abstract, keywords; frontmatter `fontsize`/`geometry`/`linestretch`/`mainfont` overrides |
+| **Hipster CV** | `simplehipstercv` | pdflatex | Two-column resume/CV with shaded sidebar, name banner, and logo timeline |
 
 Select a template with `template: tufte` in your YAML frontmatter, or use `Cmd+Shift+P` > **Inkwell: Select LaTeX Template**.
 
@@ -521,6 +536,40 @@ Features: TOC, numbered equations, runnable Python code blocks with inline outpu
 
 ---
 
+### Python Run & Insert
+
+The run-and-insert walkthrough: Python blocks generate the figure, the table, and every number in the prose. Run the blocks (`Cmd+Alt+R`), compile (`Cmd+Shift+R`), and nothing in the PDF can drift from the code.
+
+<table><tr>
+<td width="50%">
+
+````markdown
+```{python display="both" output="trend"
+    caption="Monthly ridership with trend."
+    label="trend"}
+# ...compute, save trend.png...
+print(f"::inkwell corr_r={corr:.3f}")
+```
+
+The fit uses {{n_obs}} observations
+and yields $r = {{corr_r}}$
+($r^2 = `{python} f"{float(corr_r)**2:.2f}"`$).
+````
+
+Features: `::inkwell` exports and `vars.json` bulk bindings, `{{key}}` substitution, inline `{python}` expressions, generated CSV table, grouped numeric citations ([1,2,3]), and unresolved-binding compile warnings.
+
+[Source](examples/demo-python-report.md) | [PDF](examples/demo-python-report.pdf)
+
+</td>
+<td width="50%">
+
+![Python run-and-insert output](media/examples/demo-python-report.png)
+
+</td>
+</tr></table>
+
+---
+
 ### Tufte Handout
 
 Edward Tufte-inspired layout with wide margins for sidenotes, margin figures, and annotations.
@@ -627,6 +676,56 @@ Features: KTH branded letterhead with school logo, institutional footer with add
 
 ---
 
+### Hipster CV
+
+Two-column resume/CV: full-width name banner, shaded sidebar with photo, about blocks, language skill dots, and contact bubbles, plus a main column of timeline entries with company logos.
+
+<table><tr>
+<td width="50%">
+
+```yaml
+template: hipster-cv
+classoption: [lighthipster]
+first-name: "Eli"
+last-name: "Goldberg"
+tagline: "PhD, MSc"
+photo: "headshot.jpeg"
+sidebar:
+  - title: "About me"
+    text: |
+      Healthcare data scientist,
+      technologist, and investor.
+languages:
+  - name: English
+    note: native
+  - name: French
+    level: B1
+    filled: 2
+    empty: 2
+contact:
+  - icon: At
+    text: elisgoldberg
+    url: "mailto:eli@example.com"
+footer:
+  name: "Eli Goldberg"
+  location: "Boston, USA"
+  email: "eli@example.com"
+```
+
+Features: six color themes via `classoption`, YAML-driven sidebar, `\cvevent{...}` timeline entries with optional logos inside `\begin{cventries}`, `\cvyear{...}` year lists for education/patents/publications, FontAwesome contact bubbles, Raleway typography.
+
+[Source](examples/demo-hipster-cv.md) | [PDF](examples/demo-hipster-cv.pdf)
+
+</td>
+<td width="50%">
+
+![Hipster CV output](media/examples/demo-hipster-cv.png)
+
+</td>
+</tr></table>
+
+---
+
 ### ETH Report
 
 ETH Zürich IVT working paper with title page, abstract, keywords, and suggested-citation block.
@@ -654,7 +753,7 @@ lof: true
 lot: true
 ```
 
-Features: KOMA-Script working-paper title page, report number and date, abstract with keywords, TOC/LOF/LOT front matter, suggested-citation block.
+Features: KOMA-Script working-paper title page, report number and date, abstract with keywords, TOC/LOF/LOT front matter, suggested-citation block. Compiles with XeLaTeX: system fonts via `mainfont`, plus `fontsize` / `geometry` / `linestretch` overrides and hyperlinked citations.
 
 [Source](examples/demo-eth-report.md) | [PDF](examples/demo-eth-report.pdf)
 

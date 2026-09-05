@@ -1982,10 +1982,16 @@ function resolveReferences(
     },
   );
 
-  // Image figure labels: ![cap](src){#fig:label}
+  // Image figure labels: ![cap](src){#fig:label}. The attribute block may
+  // carry more than the identifier (e.g. {#fig:label width=80%} or
+  // {width=80% #fig:label}) — pandoc numbers those figures in the PDF, so
+  // the preview must register them too, not just the bare-label form.
   result = result.replace(
-    /!\[([^\]]*)\]\(([^)]+)\)\{#(fig:[\w:.-]+)\}/g,
-    (_, caption: string, src: string, label: string) => {
+    /!\[([^\]]*)\]\(([^)]+)\)\{([^}]*)\}/g,
+    (full: string, caption: string, src: string, attrs: string) => {
+      const labelMatch = attrs.match(/#(fig:[\w:.-]+)/);
+      if (!labelMatch) return full;
+      const label = labelMatch[1];
       figNum++;
       labels.set(label, `${prefixes.fig}\u00a0${figNum}`);
       return `<a id="${label}"></a>\n\n![${prefixes.fig} ${figNum}: ${caption}](${src})`;

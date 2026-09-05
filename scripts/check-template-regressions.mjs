@@ -19,6 +19,92 @@ const checks = [
     pattern: /\\usepackage\{array\}\s*\n\\usepackage\{longtable\}/,
     message: "rho template must load array before longtable",
   },
+  {
+    file: "templates/hipster-cv/hipster-cv.latex",
+    pattern: /\\usepackage\{array\}\s*\n\\usepackage\{booktabs\}/,
+    message: "hipster-cv template must load array before booktabs",
+  },
+  // eth-report XeLaTeX/fontspec port. Each of these regressed silently in
+  // the pdflatex era: wrong engine broke system fonts, a late fontspec
+  // load defeated the class's @ifpackageloaded guards, an unguarded
+  // Inter fallback failed on machines without the font (CI), and the
+  // natbib citation route rendered labels like "[(1code )]".
+  {
+    file: "templates/eth-report/template.json",
+    pattern: /"engine":\s*"xelatex"/,
+    message: "eth-report manifest must declare xelatex (fontspec wrapper breaks under pdflatex)",
+  },
+  {
+    file: "templates/eth-report/eth-report.latex",
+    pattern: /\\RequirePackage\{fontspec\}[\s\S]*?\\documentclass/,
+    message: "eth-report wrapper must load fontspec before the IVT class so the class guards see it",
+  },
+  {
+    file: "templates/eth-report/eth-report.latex",
+    pattern: /\\IfFontExistsTF\{Inter\}/,
+    message: "eth-report Inter fallback must be guarded with \\IfFontExistsTF (CI runners lack Inter)",
+  },
+  {
+    file: "templates/eth-report/eth-report.latex",
+    pattern: /\\NewDocumentCommand\\citeproc\{mm\}\{\\hyperlink\{cite\.#1\}\{#2\}\}/,
+    message: "eth-report citeproc must hyperlink rendered citation text (natbib route renders garbage labels)",
+  },
+  {
+    file: "templates/eth-report/ivt-style/standard.cls",
+    pattern: /\\@ifpackageloaded\{fontspec\}\{\}\{%\s*\n\s*\\RequirePackage\[utf8\]\{inputenc\}/,
+    message: "IVT class must guard inputenc/fontenc behind @ifpackageloaded{fontspec}",
+  },
+  {
+    file: "templates/eth-report/ivt-style/standard.cls",
+    pattern: /\\@ifpackageloaded\{fontspec\}\{\}\{\\usepackage\[scaled=0\.92\]\{helvet\}\}/,
+    message: "IVT class must guard helvet behind @ifpackageloaded{fontspec}",
+  },
+  // Citation pipeline assets. The bundled numeric CSL must never use
+  // second-field-align: aligned styles make pandoc emit
+  // \CSLLeftMargin/\CSLRightInline parboxes that crash the tufte-latex
+  // wrappers with "Float(s) lost".
+  {
+    file: "csl/inkwell-numeric.csl",
+    pattern: /citation-number/,
+    message: "bundled default CSL must be a numeric style",
+  },
+  {
+    file: "csl/inkwell-numeric.csl",
+    antiPattern: /second-field-align/,
+    message: "bundled default CSL must not use second-field-align (tufte wrappers crash on the parbox output)",
+  },
+  {
+    file: "filters/section-bibliographies.lua",
+    pattern: /pandoc\.utils\.citeproc/,
+    message: "section-bibliographies filter must run citeproc per segment",
+  },
+  {
+    file: "templates/tufte-book-vdqi/tufte-book-vdqi.latex",
+    pattern: /\\def\\@biblabel#1\{\}/,
+    message: "tufte-book wrapper must suppress the empty bibitem label (renders stray [] before numbered entries)",
+  },
+  // The extension and the CI harness must drive the same citation
+  // pipeline: bundled CSL default and the section-scope Lua filter.
+  {
+    file: "src/compiler.ts",
+    pattern: /inkwell-numeric\.csl/,
+    message: "compiler must wire the bundled numeric CSL default",
+  },
+  {
+    file: "src/compiler.ts",
+    pattern: /section-bibliographies\.lua/,
+    message: "compiler must wire the section-bibliographies filter",
+  },
+  {
+    file: "scripts/compile-demo.sh",
+    pattern: /inkwell-numeric\.csl/,
+    message: "compile-demo.sh must mirror the bundled numeric CSL default",
+  },
+  {
+    file: "scripts/compile-demo.sh",
+    pattern: /section-bibliographies\.lua/,
+    message: "compile-demo.sh must mirror the section-scope Lua filter",
+  },
 ];
 
 let failures = 0;
@@ -26,7 +112,11 @@ let failures = 0;
 for (const check of checks) {
   const fullPath = path.join(repoRoot, check.file);
   const content = fs.readFileSync(fullPath, "utf8");
-  if (!check.pattern.test(content)) {
+  if (check.pattern && !check.pattern.test(content)) {
+    failures += 1;
+    console.error(`FAIL: ${check.message} (${check.file})`);
+  }
+  if (check.antiPattern && check.antiPattern.test(content)) {
     failures += 1;
     console.error(`FAIL: ${check.message} (${check.file})`);
   }

@@ -313,6 +313,13 @@ suggestedcitation: ""
 toc: true
 lot: true
 lof: true
+
+# The IVT class defaults to 12pt, its own A4 margins, and one-half
+# spacing. Uncomment to override (see guide.md, ETH Report section):
+# fontsize: 11pt
+# linestretch: 1.08
+# geometry: margin=1in
+# mainfont: "Charter"
 `,
   "kth-letter": `template: kth-letter
 name: "Sender Name"
@@ -327,6 +334,40 @@ recipient:
   - "Country"
 opening: "Dear Dr. Name,"
 closing: "Kind regards,"
+`,
+  "hipster-cv": `template: hipster-cv
+classoption:
+  - lighthipster                     # darkhipster, pastel, allblack, grey, verylight, withoutsidebar
+first-name: "First"
+last-name: "Last"
+tagline: "Job Title"
+# header-contact: "+1 555 010 2030; City, Country"   # optional line under the tagline
+# photo: "headshot.jpeg"             # optional round portrait in the sidebar
+sidebar:
+  - title: "About me"
+    text: |
+      Two or three sentences about who you are and what you do.
+  - title: "Areas of specialization"
+    text: "Skill One • Skill Two • Skill Three"
+languages:
+  - name: English
+    note: native
+  - name: French
+    level: B1
+    filled: 2
+    empty: 2
+contact:
+  - icon: At
+    text: you
+    url: "mailto:you@example.com"
+  - icon: Github
+    text: github
+    url: "https://github.com/you"
+footer:
+  name: "First Last"
+  location: "City, Country"
+  phone: "+1 555 010 2030"
+  email: "you@example.com"
 `,
 };
 

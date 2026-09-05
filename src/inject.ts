@@ -59,6 +59,10 @@ const PANDOC_LANG_MAP: Record<string, string> = {
 
 const INKWELL_VAR_RE = /^::inkwell\s+(\w+)=(.+)$/;
 
+// collectVariables runs on every preview refresh; repeat the non-scalar
+// vars.json warning only when the offending key set changes.
+let lastSkippedVarsWarning = "";
+
 function resolveDisplay(block: CodeBlock, defaultDisplay: DisplayMode): DisplayMode {
   if (block.display) return block.display;
   if (block.file) return "output";
@@ -84,8 +88,29 @@ export function collectVariables(results: BlockResult[]): Map<string, string> {
       try {
         const parsed = JSON.parse(fs.readFileSync(varsJson, "utf-8"));
         if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          // Bindings are a flat scalar contract. Nested objects would
+          // stringify to "[object Object]" and arrays to comma-joined
+          // fragments — both ship silently into the PDF, so refuse them
+          // loudly instead.
+          const skipped: string[] = [];
           for (const [k, v] of Object.entries(parsed)) {
-            vars.set(k, String(v));
+            const t = typeof v;
+            if (v === null || t === "string" || t === "number" || t === "boolean") {
+              vars.set(k, String(v));
+            } else {
+              skipped.push(k);
+            }
+          }
+          if (skipped.length) {
+            const warning = skipped.sort().join(", ");
+            if (warning !== lastSkippedVarsWarning) {
+              lastSkippedVarsWarning = warning;
+              getInkwellOutputChannel().appendLine(
+                `[inkwell] vars.json: skipped non-scalar keys: ${warning}. ` +
+                `Bindings must be strings, numbers, or booleans (objects render as "[object Object]"); ` +
+                `flatten them in the exporting code block.`,
+              );
+            }
           }
         }
       } catch {}
@@ -617,10 +642,17 @@ function normalizeMermaidForPreview(markdown: string): string {
 
 // ── Compilation and preview entry points ──────────────────────────────
 
+/** Unique `{{key}}` placeholders that survived substitution (frontmatter included). */
+export function collectUnresolvedVars(markdown: string): string[] {
+  const out = new Set<string>();
+  for (const m of markdown.matchAll(/\{\{(\w+)\}\}/g)) out.add(m[1]);
+  return [...out];
+}
+
 export function prepareForCompilation(
   markdown: string,
   sourceFile: string,
-): { injected: string; tempFile: string } {
+): { injected: string; tempFile: string; unresolvedVars: string[] } {
   const docDir = path.dirname(sourceFile);
   const projectRoot = getInkwellProjectRoot(sourceFile);
 
@@ -635,7 +667,7 @@ export function prepareForCompilation(
   const hasInlineExprs = /`\{python\}\s+[^`]+`/.test(processed);
 
   if (!hasBlocks && !hasVarRefs && !hasInlineExprs && !hasMermaid) {
-    return { injected: markdown, tempFile: sourceFile };
+    return { injected: markdown, tempFile: sourceFile, unresolvedVars: [] };
   }
 
   const runConfig = parseRunConfig(processed);
@@ -649,11 +681,15 @@ export function prepareForCompilation(
   const cacheDir = getInkwellOutputsDir(sourceFile);
   injected = evaluateInlineExpressions(injected, vars, runConfig, docDir, projectRoot, cacheDir);
 
+  // A leftover {{key}} means a typo or a stale/missing binding; it ships
+  // literally into the PDF, so the compile surfaces it as a warning.
+  const unresolvedVars = collectUnresolvedVars(injected);
+
   const tempFile = getInkwellCompiledPath(sourceFile);
   fs.mkdirSync(path.dirname(tempFile), { recursive: true });
   fs.writeFileSync(tempFile, injected, "utf-8");
 
-  return { injected, tempFile };
+  return { injected, tempFile, unresolvedVars };
 }
 
 export function prepareForPreview(

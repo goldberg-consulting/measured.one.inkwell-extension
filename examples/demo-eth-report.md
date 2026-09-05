@@ -25,6 +25,17 @@ abstract: |
 keywords: "traffic simulation; Fourier analysis; reproducible research"
 suggestedcitation: "Molloy, J. and Author, S. (2026) Signal Decomposition Methods for Urban Traffic Flow Analysis. Working Paper 1042, IVT, ETH Zürich."
 
+# The IVT class hardcodes 12pt and one-half spacing; these frontmatter
+# fields override both (the wrapper applies them after the class loads).
+fontsize: 11pt
+linestretch: 1.15
+
+# Document-level preamble additions compose with Inkwell's generated
+# styling (inkwell: keys below) instead of being replaced by it. The body
+# uses \DemoTerm, so a compile fails loudly if header-includes are dropped.
+header-includes: |
+  \newcommand{\DemoTerm}[1]{\textsc{#1}}
+
 toc: true
 lot: true
 lof: true
@@ -58,7 +69,7 @@ The Fourier partial sum approximating a square wave is given by @eq:fourier:
 
 $$f_n(x) = \sum_{k=1}^{n} \frac{4}{(2k-1)\pi}\sin\bigl((2k-1)x\bigr)$$ {#eq:fourier}
 
-As $n \to \infty$, the partial sums converge pointwise to the square wave at all points of continuity. The overshoot near discontinuities is the Gibbs phenomenon, which persists at approximately 9% of the jump regardless of the number of terms.
+As $n \to \infty$, the partial sums converge pointwise to the square wave at all points of continuity. The overshoot near discontinuities is the \DemoTerm{Gibbs phenomenon}, which persists at approximately 9% of the jump regardless of the number of terms.
 
 # Computational Results {#sec:results}
 

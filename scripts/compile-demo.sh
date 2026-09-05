@@ -155,7 +155,47 @@ PANDOC_ARGS=(
 if [[ -n "$CROSSREF_BIN" ]]; then
   PANDOC_ARGS+=(--filter "$CROSSREF_BIN")
 fi
-PANDOC_ARGS+=(--citeproc)
+
+# Mirror the extension's citation pipeline (src/compiler.ts):
+#   - `bibliography-scope: section` swaps --citeproc for the bundled
+#     per-section Lua filter (never pass both);
+#   - without a frontmatter `csl:`, the bundled numeric style applies,
+#     so citations render as [1,2,3] in CI exactly as in the editor.
+BIB_SCOPE="$(awk '
+  /^---$/ { fm = !fm; next }
+  fm && $1 == "bibliography-scope:" {
+    v = $2
+    gsub(/^[\"\x27]/, "", v)
+    gsub(/[\"\x27]$/, "", v)
+    if (v == "section" || v == "document") print v
+    exit
+  }
+' "$SRC_ABS")"
+if [[ "$BIB_SCOPE" == "section" ]]; then
+  PANDOC_ARGS+=(--lua-filter "$REPO_ROOT/filters/section-bibliographies.lua")
+else
+  PANDOC_ARGS+=(--citeproc)
+fi
+
+CSL_DECLARED="$(awk '
+  /^---$/ { fm = !fm; next }
+  fm && $1 == "csl:" {
+    v = $2
+    gsub(/^[\"\x27]/, "", v)
+    gsub(/[\"\x27]$/, "", v)
+    print v
+    exit
+  }
+' "$SRC_ABS")"
+if [[ -n "$CSL_DECLARED" ]]; then
+  if [[ -f "$REPO_ROOT/$CSL_DECLARED" ]]; then
+    PANDOC_ARGS+=(--csl "$REPO_ROOT/$CSL_DECLARED")
+  elif [[ -f "$SRC_DIR/$CSL_DECLARED" ]]; then
+    PANDOC_ARGS+=(--csl "$SRC_DIR/$CSL_DECLARED")
+  fi
+else
+  PANDOC_ARGS+=(--csl "$REPO_ROOT/csl/inkwell-numeric.csl")
+fi
 
 # Mirror the extension: forward frontmatter `top-level-division:` as a CLI
 # flag (Pandoc ignores it as plain metadata). Needed by book templates so

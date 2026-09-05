@@ -1,0 +1,241 @@
+% Hipster CV template wrapper for Pandoc.
+% Wraps the simplehipstercv class (a mashup of hipstercv, friggeri and
+% twenty-seconds CV) so a resume can be authored in markdown + YAML.
+%
+% Layout: full-width name banner, a shaded sidebar column (photo, about,
+% languages, contact bubbles) driven entirely by YAML frontmatter, and a
+% main column built from the markdown body. Timeline entries use the raw
+% LaTeX helpers \cvevent inside a cventries block; year-indexed lists
+% (education, patents, publications) use \cvyear inside cvyears.
+%
+% Compiles with pdfLaTeX (raleway + fontawesome are Type1 fonts).
+
+\documentclass[$for(classoption)$$classoption$$sep$,$endfor$$if(classoption)$$else$lighthipster$endif$]{simplehipstercv}
+% classoption themes: lighthipster (default), darkhipster, pastel,
+% allblack, grey, verylight, withoutsidebar
+
+\usepackage[utf8]{inputenc}
+\usepackage[default]{raleway}
+\usepackage[$if(geometry)$$for(geometry)$$geometry$$sep$,$endfor$$else$margin=1cm, a4paper$endif$]{geometry}
+\hypersetup{breaklinks=true}
+\Urlmuskip=0mu plus 1mu
+$if(colorlinks)$
+\hypersetup{
+  colorlinks=true,
+  linkcolor=$if(linkcolor)$$linkcolor$$else$headerblue$endif$,
+  citecolor=$if(citecolor)$$citecolor$$else$headerblue$endif$,
+  urlcolor=$if(urlcolor)$$urlcolor$$else$headerblue$endif$,
+  pdfborder={0 0 0},
+}
+$endif$
+
+% ── Column geometry (matches the original template) ─────────────────
+\newlength{\rightcolwidth}
+\newlength{\leftcolwidth}
+\setlength{\leftcolwidth}{0.23\textwidth}
+\setlength{\rightcolwidth}{0.75\textwidth}
+
+% ── CV building blocks ──────────────────────────────────────────────
+% The class's \cvevent requires a logo; make the 6th argument optional
+% so entries without a logo reserve the same gutter and stay aligned.
+% Logos are bounded by height AND width (keepaspectratio) so wide
+% wordmarks fit the logo slot instead of overflowing the column.
+\renewcommand{\cvevent}[6]{{#1} & \textbf{#2}\newline\textsc{#3} $$\cdot$$ {#4 ~\faMapMarker}\newline{\color{black!70}\footnotesize #5}\vspace{1.5em} & \ifthenelse{\equal{#6}{}}{}{\raisebox{-0.7\height}{\includegraphics[height=1cm, width=2.4cm, keepaspectratio]{#6}}}}
+
+% Timeline table: rows of \cvevent{...} \\ share one continuous rule.
+\newenvironment{cventries}{\begin{tabular}{r| p{0.5\textwidth} c}}{\end{tabular}\par\medskip}
+
+% Year-indexed list: \cvyear{2016}{...} rows. Optional argument sets
+% the text-column width as a fraction of \textwidth (default 0.6 --
+% inside paracol, \textwidth is the full page width, so 0.6 fills the
+% main column; larger values overflow it).
+\newenvironment{cvyears}[1][0.6]{\begin{tabular}{>{\footnotesize\bfseries}r >{\footnotesize}p{#1\textwidth}}}{\end{tabular}\par\medskip}
+\newcommand{\cvyear}[2]{#1 & #2 \\}
+
+% ── Pandoc compatibility ─────────────────────────────────────────────
+\providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\makeatletter
+\providecommand\pandocbounded[1]{%
+  \sbox\z@{#1}%
+  \ifdim\wd\z@>\linewidth\resizebox{\linewidth}{!}{#1}\else\usebox\z@\fi
+}
+\makeatother
+
+% Tables. Pandoc emits longtable, which cannot run inside paracol;
+% redirect it to a plain tabular in an [H] float (same trick as the
+% rmxaa template). Load order matters: array before booktabs/longtable.
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{calc}
+\makeatletter
+\@ifundefined{c@none}{\newcounter{none}}{}
+\makeatother
+\makeatletter
+\newcommand{\hipstercv@colspec}{}
+\renewenvironment{longtable}[2][]{%
+  \begin{table}[H]%
+  \centering\small
+  \gdef\hipstercv@colspec{#2}%
+  \let\hipstercv@origtabularnewline\tabularnewline
+  \def\tabularnewline{%
+    \let\tabularnewline\hipstercv@origtabularnewline
+    \expandafter\tabular\expandafter{\hipstercv@colspec}%
+  }%
+}{%
+  \bottomrule
+  \endtabular
+  \end{table}%
+}
+\def\endfirsthead#1\endlastfoot{}
+\def\endhead{}
+\def\endfoot{}
+\def\endlastfoot{}
+\makeatother
+
+% Syntax highlighting (rarely used in a CV, but cheap to support)
+\usepackage{fancyvrb}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\},fontsize=\footnotesize,breaklines}
+\newenvironment{Shaded}{\begin{quote}\footnotesize}{\end{quote}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{0.94,0.16,0.16}{#1}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.77,0.63,0.00}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\BuiltInTok}[1]{#1}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.64,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\ImportTok}[1]{#1}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+
+% Citeproc bibliography support
+\NewDocumentCommand\citeproctext{}{}
+\NewDocumentCommand\citeproc{mm}{%
+  \begingroup\def\citeproctext{#2}\cite{#1}\endgroup}
+\makeatletter
+ \let\@cite@ofmt\@firstofone
+ \def\@biblabel#1{}
+ \def\@cite#1#2{{#1\if@tempswa , #2\fi}}
+\makeatother
+\newlength{\cslhangindent}\setlength{\cslhangindent}{1.5em}
+\newlength{\csllabelwidth}\setlength{\csllabelwidth}{3em}
+\newenvironment{CSLReferences}[2]%
+ {\begin{list}{}{%
+  \setlength{\itemindent}{0pt}%
+  \setlength{\leftmargin}{0pt}%
+  \setlength{\parsep}{0pt}%
+  \ifodd #1
+   \setlength{\leftmargin}{\cslhangindent}%
+   \setlength{\itemindent}{-1\cslhangindent}%
+  \fi
+  \setlength{\itemsep}{#2\baselineskip}}}
+ {\end{list}}
+\newcommand{\CSLBlock}[1]{\hfill\break\parbox[t]{\linewidth}{\strut\ignorespaces#1\strut}}
+\newcommand{\CSLLeftMargin}[1]{\parbox[t]{\csllabelwidth}{\strut#1\strut}}
+\newcommand{\CSLRightInline}[1]{\parbox[t]{\linewidth - \csllabelwidth}{\strut#1\strut}}
+\newcommand{\CSLIndent}[1]{\hspace{\cslhangindent}#1}
+
+$for(header-includes)$
+$header-includes$
+$endfor$
+
+\title{$if(title)$$title$$else$$if(first-name)$$first-name$ $endif$$if(last-name)$$last-name$$endif$$endif$}
+\author{$if(first-name)$$first-name$ $endif$$if(last-name)$$last-name$$endif$}
+\date{}
+\pagestyle{empty}
+
+\begin{document}
+\thispagestyle{empty}
+\section*{Start}
+
+\simpleheader{headercolour}{$if(first-name)$$first-name$$endif$}{$if(last-name)$$last-name$$endif$}{$if(header-contact)$\begin{tabular}{@{}c@{}}$if(tagline)$$tagline$$endif$\\[0.3em]{\footnotesize $header-contact$}\end{tabular}$else$$if(tagline)$$tagline$$endif$$endif$}{white}
+
+% this has to be here so the paracols starts..
+\subsection*{}
+\vspace{4em}
+
+\setlength{\columnsep}{1.5cm}
+\columnratio{0.23}[0.75]
+\begin{paracol}{2}
+\hbadness5000
+\paracolbackgroundoptions
+
+\footnotesize
+{\setasidefontcolour
+\flushright
+$if(photo)$
+\begin{center}
+    {\roundpic{$photo$}}
+\end{center}
+$endif$
+$for(sidebar)$
+$if(sidebar.title)$
+\bg{cvgreen}{white}{$sidebar.title$}\\[0.5em]
+$endif$
+$sidebar.text$
+
+\bigskip
+
+$endfor$
+$if(languages)$
+\bg{cvgreen}{white}{Languages}\\[0.5em]
+
+\begin{tabular}{l | ll}
+$for(languages)$
+\textbf{$languages.name$} & $if(languages.level)$$languages.level$$else$--$endif$ & $if(languages.note)${\phantom{x}\footnotesize $languages.note$}$else$\pictofraction{\faCircle}{cvgreen}{$languages.filled$}{black!30}{$languages.empty$}{\tiny}$endif$ \\
+$endfor$
+\end{tabular}
+
+\bigskip
+$endif$
+
+\vspace{4em}
+
+$for(contact)$
+\infobubble{\csname fa$contact.icon$\endcsname}{cvgreen}{white}{$if(contact.url)$\href{$contact.url$}{$contact.text$}$else$$contact.text$$endif$}
+
+$endfor$
+\phantom{turn the page}
+
+\phantom{turn the page}
+}
+%-----------------------------------------------------------
+\switchcolumn
+
+$body$
+
+$if(footer)$
+\vfill % Whitespace before final footer
+\setlength{\parindent}{0pt}
+\begin{minipage}[t]{\rightcolwidth}
+\begin{center}\fontfamily{\sfdefault}\selectfont \color{black!70}
+{\small $if(footer.name)$$footer.name$$endif$$if(footer.location)$ \icon{\faMapMarker}{cvgreen}{} $footer.location$$endif$$if(footer.phone)$ \icon{\faPhone}{cvgreen}{} $footer.phone$$endif$$if(footer.email)$ \icon{\faAt}{cvgreen}{} \protect\url{$footer.email$}$endif$
+}
+\end{center}
+\end{minipage}
+$endif$
+
+\end{paracol}
+
+\end{document}

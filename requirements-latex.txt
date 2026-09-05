@@ -151,5 +151,21 @@ tabularx
 epstopdf-pkg
 epstopdf
 
+# hipster-cv template dependencies. The simplehipstercv class draws its
+# sidebar, timeline, and info bubbles with TikZ (pgf) and FontAwesome
+# icons, sets the body in Raleway, and lays out the two columns with
+# paracol. smartdiagram and tikz-3dplot are loaded by the class's style
+# file for its bubble-diagram helpers.
+fontawesome
+raleway
+# raleway's .sty defaults to the LY1 font encoding; ly1 provides
+# ly1enc.def, which full TeX Live ships but minimal TinyTeX does not
+# ("Encoding file 'ly1enc.def' not found" at \ProcessOptions).
+ly1
+paracol
+smartdiagram
+tikz-3dplot
+pgf
+
 # document classes
 tufte-latex

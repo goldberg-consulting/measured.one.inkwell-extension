@@ -30,7 +30,7 @@ lot: true                          # list of tables
 Set `template:` to use a journal template. Omit it (or set `template: default`) for the default article layout.
 
 ```yaml
-template: tufte    # or: tufte-book-vdqi, rho, rmxaa, ludus, tmsce, eth-report, kth-letter, default
+template: tufte    # or: tufte-book-vdqi, rho, rmxaa, ludus, tmsce, eth-report, kth-letter, hipster-cv, default
 ```
 
 ### The `inkwell:` styling namespace
@@ -63,6 +63,12 @@ header-includes: |
   \definecolor{accent}{HTML}{2E86AB}
   \usepackage{tikz}
 ```
+
+`header-includes:` composes with the `inkwell:` styling namespace: Inkwell
+merges its generated styling into the template ahead of your block, so your
+commands render after it and win any conflict (for example, your own
+`Highlighting` or `Shaded` redefinition overrides `code-font-size` /
+`code-border`). You do not have to choose between the two mechanisms.
 
 Leave it commented out as a placeholder until needed:
 
@@ -378,6 +384,35 @@ link-citations: true
 
 Inkwell runs `--citeproc` automatically. Place a `## References` heading where you want the bibliography to appear (typically at the end).
 
+The `bibliography:` path (a single file or a list) resolves relative to the document's directory first, then the project root, and is honored even when Inkwell also discovers `.bib` files in the project root, `references/`, or `.inkwell/references/` — all of them are passed to Pandoc together. A declared file that does not exist produces a compile warning instead of silently unresolved citations.
+
+### Citation style
+
+Without a declared style, Inkwell uses its bundled numeric CSL: bracketed, comma-grouped citations — `[@a; @b; @c]` renders as `[1,2,3]` — and a numbered reference list in order of first citation. The PDF and the preview both use it.
+
+To use another style, declare it in frontmatter:
+
+```yaml
+csl: csl/vancouver-brackets.csl   # searched in .inkwell/csl/, csl/, the
+                                  # project root, references/, and the
+                                  # document directory
+```
+
+A `csl:` entry in `defaults.yaml` also overrides the bundled default. A declared `.csl` path that cannot be found produces a compile warning.
+
+### Section-level bibliographies
+
+By default one reference list covers the whole document. For per-section (or per-chapter) reference lists:
+
+```yaml
+bibliography-scope: section   # default: document
+# section-bibs-level: 2       # optional: split at level-2 headings instead
+```
+
+Each top-level section — chapters, in book templates using `top-level-division: chapter` — is processed separately, so its reference list lands at the section's end and citation numbers restart per section. Place a `## References` heading at the end of each citing section to give the list a title, exactly like the document-level convention; sections without citations produce no list. Raw `\part{...}` commands also start a new segment, so a chapter's references stay ahead of the next part page.
+
+Two caveats: the preview still renders one combined bibliography (the PDF is authoritative), and `nocite` entries would repeat in every section, so avoid combining `nocite` with section scope.
+
 ### Syntax
 
 | Syntax | Renders as |
@@ -522,7 +557,45 @@ epigraphs:                      # optional epigraph page before the title
 
 All Tufte Handout margin features work here too: `\marginnote{...}`, Markdown footnotes as numbered sidenotes, `\begin{marginfigure}`, `\begin{fullwidth}`, and `\newthought{...}`.
 
+Books pair well with `bibliography-scope: section` (see [Section-level bibliographies](#section-level-bibliographies)): each chapter that cites sources ends with its own reference list under a chapter-final `## References` heading, as the shipped book demo does.
+
 There is no multi-file chapter assembly yet — draft the book as a single master markdown document so Pandoc sees the whole table of contents, cross-references, and citations in one pass.
+
+### ETH Report (XeLaTeX)
+
+ETH Zürich IVT working paper / report: single-column A4 with a title page, abstract, and the KOMA-Script-based IVT class. Compiles with XeLaTeX, so system OpenType fonts work via `mainfont` / `sansfont` / `monofont`. Without a `mainfont`, the template keeps the historical all-Inter sans-serif look when Inter is installed and falls back to TeX Gyre Heros (then Latin Modern) when it is not.
+
+```yaml
+template: eth-report
+title: "Report Title"
+subtitle: "Optional Subtitle"
+papertype: "Working Paper 1042"   # printed on the title page
+headingstitle: "Short Header"     # page-header variant of the title
+eth-authors:                      # structured author blocks
+  - name: "First Author"
+    department: "IVT"
+    institution: "ETH Zürich"
+    address: "CH-8093 Zurich"
+    email: "author@ethz.ch"
+reportdate: "March 2026"
+reportnumber: "1042"
+abstract: |
+  Abstract text.
+keywords: "keyword one; keyword two"
+suggestedcitation: "Author, F. (2026) Report Title. Working Paper 1042."
+```
+
+The IVT class hardcodes 12 pt, its own A4 margins, and one-half line spacing. Frontmatter overrides all three after the class loads:
+
+```yaml
+fontsize: 11pt          # 10pt for dense protocols, 11pt for reports
+geometry: margin=1in    # scalar or list, passed to \geometry
+linestretch: 1.08       # replaces the class's \onehalfspacing
+mainfont: "Charter"     # optional; any installed OpenType family
+monofont: "Menlo"
+```
+
+Citations render as the citeproc text (numeric with a numeric CSL style, author-date otherwise) hyperlinked to the bibliography entry. The class's natbib is neutralized — do not route citations through raw `\cite`.
 
 ### KTH Letter (pdfLaTeX)
 
@@ -547,6 +620,76 @@ closing: "Kind regards,"
 Additional fields: `location` (office address), `signature-name` (for the signature block), `signature-cols` (number of signature columns for multiple signatories), `cc` (carbon copy), `encl` (enclosures), `classoption` (e.g. `a4paper`, `nofoot`).
 
 The `recipient` field accepts a list; each item becomes a line in the address block. The body of the markdown file becomes the letter content between the salutation and closing. The template supports section headings, tables (`booktabs`/`longtable`), code blocks with syntax highlighting, math (`amsmath`), graphics, and hyperlinks. Use `header-includes` to inject custom preamble commands such as `\date{...}` or `\signature[1]{...}`.
+
+### Hipster CV (pdfLaTeX)
+
+Two-column resume/CV based on the `simplehipstercv` class: a full-width name banner, a shaded sidebar (photo, about blocks, languages with skill dots, contact bubbles), and a main column with timeline entries and company logos. The sidebar comes entirely from YAML frontmatter; the markdown body fills the main column.
+
+```yaml
+template: hipster-cv
+classoption:
+  - lighthipster                     # darkhipster, pastel, allblack, grey, verylight, withoutsidebar
+first-name: "First"
+last-name: "Last"
+tagline: "PhD, MSc"
+header-contact: "+1 555 010 2030; City, Country"   # optional; small line under the tagline in the banner
+photo: "headshot.jpeg"               # optional; round portrait at the top of the sidebar
+sidebar:                             # ordered sidebar blocks; title is optional per block
+  - title: "About me"
+    text: |
+      Two or three sentences about who you are.
+  - text: |
+      A follow-on paragraph without a header.
+  - title: "Areas of specialization"
+    text: "Skill One • Skill Two • Skill Three"
+languages:                           # optional; use note OR filled/empty dots
+  - name: English
+    note: native
+  - name: French
+    level: B1
+    filled: 2                        # colored dots (must be at least 1)
+    empty: 2                         # gray dots (must be at least 1)
+contact:                             # sidebar contact bubbles
+  - icon: At                         # FontAwesome name without the "fa" prefix:
+    text: you                        # At, Github, Linkedin, Phone, Globe, Twitter, ...
+    url: "mailto:you@example.com"
+footer:                              # optional footer line under the main column
+  name: "First Last"
+  location: "City, Country"
+  phone: "+1 555 010 2030"
+  email: "you@example.com"
+```
+
+#### Timeline entries
+
+Write the main column in markdown; `#` headings become the ruled small-caps section titles. CV entries are raw LaTeX blocks that pass straight through Pandoc:
+
+```markdown
+# Experience
+
+\begin{cventries}
+    \cvevent{2023--Present}{Principal}{Measured.One}{USA \color{cvred}}{One or two lines describing the role.}{logo.png} \\
+
+    \cvevent{2021--2023}{VP of Data Science}{Company}{Global \color{cvred}}{Description.}{}
+\end{cventries}
+```
+
+`\cvevent{dates}{role}{organization}{location}{description}{logo}` renders one timeline row; separate rows with `\\`. The logo is a path to an image beside your document — leave the argument empty (`{}`) for no logo. The `\color{cvred}` after the location tints the map-marker icon.
+
+#### Year-indexed lists
+
+For education, patents, publications, or press, use `cvyears` (optional argument sets the text column width as a fraction of the column, default `0.66`):
+
+```markdown
+# Education
+
+\begin{cvyears}
+    \cvyear{2016}{\emph{Ph.D. in Chemistry}, ETH Zurich}
+    \cvyear{2012}{\emph{M.Sc. in Environmental Engineering}, ETH Zurich}
+\end{cvyears}
+```
+
+Escape dollar signs in amounts as `\$` (`supported the company's \$400M acquisition`), both in the body and in sidebar YAML text. Separate short sidebar items with a plain ` • ` — do **not** write `~•~` in YAML or markdown text (Pandoc reads `~...~` as subscript); inside raw LaTeX blocks like `\cvevent{...}` arguments, `~•~` is fine.
 
 ### Rho Academic Article (pdfLaTeX)
 
