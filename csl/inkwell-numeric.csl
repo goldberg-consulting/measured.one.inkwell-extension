@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<style xmlns="http://purl.org/net/xbiblio/csl" class="in-text" version="1.0" demote-non-dropping-particle="sort-only" default-locale="en-US">
+  <!-- Inkwell's default citation style: bracketed numeric citations with a
+       comma-separated group ([1,2,3] — no range collapsing) and a numbered
+       reference list in order of first citation. Documents override it by
+       declaring `csl:` in frontmatter or a csl entry in defaults.yaml. -->
+  <info>
+    <title>Inkwell Numeric (bracketed)</title>
+    <id>https://github.com/goldberg-consulting/measured.one.inkwell-extension/csl/inkwell-numeric</id>
+    <link href="https://github.com/goldberg-consulting/measured.one.inkwell-extension" rel="self"/>
+    <summary>Bracketed numeric citations like [1,2,3] with a numbered bibliography.</summary>
+    <updated>2026-09-04T00:00:00+00:00</updated>
+    <rights license="https://creativecommons.org/publicdomain/zero/1.0/">CC0 Public Domain Dedication</rights>
+  </info>
+  <locale xml:lang="en">
+    <terms>
+      <term name="et-al">et al.</term>
+    </terms>
+  </locale>
+  <citation>
+    <sort>
+      <key variable="citation-number"/>
+    </sort>
+    <layout prefix="[" suffix="]" delimiter=",">
+      <text variable="citation-number"/>
+    </layout>
+  </citation>
+  <!-- Deliberately NOT an aligned-label style: alignment makes pandoc wrap
+       every entry in \CSLLeftMargin/\CSLRightInline parboxes, which the
+       tufte-latex wrappers cannot host (pdfLaTeX dies with "Float(s)
+       lost"). Plain flowed entries render on every bundled template. -->
+  <bibliography et-al-min="7" et-al-use-first="6" entry-spacing="0">
+    <layout>
+      <text variable="citation-number" prefix="[" suffix="] "/>
+      <group delimiter=". " suffix=".">
+        <names variable="author">
+          <name initialize-with=". " delimiter=", " and="text"/>
+          <substitute>
+            <names variable="editor"/>
+            <text variable="title"/>
+          </substitute>
+        </names>
+        <text variable="title"/>
+        <group delimiter=", ">
+          <text variable="container-title" font-style="italic"/>
+          <text variable="collection-title"/>
+          <text variable="publisher"/>
+          <group delimiter=" ">
+            <text variable="volume" font-weight="bold"/>
+            <text variable="page" prefix="pp. "/>
+          </group>
+          <date variable="issued">
+            <date-part name="year"/>
+          </date>
+        </group>
+        <text variable="DOI" prefix="doi:"/>
+      </group>
+    </layout>
+  </bibliography>
+</style>

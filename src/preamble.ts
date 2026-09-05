@@ -1,8 +1,17 @@
 // Dynamic LaTeX preamble generator. Reads inkwell style options from
 // YAML frontmatter (code-bg, tables, hanging-indent, etc.) and emits
 // the corresponding LaTeX packages and environment redefinitions.
-// The generated preamble is written to the compile cache and passed
-// to Pandoc via -H so it precedes the document body.
+//
+// The generated preamble is merged into the *template copy* in the
+// compile cache (injectPreambleIntoTemplate), not passed via -H:
+// pandoc treats -H files as the `header-includes` template variable,
+// which silently REPLACES the document's own `header-includes`
+// metadata. A document could then compile cleanly while losing its
+// font, spacing, table, and citation commands. Injecting into the
+// template keeps the document's header-includes as the only writer of
+// that variable, and places them after the generated block so document
+// commands override Inkwell styles. writePreambleFile remains as the
+// -H fallback for templates without a recognizable injection point.
 
 import * as fs from "fs";
 import * as path from "path";
@@ -19,7 +28,6 @@ export interface InkwellStyle {
   "hanging-indent"?: boolean;
   columns?: number;
   "caption-style"?: "above" | "below";
-  "header-includes"?: string[];
 }
 
 export function parseInkwellStyle(text: string): InkwellStyle {
@@ -135,7 +143,10 @@ export function generatePreamble(style: InkwellStyle): string {
     if (style["code-font-size"]) {
       const size = style["code-font-size"];
       if (VALID_LATEX_FONT_SIZES.includes(size)) {
-        lines.push(`\\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\\\\{\\},fontsize=\\${size}}`);
+        // breaklines/breakanywhere must be restated: this redefinition
+        // replaces the template's own Highlighting environment, and
+        // dropping them silently re-enables overfull code lines.
+        lines.push(`\\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\\\\{\\},breaklines,breakanywhere,fontsize=\\${size}}`);
       }
     }
   }
@@ -188,13 +199,54 @@ export function generatePreamble(style: InkwellStyle): string {
   return lines.join("\n");
 }
 
+/** The generated preamble for a document, or "" when no style keys are set. */
+export function generatePreambleText(text: string): string {
+  const style = parseInkwellStyle(text);
+  const preamble = generatePreamble(style);
+  return preamble.trim() ? preamble : "";
+}
+
+const GENERATED_PREAMBLE_BEGIN = "% --- Inkwell generated preamble (from frontmatter inkwell: options) ---";
+const GENERATED_PREAMBLE_END = "% --- end Inkwell generated preamble ---";
+
+/**
+ * Merge the generated preamble into a Pandoc template's text, immediately
+ * before the template's `$for(header-includes)$` loop (falling back to a
+ * bare `$header-includes$` variable, then to `\begin{document}`). The
+ * document's own header-includes therefore stay in the output AND render
+ * after the generated block, so document commands win.
+ *
+ * Returns `injected: false` when the template has no recognizable
+ * injection point; the caller should fall back to -H.
+ */
+export function injectPreambleIntoTemplate(
+  templateText: string,
+  preamble: string
+): { text: string; injected: boolean } {
+  const block = `${GENERATED_PREAMBLE_BEGIN}\n${preamble}\n${GENERATED_PREAMBLE_END}\n`;
+
+  const markers = [
+    /^\$for\(header-includes\)\$/m,
+    /^\$header-includes\$/m,
+    /^\\begin\{document\}/m,
+  ];
+  for (const marker of markers) {
+    const m = templateText.match(marker);
+    if (m && m.index !== undefined) {
+      const text =
+        templateText.slice(0, m.index) + block + templateText.slice(m.index);
+      return { text, injected: true };
+    }
+  }
+  return { text: templateText, injected: false };
+}
+
 export function writePreambleFile(
   text: string,
   cacheDir: string
 ): string | undefined {
-  const style = parseInkwellStyle(text);
-  const preamble = generatePreamble(style);
-  if (!preamble.trim()) return undefined;
+  const preamble = generatePreambleText(text);
+  if (!preamble) return undefined;
 
   const file = path.join(cacheDir, "inkwell-preamble.tex");
   fs.writeFileSync(file, preamble, "utf-8");

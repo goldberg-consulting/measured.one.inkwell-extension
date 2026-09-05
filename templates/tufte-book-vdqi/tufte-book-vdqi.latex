@@ -165,6 +165,12 @@
   \ifdim\wd\z@>\linewidth\resizebox{\linewidth}{!}{#1}\else\usebox\z@\fi
 }
 \makeatother
+% Suppress the default [\citeproctext] bibitem label: \citeproctext is
+% empty at the reference list, so \@biblabel would print a bare "[]"
+% before every numbered entry. (Same guard as the tufte handout wrapper.)
+\makeatletter
+\def\@biblabel#1{}
+\makeatother
 \providecommand{\citeproctext}{}
 \providecommand{\citeproc}[2]{#2}
 \providecommand{\cite}[1]{[#1]}
