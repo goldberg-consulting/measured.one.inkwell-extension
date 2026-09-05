@@ -30,6 +30,10 @@ epigraphs:
 # --- Bibliography ---
 bibliography: .inkwell/references/refs.bib
 link-citations: true
+# Per-chapter reference lists: each top-level chapter that cites sources
+# ends with its own bibliography under its "## References" heading.
+# Remove this line (or set "document") for one list at the end of the book.
+bibliography-scope: section
 
 # --- Cross-reference prefixes ---
 figPrefix: "Figure"
@@ -92,6 +96,8 @@ more horizontal space. Use them sparingly; the extra width is most effective
 when it lets a table, figure, or short aside breathe.
 
 \end{fullwidth}
+
+## References
 
 # Chapter Structure from Markdown {#sec:chapters}
 
@@ -164,9 +170,13 @@ Pandoc citeproc keeps bibliography handling consistent across templates. A
 book chapter can cite software, articles, reports, or books using the same
 `[@key]` syntax used by shorter Inkwell documents [@macfarlane2023].
 
-The generated references appear wherever the bibliography heading is placed in
-the Markdown source. In this demo the references heading sits at the end of the
-book, after the final chapter.
+This book sets `bibliography-scope: section` in its frontmatter, so every
+chapter that cites sources carries its own reference list under the
+`## References` heading at the chapter's end, with citation numbers that
+restart per chapter. Omit the key (or set `document`) for the default: one
+combined bibliography wherever the final references heading is placed.
+
+## References
 
 # Full-Width Displays {#sec:fullwidth-displays}
 
@@ -265,5 +275,3 @@ chapters:
 That feature is not required for the template to work, but it would make larger
 books easier to maintain. Until then, the single master document is the working
 model.
-
-## References
