@@ -51,8 +51,11 @@
 % sets margins, borders and offset
 \RequirePackage[a4paper,left=1.0in,right=1.0in,top=0.5in,bottom=0.5in,includeheadfoot]{geometry}
 % fontenc: output font, inputenc:provides umlaute for german, input font
-\RequirePackage[utf8]{inputenc}
-\RequirePackage[T1]{fontenc}
+% (legacy 8-bit engines only: both conflict with fontspec under XeLaTeX)
+\@ifpackageloaded{fontspec}{}{%
+  \RequirePackage[utf8]{inputenc}%
+  \RequirePackage[T1]{fontenc}%
+}
 % provides if-then-else-function
 \RequirePackage{ifthen}
 % language package babel
@@ -95,7 +98,7 @@
 \DeclareCaptionFormat{myformat}{#1#2#3\hrulefill}
 \captionsetup{format=myformat}
 
-\usepackage[scaled=0.92]{helvet}
+\@ifpackageloaded{fontspec}{}{\usepackage[scaled=0.92]{helvet}}
 %\usepackage{sfmath}
 
 \DeclareTranslationFallback{source}{Source}

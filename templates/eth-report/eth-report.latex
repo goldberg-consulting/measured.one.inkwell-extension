@@ -1,8 +1,54 @@
+% Load fontspec before the class so the class's \@ifpackageloaded{fontspec}
+% guards skip inputenc/fontenc/helvet (they conflict with the XeLaTeX path).
+\RequirePackage{fontspec}
 \documentclass[$for(classoption)$$classoption$$sep$,$endfor$$if(classoption)$$else$numbered$endif$]{ivt-style/standard}
+
+% The ivt-style class hardcodes 12pt in its \LoadClass and its own geometry
+% call, so both have to be reset after the class loads rather than passed as
+% class options.
+$if(fontsize)$\KOMAoptions{fontsize=$fontsize$}$endif$
+$if(geometry)$\geometry{$for(geometry)$$geometry$$sep$,$endfor$}$endif$
 
 \RequirePackage[capitalize]{cleveref}
 \RequirePackage{booktabs}
 \providecommand{\ivthline}{}
+
+$if(mainfont)$
+\setmainfont{$mainfont$}$if(mainfontoptions)$[$for(mainfontoptions)$$mainfontoptions$$sep$,$endfor$]$endif$
+$else$
+% No mainfont given: keep the historical all-Inter, sans-body ETH look.
+% Fall back to TeX Gyre Heros (the closest TeX-distributed match for the
+% class's pdfLaTeX-era helvet choice) when Inter is not installed, and to
+% the Latin Modern defaults when neither font is present (e.g. CI).
+\IfFontExistsTF{Inter}{%
+  \setmainfont{Inter}[
+    UprightFont=*-Regular,
+    BoldFont=*-Bold,
+    ItalicFont=*-Italic,
+    BoldItalicFont=*-BoldItalic
+  ]%
+  \setsansfont{Inter}[
+    UprightFont=*-Regular,
+    BoldFont=*-Bold,
+    ItalicFont=*-Italic,
+    BoldItalicFont=*-BoldItalic
+  ]%
+}{%
+  \IfFontExistsTF{TeX Gyre Heros}{%
+    \setmainfont{TeX Gyre Heros}%
+    \setsansfont{TeX Gyre Heros}%
+  }{}%
+}
+\renewcommand{\familydefault}{\sfdefault}
+$endif$
+$if(sansfont)$
+\setsansfont{$sansfont$}$if(sansfontoptions)$[$for(sansfontoptions)$$sansfontoptions$$sep$,$endfor$]$endif$
+$endif$
+$if(monofont)$
+\setmonofont{$monofont$}$if(monofontoptions)$[$for(monofontoptions)$$monofontoptions$$sep$,$endfor$]$endif$
+$endif$
+% The class calls \onehalfspacing; let the document pick its own density.
+$if(linestretch)$\setstretch{$linestretch$}$endif$
 
 % Neutralize natbib — Pandoc citeproc handles citations and bibliography
 \renewcommand{\mybibstyle}{}
@@ -101,8 +147,12 @@ $if(suggestedcitation)$\suggestedCitation{$suggestedcitation$}$endif$
 \makeatother
 \setkeys{Gin}{width=\maxwidth,keepaspectratio}
 \NewDocumentCommand\citeproctext{}{}
-\NewDocumentCommand\citeproc{mm}{%
-  \begingroup\def\citeproctext{#2}\cite{#1}\endgroup}
+% The IVT class loads natbib, and routing citeproc through natbib's \cite
+% renders the structured \bibitem[\citeproctext] labels as strings like
+% "[(1code )]" without any LaTeX error. Print the already-rendered citation
+% text and hyperlink it to the bibliography anchor instead (hyperref is
+% loaded by the class).
+\NewDocumentCommand\citeproc{mm}{\hyperlink{cite.#1}{#2}}
 \makeatletter
  \let\@cite@ofmt\@firstofone
  \def\@biblabel#1{}
