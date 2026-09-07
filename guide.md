@@ -77,7 +77,7 @@ inkwell:
   code-border: true          # thin border around code blocks
   code-rounded: true         # rounded corners on code blocks
   code-font-size: small      # tiny, scriptsize, footnotesize, small, normalsize
-  tables: booktabs            # booktabs, grid, plain
+  tables: booktabs            # booktabs, grid, plain, zebra, compact
   table-font-size: small
   table-stripe: true
   hanging-indent: true        # hanging indent for bibliography entries
@@ -86,6 +86,10 @@ inkwell:
   code-display: output        # default display mode for code blocks
   python-env: ./venv          # Python virtual environment path
 ```
+
+For the full table model, per-table overrides, literal CSV/JSON cells, and
+template capability limits, see [Body tables](docs/tables.md). Canonical
+`tables: {...}` settings and legacy flat keys use the same preview/PDF model.
 
 ### Custom LaTeX in the preamble
 

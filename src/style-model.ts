@@ -29,7 +29,7 @@ export function normalizeFontFamily(value: unknown): string | undefined {
 export function normalizeHeadingWeight(value: unknown): "normal" | "bold" | undefined {
   return value === "normal" || value === 400 || value === "400" ? "normal" : value === "bold" || value === 700 || value === "700" ? "bold" : undefined;
 }
-const colors: Record<string, string> = {
+export const TYPOGRAPHY_COLORS: Readonly<Record<string, string>> = {
   black: "000000", white: "ffffff", red: "ff0000", green: "008000", blue: "0000ff", navy: "000080", gray: "808080", grey: "808080",
   silver: "c0c0c0", maroon: "800000", purple: "800080", teal: "008080", olive: "808000", yellow: "ffff00", orange: "ffa500",
   fuchsia: "ff00ff", magenta: "ff00ff", aqua: "00ffff", cyan: "00ffff", lime: "00ff00", royalblue: "4169e1", darkblue: "00008b",
@@ -37,7 +37,7 @@ const colors: Record<string, string> = {
 export function normalizeTypographyColor(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const raw = value.trim().toLowerCase();
-  if (Object.hasOwn(colors, raw)) return `#${colors[raw]}`;
+  if (Object.hasOwn(TYPOGRAPHY_COLORS, raw)) return `#${TYPOGRAPHY_COLORS[raw]}`;
   if (/^#[a-f0-9]{6}$/.test(raw)) return raw;
   if (/^#[a-f0-9]{3}$/.test(raw)) return `#${[...raw.slice(1)].map(c => c + c).join("")}`;
   const rgb = raw.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/);

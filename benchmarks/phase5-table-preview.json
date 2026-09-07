@@ -1,0 +1,121 @@
+{
+  "phase": 5,
+  "kind": "Chrome computed layout",
+  "measurements": [
+    {
+      "preset": "booktabs",
+      "fontSize": 11.9552,
+      "lineHeight": 14.3462,
+      "padding": 3.98506,
+      "border": 0,
+      "outerBorder": 1,
+      "headerColor": "rgb(221, 238, 255)",
+      "headerWeight": "700",
+      "stripe": "rgba(0, 0, 0, 0)",
+      "captionBelow": false,
+      "align": [
+        "left",
+        "right"
+      ],
+      "literal": "TableMarker\nSecondLineMarker | \"quotes\", commas",
+      "whiteSpace": "pre-wrap",
+      "wrapperWidth": 520,
+      "tableWidth": 520,
+      "overflow": "auto",
+      "tabindex": "0",
+      "scrollWidth": 520
+    },
+    {
+      "preset": "grid",
+      "fontSize": 11.9552,
+      "lineHeight": 14.3462,
+      "padding": 3.98506,
+      "border": 1,
+      "outerBorder": 1,
+      "headerColor": "rgb(221, 238, 255)",
+      "headerWeight": "700",
+      "stripe": "rgba(0, 0, 0, 0)",
+      "captionBelow": false,
+      "align": [
+        "left",
+        "right"
+      ],
+      "literal": "TableMarker\nSecondLineMarker | \"quotes\", commas",
+      "whiteSpace": "pre-wrap",
+      "wrapperWidth": 520,
+      "tableWidth": 520,
+      "overflow": "auto",
+      "tabindex": "0",
+      "scrollWidth": 520
+    },
+    {
+      "preset": "plain",
+      "fontSize": 11.9552,
+      "lineHeight": 14.3462,
+      "padding": 3.98506,
+      "border": 0,
+      "outerBorder": 0,
+      "headerColor": "rgb(221, 238, 255)",
+      "headerWeight": "700",
+      "stripe": "rgba(0, 0, 0, 0)",
+      "captionBelow": true,
+      "align": [
+        "left",
+        "right"
+      ],
+      "literal": "TableMarker\nSecondLineMarker | \"quotes\", commas",
+      "whiteSpace": "pre-wrap",
+      "wrapperWidth": 520,
+      "tableWidth": 520,
+      "overflow": "auto",
+      "tabindex": "0",
+      "scrollWidth": 520
+    },
+    {
+      "preset": "zebra",
+      "fontSize": 11.9552,
+      "lineHeight": 14.3462,
+      "padding": 3.98506,
+      "border": 0,
+      "outerBorder": 1,
+      "headerColor": "rgb(221, 238, 255)",
+      "headerWeight": "700",
+      "stripe": "rgb(245, 245, 250)",
+      "captionBelow": true,
+      "align": [
+        "left",
+        "right"
+      ],
+      "literal": "TableMarker\nSecondLineMarker | \"quotes\", commas",
+      "whiteSpace": "pre-wrap",
+      "wrapperWidth": 520,
+      "tableWidth": 520,
+      "overflow": "auto",
+      "tabindex": "0",
+      "scrollWidth": 520
+    },
+    {
+      "preset": "compact",
+      "fontSize": 11.9552,
+      "lineHeight": 14.3462,
+      "padding": 1.99253,
+      "border": 0,
+      "outerBorder": 1,
+      "headerColor": "rgb(221, 238, 255)",
+      "headerWeight": "700",
+      "stripe": "rgba(0, 0, 0, 0)",
+      "captionBelow": false,
+      "align": [
+        "left",
+        "right"
+      ],
+      "literal": "TableMarker\nSecondLineMarker | \"quotes\", commas",
+      "whiteSpace": "pre-wrap",
+      "wrapperWidth": 520,
+      "tableWidth": 520,
+      "overflow": "auto",
+      "tabindex": "0",
+      "scrollWidth": 520
+    }
+  ]
+}

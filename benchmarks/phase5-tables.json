@@ -1,0 +1,967 @@
+{
+  "phase": 5,
+  "kind": "phase5-tables",
+  "environment": "macOS arm64; Pandoc 3.9; installed TinyTeX",
+  "measurements": [
+    {
+      "template": "default",
+      "preset": "booktabs",
+      "style": {
+        "preset": "booktabs",
+        "stripe": false,
+        "density": "normal",
+        "fontSizePt": 9,
+        "headerWeight": "bold",
+        "headerBackground": "#ddeeff",
+        "stripeColor": "#f5f5fa",
+        "ruleColor": "#336699",
+        "ruleThicknessPt": 0.8,
+        "paddingHorizontalPt": 6,
+        "paddingVerticalPt": 3,
+        "alignment": [],
+        "numericAlignment": "right",
+        "width": "auto",
+        "overflow": "wrap",
+        "captionPosition": "above",
+        "captionStyle": "normal"
+      },
+      "measured": {
+        "cell": {
+          "size": 8.966400146484375,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMRoman9-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "TableMarker",
+          "origin": [
+            77.64599609375,
+            162.26998901367188
+          ],
+          "bbox": [
+            77.64599609375,
+            155.04307556152344,
+            128.88002014160156,
+            164.0094757080078
+          ],
+          "page": 3
+        },
+        "nextLine": {
+          "size": 8.966400146484375,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMRoman9-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "SecondLineMarker",
+          "origin": [
+            77.97799682617188,
+            173.02999877929688
+          ],
+          "bbox": [
+            77.97799682617188,
+            165.80308532714844,
+            152.64122009277344,
+            174.7694854736328
+          ],
+          "page": 3
+        },
+        "caption": {
+          "size": 10.909099578857422,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMRoman10-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "CaptionMarker",
+          "origin": [
+            291.21795654296875,
+            104.68199920654297
+          ],
+          "bbox": [
+            291.21795654296875,
+            95.88926696777344,
+            363.7306823730469,
+            106.7983627319336
+          ],
+          "page": 3
+        },
+        "ruleCount": 3,
+        "verticalRules": false
+      }
+    },
+    {
+      "template": "default",
+      "preset": "grid",
+      "style": {
+        "preset": "grid",
+        "stripe": false,
+        "density": "normal",
+        "fontSizePt": 9,
+        "headerWeight": "bold",
+        "headerBackground": "#ddeeff",
+        "stripeColor": "#f5f5fa",
+        "ruleColor": "#336699",
+        "ruleThicknessPt": 0.5,
+        "paddingHorizontalPt": 6,
+        "paddingVerticalPt": 3,
+        "alignment": [],
+        "numericAlignment": "right",
+        "width": "auto",
+        "overflow": "wrap",
+        "captionPosition": "above",
+        "captionStyle": "normal"
+      },
+      "measured": {
+        "cell": {
+          "size": 8.966400146484375,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMRoman9-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "TableMarker",
+          "origin": [
+            78.14399719238281,
+            153.6790008544922
+          ],
+          "bbox": [
+            78.14399719238281,
+            146.45208740234375,
+            129.38697814941406,
+            155.41848754882812
+          ],
+          "page": 3
+        },
+        "nextLine": {
+          "size": 8.966400146484375,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMRoman9-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "SecondLineMarker",
+          "origin": [
+            78.47599792480469,
+            164.43899536132812
+          ],
+          "bbox": [
+            78.47599792480469,
+            157.2120819091797,
+            153.13922119140625,
+            166.17848205566406
+          ],
+          "page": 3
+        },
+        "caption": {
+          "size": 10.909099578857422,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMRoman10-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "CaptionMarker",
+          "origin": [
+            291.21795654296875,
+            104.68199920654297
+          ],
+          "bbox": [
+            291.21795654296875,
+            95.88926696777344,
+            363.7306823730469,
+            106.7983627319336
+          ],
+          "page": 3
+        },
+        "ruleCount": 17,
+        "verticalRules": true
+      }
+    },
+    {
+      "template": "default",
+      "preset": "plain",
+      "style": {
+        "preset": "plain",
+        "stripe": false,
+        "density": "normal",
+        "fontSizePt": 9,
+        "headerWeight": "bold",
+        "headerBackground": "#ddeeff",
+        "stripeColor": "#f5f5fa",
+        "ruleColor": "#336699",
+        "ruleThicknessPt": 0,
+        "paddingHorizontalPt": 6,
+        "paddingVerticalPt": 3,
+        "alignment": [],
+        "numericAlignment": "right",
+        "width": "auto",
+        "overflow": "wrap",
+        "captionPosition": "below",
+        "captionStyle": "italic"
+      },
+      "measured": {
+        "cell": {
+          "size": 8.966400146484375,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMRoman9-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "TableMarker",
+          "origin": [
+            77.64599609375,
+            131.12399291992188
+          ],
+          "bbox": [
+            77.64599609375,
+            123.8970718383789,
+            128.8800048828125,
+            132.8634796142578
+          ],
+          "page": 3
+        },
+        "nextLine": {
+          "size": 8.966400146484375,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMRoman9-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "SecondLineMarker",
+          "origin": [
+            77.97799682617188,
+            141.88400268554688
+          ],
+          "bbox": [
+            77.97799682617188,
+            134.65708923339844,
+            152.64120483398438,
+            143.6234893798828
+          ],
+          "page": 3
+        },
+        "caption": {
+          "size": 10.909099578857422,
+          "flags": 6,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMRoman10-Italic",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "CaptionMarker",
+          "origin": [
+            289.4460144042969,
+            194.38299560546875
+          ],
+          "bbox": [
+            289.4460144042969,
+            185.5902557373047,
+            361.68609619140625,
+            196.49935913085938
+          ],
+          "page": 3
+        },
+        "ruleCount": 0,
+        "verticalRules": false
+      }
+    },
+    {
+      "template": "default",
+      "preset": "zebra",
+      "style": {
+        "preset": "zebra",
+        "stripe": true,
+        "density": "normal",
+        "fontSizePt": 9,
+        "headerWeight": "bold",
+        "headerBackground": "#ddeeff",
+        "stripeColor": "#f5f5fa",
+        "ruleColor": "#336699",
+        "ruleThicknessPt": 0.8,
+        "paddingHorizontalPt": 6,
+        "paddingVerticalPt": 3,
+        "alignment": [],
+        "numericAlignment": "right",
+        "width": "auto",
+        "overflow": "wrap",
+        "captionPosition": "below",
+        "captionStyle": "italic"
+      },
+      "measured": {
+        "cell": {
+          "size": 8.966400146484375,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMRoman9-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "TableMarker",
+          "origin": [
+            77.64599609375,
+            140.71099853515625
+          ],
+          "bbox": [
+            77.64599609375,
+            133.4840850830078,
+            128.88002014160156,
+            142.4504852294922
+          ],
+          "page": 3
+        },
+        "nextLine": {
+          "size": 8.966400146484375,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMRoman9-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "SecondLineMarker",
+          "origin": [
+            77.97799682617188,
+            151.47100830078125
+          ],
+          "bbox": [
+            77.97799682617188,
+            144.2440948486328,
+            152.64122009277344,
+            153.2104949951172
+          ],
+          "page": 3
+        },
+        "caption": {
+          "size": 10.909099578857422,
+          "flags": 6,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMRoman10-Italic",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "CaptionMarker",
+          "origin": [
+            289.4460144042969,
+            206.64700317382812
+          ],
+          "bbox": [
+            289.4460144042969,
+            197.85426330566406,
+            361.68609619140625,
+            208.76336669921875
+          ],
+          "page": 3
+        },
+        "ruleCount": 3,
+        "verticalRules": false
+      }
+    },
+    {
+      "template": "default",
+      "preset": "compact",
+      "style": {
+        "preset": "compact",
+        "stripe": false,
+        "density": "compact",
+        "fontSizePt": 9,
+        "headerWeight": "bold",
+        "headerBackground": "#ddeeff",
+        "stripeColor": "#f5f5fa",
+        "ruleColor": "#336699",
+        "ruleThicknessPt": 0.5,
+        "paddingHorizontalPt": 3,
+        "paddingVerticalPt": 1.5,
+        "alignment": [],
+        "numericAlignment": "right",
+        "width": "auto",
+        "overflow": "wrap",
+        "captionPosition": "above",
+        "captionStyle": "normal"
+      },
+      "measured": {
+        "cell": {
+          "size": 8.966400146484375,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMRoman9-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "TableMarker",
+          "origin": [
+            74.65699768066406,
+            157.18899536132812
+          ],
+          "bbox": [
+            74.65699768066406,
+            149.9620819091797,
+            125.89997863769531,
+            158.92848205566406
+          ],
+          "page": 3
+        },
+        "nextLine": {
+          "size": 8.966400146484375,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMRoman9-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "SecondLineMarker",
+          "origin": [
+            74.98899841308594,
+            167.94900512695312
+          ],
+          "bbox": [
+            74.98899841308594,
+            160.7220916748047,
+            149.6522216796875,
+            169.68849182128906
+          ],
+          "page": 3
+        },
+        "caption": {
+          "size": 10.909099578857422,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMRoman10-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "CaptionMarker",
+          "origin": [
+            291.21795654296875,
+            104.68199920654297
+          ],
+          "bbox": [
+            291.21795654296875,
+            95.88926696777344,
+            363.7306823730469,
+            106.7983627319336
+          ],
+          "page": 3
+        },
+        "ruleCount": 3,
+        "verticalRules": false
+      }
+    },
+    {
+      "template": "eth-report",
+      "preset": "booktabs",
+      "style": {
+        "preset": "booktabs",
+        "stripe": false,
+        "density": "normal",
+        "fontSizePt": 9,
+        "headerWeight": "bold",
+        "headerBackground": "#ddeeff",
+        "stripeColor": "#f5f5fa",
+        "ruleColor": "#336699",
+        "ruleThicknessPt": 0.8,
+        "paddingHorizontalPt": 6,
+        "paddingVerticalPt": 3,
+        "alignment": [],
+        "numericAlignment": "right",
+        "width": "auto",
+        "overflow": "wrap",
+        "captionPosition": "above",
+        "captionStyle": "normal"
+      },
+      "measured": {
+        "cell": {
+          "size": 8.966400146484375,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMSans9-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "TableMarker",
+          "origin": [
+            77.66400146484375,
+            200.88499450683594
+          ],
+          "bbox": [
+            77.66400146484375,
+            193.6580810546875,
+            125.52664947509766,
+            202.62448120117188
+          ],
+          "page": 2
+        },
+        "nextLine": {
+          "size": 8.966400146484375,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMSans9-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "SecondLineMarker",
+          "origin": [
+            77.97799682617188,
+            211.64498901367188
+          ],
+          "bbox": [
+            77.97799682617188,
+            204.41807556152344,
+            148.3552703857422,
+            213.3844757080078
+          ],
+          "page": 2
+        },
+        "caption": {
+          "size": 10.909099578857422,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMSans10-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "CaptionMarker",
+          "origin": [
+            112.61500549316406,
+            133.00100708007812
+          ],
+          "bbox": [
+            112.61500549316406,
+            124.2082748413086,
+            179.93505859375,
+            135.11737060546875
+          ],
+          "page": 2
+        },
+        "ruleCount": 3,
+        "verticalRules": false
+      }
+    },
+    {
+      "template": "eth-report",
+      "preset": "grid",
+      "style": {
+        "preset": "grid",
+        "stripe": false,
+        "density": "normal",
+        "fontSizePt": 9,
+        "headerWeight": "bold",
+        "headerBackground": "#ddeeff",
+        "stripeColor": "#f5f5fa",
+        "ruleColor": "#336699",
+        "ruleThicknessPt": 0.5,
+        "paddingHorizontalPt": 6,
+        "paddingVerticalPt": 3,
+        "alignment": [],
+        "numericAlignment": "right",
+        "width": "auto",
+        "overflow": "wrap",
+        "captionPosition": "above",
+        "captionStyle": "normal"
+      },
+      "measured": {
+        "cell": {
+          "size": 8.966400146484375,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMSans9-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "TableMarker",
+          "origin": [
+            78.16200256347656,
+            191.5279998779297
+          ],
+          "bbox": [
+            78.16200256347656,
+            184.30108642578125,
+            126.02465057373047,
+            193.26748657226562
+          ],
+          "page": 2
+        },
+        "nextLine": {
+          "size": 8.966400146484375,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMSans9-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "SecondLineMarker",
+          "origin": [
+            78.47599792480469,
+            202.28700256347656
+          ],
+          "bbox": [
+            78.47599792480469,
+            195.06008911132812,
+            148.853271484375,
+            204.0264892578125
+          ],
+          "page": 2
+        },
+        "caption": {
+          "size": 10.909099578857422,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMSans10-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "CaptionMarker",
+          "origin": [
+            112.61500549316406,
+            133.00100708007812
+          ],
+          "bbox": [
+            112.61500549316406,
+            124.2082748413086,
+            179.93505859375,
+            135.11737060546875
+          ],
+          "page": 2
+        },
+        "ruleCount": 17,
+        "verticalRules": true
+      }
+    },
+    {
+      "template": "eth-report",
+      "preset": "plain",
+      "style": {
+        "preset": "plain",
+        "stripe": false,
+        "density": "normal",
+        "fontSizePt": 9,
+        "headerWeight": "bold",
+        "headerBackground": "#ddeeff",
+        "stripeColor": "#f5f5fa",
+        "ruleColor": "#336699",
+        "ruleThicknessPt": 0,
+        "paddingHorizontalPt": 6,
+        "paddingVerticalPt": 3,
+        "alignment": [],
+        "numericAlignment": "right",
+        "width": "auto",
+        "overflow": "wrap",
+        "captionPosition": "below",
+        "captionStyle": "italic"
+      },
+      "measured": {
+        "cell": {
+          "size": 8.966400146484375,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMSans9-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "TableMarker",
+          "origin": [
+            77.66400146484375,
+            159.48800659179688
+          ],
+          "bbox": [
+            77.66400146484375,
+            152.26109313964844,
+            125.52664947509766,
+            161.2274932861328
+          ],
+          "page": 2
+        },
+        "nextLine": {
+          "size": 8.966400146484375,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMSans9-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "SecondLineMarker",
+          "origin": [
+            77.9780044555664,
+            170.2480010986328
+          ],
+          "bbox": [
+            77.9780044555664,
+            163.02108764648438,
+            148.3552703857422,
+            171.98748779296875
+          ],
+          "page": 2
+        },
+        "caption": {
+          "size": 10.909099578857422,
+          "flags": 6,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMSans10-Oblique",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "CaptionMarker",
+          "origin": [
+            111.07699584960938,
+            212.78399658203125
+          ],
+          "bbox": [
+            111.07699584960938,
+            203.9912567138672,
+            178.3970489501953,
+            214.90036010742188
+          ],
+          "page": 2
+        },
+        "ruleCount": 0,
+        "verticalRules": false
+      }
+    },
+    {
+      "template": "eth-report",
+      "preset": "zebra",
+      "style": {
+        "preset": "zebra",
+        "stripe": true,
+        "density": "normal",
+        "fontSizePt": 9,
+        "headerWeight": "bold",
+        "headerBackground": "#ddeeff",
+        "stripeColor": "#f5f5fa",
+        "ruleColor": "#336699",
+        "ruleThicknessPt": 0.8,
+        "paddingHorizontalPt": 6,
+        "paddingVerticalPt": 3,
+        "alignment": [],
+        "numericAlignment": "right",
+        "width": "auto",
+        "overflow": "wrap",
+        "captionPosition": "below",
+        "captionStyle": "italic"
+      },
+      "measured": {
+        "cell": {
+          "size": 8.966400146484375,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMSans9-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "TableMarker",
+          "origin": [
+            77.66400146484375,
+            169.84100341796875
+          ],
+          "bbox": [
+            77.66400146484375,
+            162.6140899658203,
+            125.52664947509766,
+            171.5804901123047
+          ],
+          "page": 2
+        },
+        "nextLine": {
+          "size": 8.966400146484375,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMSans9-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "SecondLineMarker",
+          "origin": [
+            77.97799682617188,
+            180.60101318359375
+          ],
+          "bbox": [
+            77.97799682617188,
+            173.3740997314453,
+            148.3552703857422,
+            182.3404998779297
+          ],
+          "page": 2
+        },
+        "caption": {
+          "size": 10.909099578857422,
+          "flags": 6,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMSans10-Oblique",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "CaptionMarker",
+          "origin": [
+            111.07699584960938,
+            225.9949951171875
+          ],
+          "bbox": [
+            111.07699584960938,
+            217.20225524902344,
+            178.3970489501953,
+            228.11135864257812
+          ],
+          "page": 2
+        },
+        "ruleCount": 3,
+        "verticalRules": false
+      }
+    },
+    {
+      "template": "eth-report",
+      "preset": "compact",
+      "style": {
+        "preset": "compact",
+        "stripe": false,
+        "density": "compact",
+        "fontSizePt": 9,
+        "headerWeight": "bold",
+        "headerBackground": "#ddeeff",
+        "stripeColor": "#f5f5fa",
+        "ruleColor": "#336699",
+        "ruleThicknessPt": 0.5,
+        "paddingHorizontalPt": 3,
+        "paddingVerticalPt": 1.5,
+        "alignment": [],
+        "numericAlignment": "right",
+        "width": "auto",
+        "overflow": "wrap",
+        "captionPosition": "above",
+        "captionStyle": "normal"
+      },
+      "measured": {
+        "cell": {
+          "size": 8.966400146484375,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMSans9-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "TableMarker",
+          "origin": [
+            74.67500305175781,
+            195.8040008544922
+          ],
+          "bbox": [
+            74.67500305175781,
+            188.57708740234375,
+            122.5466079711914,
+            197.54348754882812
+          ],
+          "page": 2
+        },
+        "nextLine": {
+          "size": 8.966400146484375,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMSans9-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "SecondLineMarker",
+          "origin": [
+            74.98899841308594,
+            206.56399536132812
+          ],
+          "bbox": [
+            74.98899841308594,
+            199.3370819091797,
+            145.36627197265625,
+            208.30348205566406
+          ],
+          "page": 2
+        },
+        "caption": {
+          "size": 10.909099578857422,
+          "flags": 4,
+          "bidi": 0,
+          "char_flags": 16,
+          "font": "LMSans10-Regular",
+          "color": 0,
+          "alpha": 255,
+          "ascender": 0.8059999942779541,
+          "descender": -0.1940000057220459,
+          "text": "CaptionMarker",
+          "origin": [
+            112.61500549316406,
+            133.00100708007812
+          ],
+          "bbox": [
+            112.61500549316406,
+            124.2082748413086,
+            179.93505859375,
+            135.11737060546875
+          ],
+          "page": 2
+        },
+        "ruleCount": 3,
+        "verticalRules": false
+      }
+    }
+  ]
+}

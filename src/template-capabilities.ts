@@ -1,3 +1,5 @@
+import { TABLE_ATTRIBUTE_SCHEMA } from "./table-values";
+
 /** Capabilities describe the adapters shipped today, rather than planned UI. */
 export interface TemplateOptionCapability {
   support: "supported" | "locked" | "unsupported";
@@ -59,6 +61,9 @@ const typographyAdapterOptions: Readonly<Record<string, TemplateOptionCapability
   "typography.tableSize": supported(),
   "typography.referenceSize": supported(),
 };
+const tableAdapterOptions: Readonly<Record<string, TemplateOptionCapability>> = Object.fromEntries(TABLE_ATTRIBUTE_SCHEMA
+  .filter(rule => rule.configKey.startsWith("tables."))
+  .map(rule => [rule.configKey, supported(rule.field === "overflow" ? ["wrap"] : rule.values)]));
 const lockedFamilies: Record<string, string> = {
   "hipster-cv": "Latin Modern Roman (class-owned)", "kth-letter": "Times (class-owned)",
   ludus: "Source Sans 3; Helvetica Neue or Latin Modern Sans fallback", rho: "STIX Two Text (class-owned)",
@@ -73,6 +78,12 @@ function capabilities(
   const reason = `${name} owns this option. Choose the Default template to customize it.`;
   const options = {
     ...sharedOptions,
+    ...Object.fromEntries(TABLE_ATTRIBUTE_SCHEMA.filter(rule => rule.configKey.startsWith("tables.")).map(rule => [rule.configKey,
+      id === "default" || id === "eth-report" ? tableAdapterOptions[rule.configKey]
+        : ["rho", "rmxaa", "ludus", "hipster-cv"].includes(id) && ["width", "overflow"].includes(rule.field)
+          ? supported(rule.field === "overflow" ? ["wrap"] : undefined)
+        : rule.field === "preset" ? locked("booktabs", `${name} preserves its native body-table rules. Choose Default or ETH Report for other presets.`)
+        : locked(rule.field === "captionPosition" ? "above" : undefined, `${name} owns this table option. Choose Default or ETH Report for configurable body-table styles.`)])),
     ...(id === "default" || id === "eth-report" ? typographyAdapterOptions : {}),
     "typography.bodyFont": bodyFonts ? supported() : { ...locked(undefined, reason), valueLabel: lockedFamilies[id] || "Class-owned font" },
     "typography.sansFont": bodyFonts ? supported() : { ...locked(undefined, reason), valueLabel: "Class-owned sans-serif font" },
@@ -86,7 +97,7 @@ function capabilities(
     id, name, engine, columns, options: Object.freeze(options),
     defaults: Object.freeze({
       typography: { bodySize, ...(lineSpacing === undefined ? {} : { lineSpacing }), codeSize: id === "hipster-cv" ? "footnotesize" : "small" },
-      tables: { preset: "booktabs", stripe: false, density: "normal", captionPosition: "below" },
+      tables: { preset: "booktabs", stripe: false, density: "normal", captionPosition: "above" },
       columns, engine,
     }),
   });

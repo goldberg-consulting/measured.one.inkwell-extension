@@ -24,6 +24,7 @@ import { getInkwellOutputChannel } from "./inkwell-output";
 import { executeRunProcess } from "./run-process";
 import { publishPdf, validatePdf } from "./pdf-publication";
 import { hasTypographyOverride } from "./style-model";
+import { tablePdfOptions } from "./table-model";
 
 const exec = promisify(execFile);
 
@@ -54,6 +55,8 @@ const TEX_ENV = {
 // extension's top-level filters/ and csl/ directories.
 const SECTION_BIBS_FILTER = path.join(__dirname, "..", "filters", "section-bibliographies.lua");
 const BODY_TYPOGRAPHY_FILTER = path.join(__dirname, "..", "filters", "body-typography.lua");
+const TABLE_DATA_FILTER = path.join(__dirname, "..", "filters", "table-data.lua");
+const SEMANTIC_TABLES_FILTER = path.join(__dirname, "..", "filters", "semantic-tables.lua");
 
 function safeReadFile(file: string): string {
   try {
@@ -633,7 +636,15 @@ async function compilePandoc(
   if (invalid.length) return { success: false, pdfPath: undefined,
     errors: invalid.map(diagnostic => ({ line: diagnostic.line, message: diagnostic.message, severity: diagnostic.severity })),
     log: invalid.map(diagnostic => diagnostic.message).join("\n"), duration: (Date.now() - start) / 1000 };
-  const { injected, unresolvedVars } = prepareForCompilation(rawText, sourceFile);
+  const { injected, unresolvedVars, tableDiagnostics = [] } = prepareForCompilation(rawText, sourceFile);
+  const tableMessage = (diagnostic: (typeof tableDiagnostics)[number]): string =>
+    `${diagnostic.source}${diagnostic.line ? `:${diagnostic.line}${diagnostic.column ? `:${diagnostic.column}` : ""}` : ""}: ${diagnostic.message}`;
+  if (tableDiagnostics.length) return {
+    success: false, pdfPath: undefined,
+    // Parser coordinates refer to the artifact, not the source Markdown file.
+    errors: tableDiagnostics.map(diagnostic => ({ line: undefined, message: tableMessage(diagnostic), severity: diagnostic.severity })),
+    log: tableDiagnostics.map(tableMessage).join("\n"), duration: (Date.now() - start) / 1000,
+  };
   // Bindings may occur in metadata too, so resolve their injected values before planning Pandoc.
   const documentConfig = getDocumentConfig(injected, sourceFile);
   const references = getResolvedReferences(documentConfig, sourceFile);
@@ -741,13 +752,29 @@ async function compilePandoc(
     }
   }
 
+  // Generated CSV/JSON output becomes a native Table before crossref assigns
+  // labels. The semantic pass follows citation rendering so rich table cells
+  // retain both cross-references and ordinary bibliography citations.
+  const tableOptions = tablePdfOptions(documentConfig);
+  const invalidTables = tableOptions.diagnostics.filter(diagnostic => diagnostic.severity === "error");
+  if (invalidTables.length) return {
+    success: false, pdfPath: undefined,
+    errors: invalidTables.map(diagnostic => ({ line: diagnostic.line, message: diagnostic.message, severity: diagnostic.severity })),
+    log: invalidTables.map(diagnostic => diagnostic.message).join("\n"), duration: (Date.now() - start) / 1000,
+  };
+  const tableMetadataFile = path.join(cacheDir, "table-options.json");
+  fs.writeFileSync(tableMetadataFile, JSON.stringify({
+    "inkwell-table-options": `hex:${Buffer.from(JSON.stringify(tableOptions), "utf8").toString("hex")}`,
+  }), "utf8");
+  pandocArgs.push("--metadata-file", tableMetadataFile, "--lua-filter", TABLE_DATA_FILTER);
+
   // Filter order matters: pandoc-crossref must consume @fig:/@tbl:/@sec:
   // citations before citation rendering sees them.
   const crossref = await findBinary("pandoc-crossref");
   if (crossref) {
     pandocArgs.push("--filter", crossref);
   }
-  if (hasTypographyOverride(documentConfig, "tableSize")) {
+  if (hasTypographyOverride(documentConfig, "tableSize") && !tableOptions.enabled) {
     pandocArgs.push("--lua-filter", BODY_TYPOGRAPHY_FILTER, "--metadata", "inkwell-body-table-typography=true");
   }
 
@@ -771,6 +798,7 @@ async function compilePandoc(
     }
     pandocArgs.push("--citeproc");
   }
+  pandocArgs.push("--lua-filter", SEMANTIC_TABLES_FILTER);
 
   // Preview and PDF consume the same ordered, resolved reference set.
   const bibFiles = [...references.bibliography];

@@ -17,6 +17,8 @@ import { BlockResult, CodeBlock, DisplayMode, readCurrentRunResults, parseCodeBl
 import { buildCodeBlockPath, findBinaryViaShell } from "./shell-env";
 import { getInkwellOutputChannel } from "./inkwell-output";
 import { fingerprintBlock } from "./run-store";
+import { artifactTableLabel, decodeTableData, encodeTableData, literalFence, parseCsvTable, parseJsonTable, TABLE_DATA_LIMITS,
+  TABLE_DATA_ERROR_FENCE, TableDataDiagnostic, TableDataError, tableDataDiagnostic } from "./table-data";
 import {
   getInkwellCompiledPath,
   getInkwellOutputsDir,
@@ -127,15 +129,50 @@ export function stripInkwellLines(stdout: string): string {
     .join("\n");
 }
 
+/** Generated cell/diagnostic text is data, including binding-looking strings. */
+function shieldTableFences(markdown: string, inspectMetadata?: (values: string[]) => void): { text: string; restore: (text: string) => string } {
+  const opening = /^(`{3,})inkwell-table-(?:data|error)[ \t]*\r?\n/gm;
+  const protectedText = new Map<string, string>();
+  let text = "";
+  let offset = 0;
+  let match: RegExpExecArray | null;
+  while ((match = opening.exec(markdown))) {
+    const closing = new RegExp("^`{" + match[1].length + ",}[ \\t]*(?:\\r?\\n|$)", "gm");
+    closing.lastIndex = opening.lastIndex;
+    const end = closing.exec(markdown);
+    const nextOffset = end ? closing.lastIndex : markdown.length;
+    if (inspectMetadata && match[0].includes("inkwell-table-data")) {
+      try {
+        const table = decodeTableData(markdown.slice(opening.lastIndex, end?.index ?? markdown.length));
+        inspectMetadata([table.caption || "", table.label || "", ...Object.values(table.attributes)]);
+      } catch { /* Invalid private payloads are diagnosed by the table renderer. */ }
+    }
+    let token: string;
+    do { token = `INKWELL_LITERAL_${crypto.randomUUID()}_END`; } while (markdown.includes(token));
+    protectedText.set(token, markdown.slice(match.index, nextOffset));
+    text += markdown.slice(offset, match.index) + token;
+    offset = nextOffset;
+    opening.lastIndex = nextOffset;
+  }
+  text += markdown.slice(offset);
+  return { text, restore: (transformed) => {
+    for (const [token, original] of protectedText) transformed = transformed.replace(token, () => original);
+    return transformed;
+  } };
+}
+
 export function substituteVariables(
   markdown: string,
   vars: Map<string, string>,
 ): string {
   if (!vars.size) return markdown;
-  return markdown.replace(/\{\{(\w+)\}\}/g, (_match, key) => {
+  const literal = shieldTableFences(markdown);
+  return literal.restore(literal.text.replace(/\{\{(\w+)\}\}/g, (_match, key) => {
     return vars.get(key) ?? `{{${key}}}`;
-  });
+  }));
 }
+
+export interface InjectionOptions { sourceFile?: string; tableDiagnostics?: TableDataDiagnostic[]; variables?: Map<string, string> }
 
 export function injectResults(
   markdown: string,
@@ -143,8 +180,10 @@ export function injectResults(
   defaultDisplay: DisplayMode = "output",
   docDir: string,
   projectRoot: string,
+  options: InjectionOptions = {},
 ): string {
   if (!results.length) return markdown;
+  const resolvedOptions = { ...options, variables: options.variables ?? collectVariables(results) };
 
   const resultsByIndex = new Map<number, BlockResult>();
   for (const r of results) {
@@ -166,7 +205,7 @@ export function injectResults(
     const start = output.indexOf(block.raw, offset);
     if (start === -1) continue;
 
-    const replacement = buildBlockOutput(effectiveBlock, result, display, docDir, projectRoot);
+    const replacement = buildBlockOutput(effectiveBlock, result, display, docDir, projectRoot, resolvedOptions);
 
     output =
       output.substring(0, start) +
@@ -184,12 +223,13 @@ function buildBlockOutput(
   display: DisplayMode,
   docDir: string,
   projectRoot: string,
+  options: InjectionOptions,
 ): string {
   if (display === "none") return "";
 
   const codeSection = formatCodeBlock(block, docDir, projectRoot);
-  const outputSection = result && result.exitCode === 0
-    ? buildOutputContent(result) : null;
+  const outputSection = result && result.exitCode === 0 && result.cacheStatus !== "miss" && display !== "code"
+    ? buildOutputContent(result, options.sourceFile || docDir, options) : null;
 
   if (display === "code") return codeSection;
   if (display === "output") return outputSection || "";
@@ -219,16 +259,18 @@ function formatCodeBlock(block: CodeBlock, docDir: string, projectRoot: string):
   return "```" + lang + "\n" + block.source + "\n```";
 }
 
-function buildOutputContent(result: BlockResult): string | null {
+function buildOutputContent(result: BlockResult, sourceFile: string, options: InjectionOptions): string | null {
   const parts: string[] = [];
-  const caption = result.block.caption;
-  const label = result.block.label;
   const stdout = stripInkwellLines(result.stdout);
+  const blockId = result.blockId || result.block.id || crypto.createHash("sha256")
+    .update(JSON.stringify([result.block.lang, result.block.file, result.block.source])).digest("hex");
+  const format = (name: string, filepath: string, multiple: boolean): string => formatArtifact(name, filepath,
+    result.block, sourceFile, blockId, multiple, options);
 
   if (result.block.output) {
     const artifact = result.artifacts.get(result.block.output);
     if (artifact) {
-      parts.push(formatArtifact(result.block.output, artifact, caption, label));
+      parts.push(format(result.block.output, artifact, false));
     } else if (stdout.trim()) {
       const text = stdout.trim();
       if (looksLikeMarkdown(text)) {
@@ -241,7 +283,7 @@ function buildOutputContent(result: BlockResult): string | null {
   }
 
   for (const [name, filepath] of result.artifacts) {
-    parts.push(formatArtifact(name, filepath, caption, label));
+    parts.push(format(name, filepath, result.artifacts.size > 1));
   }
 
   if (stdout.trim()) {
@@ -259,19 +301,31 @@ function buildOutputContent(result: BlockResult): string | null {
 function formatArtifact(
   name: string,
   filepath: string,
-  caption?: string,
-  label?: string,
+  block: CodeBlock,
+  sourceFile: string,
+  blockId: string,
+  multiple: boolean,
+  options: InjectionOptions,
 ): string {
   const ext = path.extname(filepath).toLowerCase();
+  // These strings originate in the authored block, while cell values originate in data files.
+  const bindMetadata = (value: string): string => value.replace(/\{\{(\w+)\}\}/g, (match, key) => options.variables?.get(key) ?? match);
+  const caption = block.caption === undefined ? undefined : bindMetadata(block.caption);
+  const label = block.label === undefined ? undefined : bindMetadata(block.label);
 
   if (IMAGE_EXTS.has(ext)) {
     const alt = caption || name;
-    const labelAttr = label ? `{#fig:${label}}` : "";
+    const explicit = label?.replace(/^fig:/, "");
+    const figureLabel = explicit && artifactTableLabel(sourceFile, blockId, name, explicit, multiple).replace(/^tbl:/, "fig:");
+    const labelAttr = figureLabel ? `{#${figureLabel}}` : "";
     return `![${alt}](${filepath})${labelAttr}`;
   }
 
   try {
-    const content = fs.readFileSync(filepath, "utf-8");
+    const isTable = ext === ".csv" || ext === ".json";
+    const bytes = isTable ? readTableArtifact(filepath) : fs.readFileSync(filepath);
+    const content = bytes.toString("utf-8");
+    if (isTable && !Buffer.from(content, "utf-8").equals(bytes)) throw new TableDataError("table-encoding", "Table artifact is not valid UTF-8. Export the artifact with UTF-8 encoding.");
 
     if (ext === ".md" || ext === ".markdown") {
       return content.trim();
@@ -281,82 +335,41 @@ function formatArtifact(
       return content.trim();
     }
 
-    if (ext === ".csv") {
-      const table = csvToMarkdownTable(content);
-      if (caption) {
-        return table + "\n\n: " + caption + (label ? ` {#tbl:${label}}` : "");
-      }
-      return table;
+    if (isTable) {
+      const metadata = { caption, label: artifactTableLabel(sourceFile, blockId, name, label, multiple),
+        attributes: { ...Object.fromEntries(Object.entries(block.attributes || {}).map(([key, value]) => [key, bindMetadata(value)])),
+          "data-inkwell-artifact": name, "data-inkwell-block": blockId } };
+      const table = ext === ".csv" ? parseCsvTable(content, metadata) : parseJsonTable(content, metadata);
+      return table ? encodeTableData(table) : literalFence(content.trim(), "json");
     }
 
-    if (ext === ".json") {
-      const parsed = JSON.parse(content);
-      if (Array.isArray(parsed) && parsed.length && typeof parsed[0] === "object") {
-        const table = jsonArrayToTable(parsed);
-        if (caption) {
-          return table + "\n\n: " + caption + (label ? ` {#tbl:${label}}` : "");
-        }
-        return table;
-      }
-      return "```json\n" + content.trim() + "\n```";
-    }
-
-    return "```\n" + content.trim() + "\n```";
-  } catch {
-    const alt = caption || name;
-    return `![${alt}](${filepath})`;
+    return literalFence(content.trim(), "");
+  } catch (error) {
+    const diagnostic = tableDataDiagnostic(error, filepath);
+    options.tableDiagnostics?.push(diagnostic);
+    return literalFence(`Inkwell table error: ${diagnostic.message}\nArtifact: ${filepath}`, TABLE_DATA_ERROR_FENCE);
   }
+}
+
+function readTableArtifact(filepath: string): Buffer {
+  const file = fs.openSync(filepath, "r");
+  try {
+    const limit = TABLE_DATA_LIMITS.sourceBytes;
+    const tooLarge = () => new TableDataError("table-source-limit", "Table artifact exceeds the 5 MiB input limit. Export a smaller table or split it into separate artifacts.");
+    if (fs.fstatSync(file).size > limit) throw tooLarge();
+    // The extra byte detects growth after the size check without an unbounded read.
+    const buffer = Buffer.allocUnsafe(limit + 1);
+    let size = 0, read: number;
+    while (size <= limit && (read = fs.readSync(file, buffer, size, buffer.length - size, null))) size += read;
+    if (size > limit) throw tooLarge();
+    return buffer.subarray(0, size);
+  } finally { fs.closeSync(file); }
 }
 
 // Heuristic: if stdout starts with a markdown-ish character, pass it
 // through raw so tables/headings/images render correctly in the preview.
 function looksLikeMarkdown(text: string): boolean {
   return /^[#|>*\-\d]/.test(text) || text.includes("![");
-}
-
-function csvToMarkdownTable(csv: string): string {
-  const lines = csv.trim().split("\n");
-  if (lines.length < 2) return "```\n" + csv + "\n```";
-
-  const header = parseCsvLine(lines[0]);
-  const separator = header.map(() => "---");
-  const rows = lines.slice(1).map(parseCsvLine);
-
-  return [
-    "| " + header.join(" | ") + " |",
-    "| " + separator.join(" | ") + " |",
-    ...rows.map((r) => "| " + r.join(" | ") + " |"),
-  ].join("\n");
-}
-
-function parseCsvLine(line: string): string[] {
-  const result: string[] = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '"') {
-      inQuotes = !inQuotes;
-    } else if (ch === "," && !inQuotes) {
-      result.push(current.trim());
-      current = "";
-    } else {
-      current += ch;
-    }
-  }
-  result.push(current.trim());
-  return result;
-}
-
-function jsonArrayToTable(arr: Record<string, any>[]): string {
-  const keys = Object.keys(arr[0]);
-  const header = "| " + keys.join(" | ") + " |";
-  const separator = "| " + keys.map(() => "---").join(" | ") + " |";
-  const rows = arr.map(
-    (row) => "| " + keys.map((k) => String(row[k] ?? "")).join(" | ") + " |"
-  );
-  return [header, separator, ...rows].join("\n");
 }
 
 export function gatherCachedResults(
@@ -385,6 +398,13 @@ export function evaluateInlineExpressions(
   docDir: string,
   projectRoot: string,
   cacheDir: string,
+): string {
+  const literal = shieldTableFences(markdown);
+  return literal.restore(evaluateDocumentExpressions(literal.text, vars, runConfig, docDir, projectRoot, cacheDir));
+}
+
+function evaluateDocumentExpressions(
+  markdown: string, vars: Map<string, string>, runConfig: RunConfig, docDir: string, projectRoot: string, cacheDir: string,
 ): string {
   const matches: { full: string; expr: string }[] = [];
   let m: RegExpExecArray | null;
@@ -621,14 +641,15 @@ function normalizeMermaidForPreview(markdown: string): string {
 /** Unique `{{key}}` placeholders that survived substitution (frontmatter included). */
 export function collectUnresolvedVars(markdown: string): string[] {
   const out = new Set<string>();
-  for (const m of markdown.matchAll(/\{\{(\w+)\}\}/g)) out.add(m[1]);
+  const collect = (text: string) => { for (const m of text.matchAll(/\{\{(\w+)\}\}/g)) out.add(m[1]); };
+  collect(shieldTableFences(markdown, values => values.forEach(collect)).text);
   return [...out];
 }
 
 export function prepareForCompilation(
   markdown: string,
   sourceFile: string,
-): { injected: string; tempFile: string; unresolvedVars: string[] } {
+): { injected: string; tempFile: string; unresolvedVars: string[]; tableDiagnostics: TableDataDiagnostic[] } {
   const docDir = path.dirname(sourceFile);
   const projectRoot = getInkwellProjectRoot(sourceFile);
 
@@ -643,7 +664,7 @@ export function prepareForCompilation(
   const hasInlineExprs = /`\{python\}\s+[^`]+`/.test(processed);
 
   if (!hasBlocks && !hasVarRefs && !hasInlineExprs && !hasMermaid) {
-    return { injected: markdown, tempFile: sourceFile, unresolvedVars: [] };
+    return { injected: markdown, tempFile: sourceFile, unresolvedVars: [], tableDiagnostics: [] };
   }
 
   const runConfig = parseRunConfig(processed, sourceFile);
@@ -651,7 +672,8 @@ export function prepareForCompilation(
   const results = gatherCachedResults(processed, sourceFile);
   const vars = collectVariables(results);
 
-  let injected = injectResults(processed, results, defaultDisplay, docDir, projectRoot);
+  const tableDiagnostics: TableDataDiagnostic[] = [];
+  let injected = injectResults(processed, results, defaultDisplay, docDir, projectRoot, { sourceFile, tableDiagnostics, variables: vars });
   injected = substituteVariables(injected, vars);
 
   const cacheDir = getInkwellOutputsDir(sourceFile);
@@ -665,7 +687,7 @@ export function prepareForCompilation(
   fs.mkdirSync(path.dirname(tempFile), { recursive: true });
   fs.writeFileSync(tempFile, injected, "utf-8");
 
-  return { injected, tempFile, unresolvedVars };
+  return { injected, tempFile, unresolvedVars, tableDiagnostics };
 }
 
 export function prepareForPreview(
@@ -691,7 +713,7 @@ export function prepareForPreview(
   const results = gatherCachedResults(processed, sourceFile);
   const vars = collectVariables(results);
 
-  let injected = injectResults(processed, results, defaultDisplay, docDir, projectRoot);
+  let injected = injectResults(processed, results, defaultDisplay, docDir, projectRoot, { sourceFile, variables: vars });
   injected = substituteVariables(injected, vars);
 
   const cacheDir = getInkwellOutputsDir(sourceFile);

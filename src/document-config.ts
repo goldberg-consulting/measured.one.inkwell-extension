@@ -3,6 +3,8 @@ import { isMap, isScalar, isSeq, LineCounter, parseDocument } from "yaml";
 import { constrainTypographyCapabilities, getTemplateCapabilities, TemplateCapabilities } from "./template-capabilities";
 import { normalizeFontFamily, normalizeHeadingWeight, normalizeTypographyColor, sizeInPoints } from "./style-model";
 
+import { TABLE_ATTRIBUTE_SCHEMA, parseTableColor, parseTableAlignment, parseTableWidth, parseTableWeight, TableAlignment } from "./table-values";
+
 export type Metadata = Record<string, unknown>;
 export type ConfigSource = "builtin" | "template" | "editor" | "defaults" | "project" | "document" | "block";
 export interface SourceLocation { sourcePath: string; line: number; column: number }
@@ -41,6 +43,10 @@ export interface TableConfig {
   preset: "booktabs" | "grid" | "plain" | "zebra" | "compact";
   stripe: boolean; density: "normal" | "compact" | "comfortable"; captionPosition: "above" | "below";
   fontSize?: SizeValue;
+  headerWeight?: "normal" | "bold"; headerBackground?: string; stripeColor?: string; ruleColor?: string;
+  ruleThickness?: SizeValue; paddingHorizontal?: SizeValue; paddingVertical?: SizeValue;
+  alignment?: TableAlignment[]; numericAlignment?: "inherit" | TableAlignment;
+  width?: string; overflow?: "wrap" | "fit"; captionStyle?: "normal" | "italic";
 }
 export interface ReferenceConfig {
   bibliography: string[]; csl?: string; scope: "document" | "section"; heading: string; links: boolean;
@@ -266,10 +272,18 @@ const FIELDS: readonly Field[] = [
   field("typography.captionSize", "inkwell.caption-font-size", ["caption-font-size", "typography.captionFontSize"], parseSize, "a font size", ["caption-font-size"]),
   field("typography.tableSize", "inkwell.table-font-size", ["table-font-size", "tables.fontSize", "typography.tableFontSize"], parseSize, "a font size", ["table-font-size"]),
   field("typography.referenceSize", "reference-font-size", ["bibliography-font-size", "inkwell.reference-font-size", "references.fontSize", "typography.referenceFontSize"], parseSize, "a font size"),
-  field("tables.preset", "inkwell.tables", ["table-style", "inkwell.table-style", "tables.style"], enumeration(["booktabs", "grid", "plain", "zebra", "compact"]), "booktabs, grid, plain, zebra, or compact", ["tables", "table-style"]),
+  field("tables.preset", "inkwell.tables", ["table-preset", "table-style", "inkwell.table-style", "tables.style"], enumeration(["booktabs", "grid", "plain", "zebra", "compact"]), "booktabs, grid, plain, zebra, or compact", ["tables", "table-style", "table-preset"]),
   field("tables.stripe", "inkwell.table-stripe", ["table-stripe"], boolean, "true or false", ["table-stripe"]),
   field("tables.density", "table-density", ["inkwell.table-density"], enumeration(["normal", "compact", "comfortable"]), "normal, compact, or comfortable", ["table-density"]),
-  field("tables.captionPosition", "inkwell.caption-style", ["caption-style", "tables.caption-position"], enumeration(["above", "below"]), "above or below", ["caption-style"]),
+  field("tables.captionPosition", "inkwell.caption-style", ["table-caption-position", "caption-style", "tables.caption-position"], enumeration(["above", "below"]), "above or below", ["caption-style", "table-caption-position"]),
+  ...TABLE_ATTRIBUTE_SCHEMA.filter(rule => !["preset", "stripe", "density", "fontSizePt", "captionPosition"].includes(rule.field)).map(rule => {
+    const parser = rule.type === "color" ? parseTableColor : rule.type === "weight" ? parseTableWeight
+      : rule.type === "alignment" ? parseTableAlignment : rule.type === "width" ? parseTableWidth
+      : rule.type === "size" ? (value: unknown) => parseSize(value) || (/^0(?:pt|px|em|rem|%)?$/.test(String(value)) ? { value: 0, unit: "pt" } : undefined)
+      : enumeration(rule.values || []);
+    return field(rule.configKey, rule.aliases[0], rule.aliases.flatMap(alias => [alias, `inkwell.${alias}`]), parser,
+      rule.values?.join(", ") || (rule.type === "size" ? "a nonnegative size with units" : `a table ${rule.type}`), [...rule.aliases].reverse());
+  }),
   field("references.bibliography", "bibliography", ["references.paths"], strings, "a bibliography path or a list of paths"),
   field("references.csl", "csl", [], string, "a CSL path"),
   field("references.scope", "bibliography-scope", ["reference-scope", "inkwell.reference-scope"], enumeration(["document", "section"]), "document or section"),
@@ -299,7 +313,7 @@ const FIELDS: readonly Field[] = [
 const BUILTIN: Metadata = {
   template: "default", engine: "xelatex", columns: 1,
   typography: { codeSize: "small" },
-  tables: { preset: "booktabs", stripe: false, density: "normal", captionPosition: "below" },
+  tables: { preset: "booktabs", stripe: false, density: "normal", captionPosition: "above" },
   references: { bibliography: [], scope: "document", heading: "References", links: true, hangingIndent: true, lineSpacing: 1, entrySpacing: 0, pageBreak: false, nocite: [] },
   runs: { display: "output", cache: true, maxConcurrency: 2, inputs: [], dependsOn: [] },
 };
@@ -327,7 +341,8 @@ function candidates(field: Field, layer: Layer, diagnostics: ConfigDiagnostic[])
     if (field.key === "tables.preset" && key === "inkwell.tables" && mapping(raw)) continue;
     const provenance = location(layer, key);
     if (bindingTokens(raw).length) {
-      if (field.key.startsWith("runs.") || field.key === "template" || field.key === "engine") {
+      const executionSetting = field.key.startsWith("runs.") && !["runs.caption", "runs.label"].includes(field.key);
+      if (executionSetting || field.key === "template" || field.key === "engine") {
         diagnostics.push({ ...provenance, code: "unresolved-run-binding", severity: "error", key: field.key, value: copy(raw),
           message: `${key} contains an unresolved binding. Execution settings and tool selection must be explicit before a process starts.` });
         continue;
@@ -426,6 +441,10 @@ function resolveFields(layers: Layer[], capabilities: TemplateCapabilities, diag
       // Keep a typed template/builtin fallback for preview while retaining the
       // requested token separately. Capability checks require the injected value.
       selected[field.key] = candidate;
+      if (["runs.caption", "runs.label"].includes(field.key)) {
+        put(values, field.key, candidate.value);
+        continue;
+      }
       const fallback = all.filter((entry) => !entry.deferred && !explicit(entry.provenance.source)).at(-1);
       if (fallback) put(values, field.key, fallback.value);
       continue;
@@ -571,6 +590,7 @@ export function applyBlockOverrides(config: DocumentConfig, attributes: Metadata
     if (!candidate) continue;
     if (candidate.deferred) {
       selected[field.key] = candidate;
+      if (["runs.caption", "runs.label"].includes(field.key)) put(values, field.key, candidate.value);
       continue;
     }
     const capability = config.capabilities.options[field.key];

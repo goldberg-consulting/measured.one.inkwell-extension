@@ -53,6 +53,20 @@ function deferred() {
   return { promise, resolve };
 }
 
+test('generated table cells cannot collide with math restoration or become math markup', async t => {
+  const h = host(t);
+  const payload = { schemaVersion: 1, headers: ['Literal'], rows: [
+    ['INKWELLMATHPLACEHOLDER0ENDMATH'], ['$x$ <b>literal</b>'],
+  ], attributes: {} };
+  const document = h.document('table-math.md', '$a < b$\n\n```inkwell-table-data\n' + JSON.stringify(payload) + '\n```');
+  h.provider.currentDocument = document;
+  await h.provider.sendContentUpdate(document);
+  const html = h.messages.find(message => message.type === 'updateContent').html;
+  assert.match(html, /data-inkwell-math="0">\$a &lt; b\$<\/span>/);
+  assert.match(html, /class="inkwell-table-literal"[^>]*>INKWELLMATHPLACEHOLDER0ENDMATH<\/td>/);
+  assert.match(html, /class="inkwell-table-literal"[^>]*>\$x\$ &lt;b&gt;literal&lt;\/b&gt;<\/td>/);
+});
+
 // A small DOM adapter runs the actual shipped webview program. No repository
 // project data, browser process, PDF engine, or external resource is loaded.
 function client(provider, webview, globals = {}) {

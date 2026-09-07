@@ -126,25 +126,8 @@ export function generatePreamble(style: InkwellStyle): string {
     }
   }
 
-  if (style.tables === "booktabs" || style["table-font-size"] || style["table-stripe"]) {
-    lines.push("");
-    lines.push("% Inkwell table styling");
-
-    if (style["table-stripe"]) {
-      lines.push("\\usepackage{colortbl}");
-      lines.push("\\definecolor{inkwell-stripe}{RGB}{245,245,250}");
-      lines.push("\\rowcolors{2}{white}{inkwell-stripe}");
-    }
-
-    if (style["table-font-size"]) {
-      const size = style["table-font-size"];
-      if (VALID_LATEX_FONT_SIZES.includes(size)) {
-        lines.push(`\\AtBeginEnvironment{longtable}{\\${size}}`);
-        lines.push(`\\AtBeginEnvironment{tabular}{\\${size}}`);
-        lines.push("\\usepackage{etoolbox}");
-      }
-    }
-  }
+  // Body table styles are applied by semantic-tables.lua around native Tables.
+  // Never attach document styling to every tabular/longtable environment.
 
   if (style["hanging-indent"]) {
     lines.push("");
@@ -159,16 +142,6 @@ export function generatePreamble(style: InkwellStyle): string {
     lines.push("% Inkwell multi-column layout");
     lines.push("\\usepackage{multicol}");
     lines.push(`\\newcommand{\\inkwellcolumns}{${style.columns}}`);
-  }
-
-  if (style["caption-style"] === "above") {
-    lines.push("");
-    lines.push("% Inkwell caption position (above floats). Uses the caption");
-    lines.push("% package (loaded by the built-in templates); floatrow is avoided");
-    lines.push("% because it is incompatible with the float package the templates load.");
-    lines.push("\\usepackage{caption}");
-    lines.push("\\captionsetup[table]{position=top}");
-    lines.push("\\captionsetup[figure]{position=top}");
   }
 
   return lines.join("\n");

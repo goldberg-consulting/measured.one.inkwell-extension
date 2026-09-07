@@ -231,8 +231,13 @@ Results cache under `.inkwell/outputs/<document-key>/` (derived from each source
 Code blocks that write files to `INKWELL_OUTPUT_DIR` automatically embed them in the PDF. The `output` attribute names the artifact, and the file extension determines how it renders:
 
 - **Images** (`.png`, `.jpg`, `.svg`, `.pdf`, `.eps`) render as figures
-- **CSV** files render as formatted tables with booktabs styling
+- **CSV** files render as literal-cell tables using the document's table style
 - **JSON** arrays of objects render as tables
+
+Markdown, CSV, and JSON tables share presets, captions, column alignment, colors,
+spacing, and width settings. Default and ETH Report support booktabs, grid, plain,
+zebra, and compact; fixed templates report unsupported choices.
+See [body-table settings and examples](docs/tables.md).
 - **Markdown** (`.md`) and **LaTeX** (`.tex`) files are passed through raw
 
 ````markdown

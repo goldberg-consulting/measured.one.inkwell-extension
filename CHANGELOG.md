@@ -97,6 +97,23 @@
   inheriting Default's implicit `Scale=MatchLowercase`. Unsupported custom font
   scaling is diagnosed. Documents without font overrides keep their TeX behavior.
 
+### Semantic body tables (Phase 5)
+
+- Default and ETH Report implement five distinct presets, table fonts, density,
+  colors, rules, padding, alignment, width, and caption placement in preview and
+  PDF. Styling applies only to body tables; template layout tables stay intact.
+  Rho, RMxAA, Ludus, and Hipster CV additionally support width and wrapping while
+  retaining their existing table bridges. Unsupported controls are diagnosed.
+- Preview uses real captions and accessible overflow wrappers. Caption placement
+  now defaults above to match Pandoc. Existing flat settings remain aliases;
+  canonical per-table attributes override document and project defaults.
+- Standards-compliant CSV and structured JSON ingestion preserve literal cell
+  values, including embedded newlines, quotes, pipes, and executable-looking text.
+  Invalid data stops PDF publication with an artifact diagnostic. Raw LaTeX
+  remains intact and has an explicit preview limitation instead of guessed cells.
+- Quoted fence attributes can contain braces, so caption/label variable bindings
+  survive parsing and resolve from successful run values without interpreting cells.
+
 This is unreleased work toward 0.5. The final release artifact, tap checksum,
 architecture-specific installation checks, clean-machine install, and activation
 benchmark remain release gates. Mocked tests and artifact audits do not establish

@@ -92,7 +92,7 @@ const LANG_COMMANDS: Record<string, string[]> = {
 };
 
 // Quarto/Pandoc-style fenced code blocks: ```{python file="..." output="plot"}
-const BLOCK_PATTERN = /^```\{(\w+)([^}]*)\}\s*\n([\s\S]*?)^```/gm;
+const BLOCK_PATTERN = /^```\{(\w+)((?:"[^"\r\n]*"|'[^'\r\n]*'|[^}"'\r\n])*)\}\s*\n([\s\S]*?)^```/gm;
 
 export function parseRunConfig(markdown: string, sourceFile?: string): RunConfig {
   const config = sourceFile ? getDocumentConfig(markdown, sourceFile) : resolveDocumentConfig({ text: markdown });

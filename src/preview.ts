@@ -18,6 +18,9 @@ import { renderCitations, CitationRenderResult } from "./citations";
 import { DocumentConfig, resolveDocumentConfig } from "./document-config";
 import { PreviewRevision, PreviewRun, PreviewState } from "./preview-state";
 import { buildTypographyCss, resolveTypography } from "./style-model";
+import { extractTablePresentation } from "./table-preview";
+import { resolveTableStyle, buildTableCss } from "./table-model";
+import { TABLE_ATTRIBUTE_SCHEMA } from "./table-values";
 import { ViewerState, FontScaleAction, normalizeFontScale, changeFontScale, readViewerState, viewerStateRuntime } from "./viewer-state";
 
 const md = new MarkdownIt({
@@ -152,6 +155,7 @@ export class InkwellPreviewProvider {
    */
   private lastCitationSignature: string | undefined;
   private lastConfigurationSignature: string | undefined;
+  private lastTableDiagnosticSignature: string | undefined;
   private reportCitationStatus(r: CitationRenderResult, request: PreviewRevision): void {
     const total = r.resolvedKeys.size + r.missingKeys.size;
     if (total === 0) return;
@@ -375,11 +379,13 @@ export class InkwellPreviewProvider {
         eqn: fm.eqnPrefix || "Equation",
         sec: fm.secPrefix || "Section",
       };
+      const tables = extractTablePresentation(fm.body, { tablePrefix: prefixes.tbl });
       let body = resolveReferences(
-        fm.body,
+        tables.markdown,
         mermaidMeta,
         prefixes,
         fm.sectionNumbering || "decimal",
+        tables.labels,
       );
 
       const projectRoot = getInkwellProjectRoot(sourceFile);
@@ -429,8 +435,6 @@ export class InkwellPreviewProvider {
         /(?<!\$)\{\{(\w+)\}\}(?!\$)/g,
         '<span class="var-placeholder">$1</span>',
       );
-      // Convert raw LaTeX table environments to HTML for preview
-      body = convertLatexTables(body);
 
       // LaTeX typesetting directives (\newpage, \vspace, \hfill, etc.)
       // are meaningful for the PDF compile but render as literal text
@@ -449,10 +453,20 @@ export class InkwellPreviewProvider {
       // restore the raw LaTeX so KaTeX auto-render sees it intact.
       const { shielded, restore } = shieldMathForMarkdown(body);
 
-      let rendered = md.render(shielded);
+      let rendered = tables.render(md, shielded, attributes => {
+        const result = resolveTableStyle(config, attributes);
+        return { preset: result.style.preset, captionPosition: result.style.captionPosition,
+          alignment: result.style.alignment, alignmentIsLocal: TABLE_ATTRIBUTE_SCHEMA.find(rule => rule.field === "alignment")!.aliases.some(key => attributes[key] !== undefined),
+          numericAlignment: result.style.numericAlignment,
+          cssText: buildTableCss(result.style), diagnostics: result.diagnostics.filter(diagnostic => !config.diagnostics.includes(diagnostic)) };
+      });
+      const tableDiagnosticSignature = JSON.stringify([sourceFile, tables.diagnostics]);
+      if (this.lastTableDiagnosticSignature !== tableDiagnosticSignature) {
+        this.lastTableDiagnosticSignature = tableDiagnosticSignature;
+        for (const diagnostic of tables.diagnostics) this.sendLogEntry(diagnostic.severity === "error" ? "error" : "warn", diagnostic.message, undefined, request);
+      }
       rendered = restore(rendered);
       rendered = this.convertLocalImages(rendered, document);
-      rendered = applyBooktabsClasses(rendered);
       rendered = softenMissingCitations(rendered);
       htmlBody = addDataLineAttrs(rendered);
       title = fm.title;
@@ -1590,6 +1604,7 @@ export class InkwellPreviewProvider {
     function renderMath() {
       if (typeof renderMathInElement !== "undefined" && articleEl) {
         renderMathInElement(articleEl, {
+          ignoredClasses: ["inkwell-table-literal"],
           delimiters: [
             { left: "$$", right: "$$", display: true },
             { left: "$", right: "$", display: false },
@@ -2192,11 +2207,11 @@ function resolveReferences(
   mermaidMeta: MermaidMeta[],
   prefixes: { fig: string; tbl: string; eqn: string; sec: string },
   sectionNumbering: SectionNumberingStyle = "decimal",
+  tableLabels: ReadonlyMap<string, string> = new Map(),
 ): string {
-  const labels = new Map<string, string>();
+  const labels = new Map<string, string>(tableLabels);
   const secNums = [0, 0, 0, 0, 0, 0];
   let figNum = 0;
-  let tblNum = 0;
   let eqNum = 0;
 
   // Headers: # Title {#sec:label} -> numbered anchor + clean heading.
@@ -2268,16 +2283,6 @@ function resolveReferences(
     return pieces.join("\n");
   });
 
-  // Table caption labels: : caption {#tbl:label} -> HTML figcaption
-  result = result.replace(
-    /^:\s+(.*?)[ \t]*\{#(tbl:[\w:.-]+)\}[ \t]*$/gm,
-    (_, caption: string, label: string) => {
-      tblNum++;
-      labels.set(label, `${prefixes.tbl}\u00a0${tblNum}`);
-      return `<figcaption class="table-caption"><a id="${label}"></a><strong>${prefixes.tbl}\u00a0${tblNum}:</strong> ${caption}</figcaption>`;
-    },
-  );
-
   // Equation labels: $$ ... $$ {#eq:label}
   result = result.replace(
     /(\$\$[\s\S]*?\$\$)\s*\{#(eq:[\w:.-]+)\}/g,
@@ -2299,68 +2304,6 @@ function resolveReferences(
   );
 
   return result;
-}
-
-function convertLatexTables(body: string): string {
-  return body.replace(
-    /\\begin\{table\*?\}[\s\S]*?\\end\{table\*?\}/g,
-    (env) => {
-      const captionMatch = env.match(/\\caption\{([^}]+)\}/);
-      const labelMatch = env.match(/\\label\{([^}]+)\}/);
-
-      const tabularMatch = env.match(
-        /\\begin\{tabular\}(?:\{[^}]*\})?\s*([\s\S]*?)\\end\{tabular\}/,
-      );
-      if (!tabularMatch) {
-        return '<div class="latex-env-placeholder"><em>LaTeX table (renders in PDF)</em></div>';
-      }
-
-      let content = tabularMatch[1];
-      content = content.replace(/\\(?:toprule|midrule|bottomrule|hline)\s*/g, "");
-      content = content.replace(/\\(?:centering|small|normalsize|footnotesize|scriptsize|tiny|large|Large)\s*/g, "");
-
-      const rows = content
-        .split(/\\\\\s*/)
-        .map((r) => r.trim())
-        .filter((r) => r);
-
-      const htmlRows = rows.map((row, i) => {
-        const cells = row.split("&").map((cell) => cleanLatexCell(cell.trim()));
-        const tag = i === 0 ? "th" : "td";
-        return "<tr>" + cells.map((c) => `<${tag}>${c}</${tag}>`).join("") + "</tr>";
-      });
-
-      let html = "<table>\n";
-      if (htmlRows.length > 0) {
-        html += `<thead>${htmlRows[0]}</thead>\n`;
-        html += `<tbody>${htmlRows.slice(1).join("\n")}</tbody>\n`;
-      }
-      html += "</table>";
-
-      if (captionMatch) {
-        const anchor = labelMatch ? `<a id="${labelMatch[1]}"></a>` : "";
-        html += `\n<figcaption class="table-caption">${anchor}<strong>${captionMatch[1]}</strong></figcaption>`;
-      }
-
-      return html;
-    },
-  );
-}
-
-function cleanLatexCell(cell: string): string {
-  let c = cell;
-  c = c.replace(/\\textbf\{([^}]+)\}/g, "<strong>$1</strong>");
-  c = c.replace(/\\textit\{([^}]+)\}/g, "<em>$1</em>");
-  c = c.replace(/\\emph\{([^}]+)\}/g, "<em>$1</em>");
-  c = c.replace(/\{\\o\}/g, "\u00f8");
-  c = c.replace(/\\o(?=\b)/g, "\u00f8");
-  c = c.replace(/\$([^$]+)\$/g, "$$$1$$");
-  c = c.replace(/\\&/g, "&amp;");
-  c = c.replace(/\\%/g, "%");
-  c = c.replace(/\\\$/g, "$");
-  c = c.replace(/\\[a-zA-Z]+\{([^}]*)\}/g, "$1");
-  c = c.replace(/[{}]/g, "");
-  return c;
 }
 
 interface LayoutPayload {
@@ -2472,10 +2415,6 @@ function parseGeometry(raw: string | undefined): Margins {
     }
   }
   return margins;
-}
-
-function applyBooktabsClasses(html: string): string {
-  return html.replace(/<table>/g, '<table class="booktabs">');
 }
 
 const INKWELL_REFS_SLOT = "<!--INKWELL-REFS-SLOT-->";
@@ -2642,10 +2581,13 @@ function shieldMathForMarkdown(body: string): {
   );
 
   const restore = (html: string): string => {
-    return html.replace(/INKWELLMATHPLACEHOLDER(\d+)ENDMATH/g, (_m, n: string) => {
-      const idx = parseInt(n, 10);
-      return slots[idx] ?? _m;
-    });
+    // Restore only wrappers created here. Literal generated cells and source
+    // notices may contain the same marker text and must remain unchanged.
+    return html.replace(/(<(?:span|div)(?: class="math-display")? data-inkwell-math="(\d+)">)INKWELLMATHPLACEHOLDER\2ENDMATH(<\/(?:span|div)>)/g,
+      (match, opening: string, n: string, closing: string) => {
+        const raw = slots[Number(n)];
+        return raw === undefined ? match : opening + escapeHtml(raw) + closing;
+      });
   };
 
   return { shielded, restore };
