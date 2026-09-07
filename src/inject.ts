@@ -66,7 +66,6 @@ let lastSkippedVarsWarning = "";
 
 function resolveDisplay(block: CodeBlock, defaultDisplay: DisplayMode): DisplayMode {
   if (block.display) return block.display;
-  if (block.file) return "output";
   return defaultDisplay;
 }
 
@@ -161,12 +160,13 @@ export function injectResults(
 
   for (const block of blocks) {
     const result = resultsByIndex.get(block.index);
-    const display = resolveDisplay(block, defaultDisplay);
+    const effectiveBlock = result?.block || block;
+    const display = resolveDisplay(effectiveBlock, defaultDisplay);
 
     const start = output.indexOf(block.raw, offset);
     if (start === -1) continue;
 
-    const replacement = buildBlockOutput(block, result, display, docDir, projectRoot);
+    const replacement = buildBlockOutput(effectiveBlock, result, display, docDir, projectRoot);
 
     output =
       output.substring(0, start) +
@@ -646,7 +646,7 @@ export function prepareForCompilation(
     return { injected: markdown, tempFile: sourceFile, unresolvedVars: [] };
   }
 
-  const runConfig = parseRunConfig(processed);
+  const runConfig = parseRunConfig(processed, sourceFile);
   const defaultDisplay = runConfig.defaultDisplay || "output";
   const results = gatherCachedResults(processed, sourceFile);
   const vars = collectVariables(results);
@@ -686,7 +686,7 @@ export function prepareForPreview(
 
   const docDir = path.dirname(sourceFile);
   const projectRoot = getInkwellProjectRoot(sourceFile);
-  const runConfig = parseRunConfig(processed);
+  const runConfig = parseRunConfig(processed, sourceFile);
   const defaultDisplay = runConfig.defaultDisplay || "output";
   const results = gatherCachedResults(processed, sourceFile);
   const vars = collectVariables(results);

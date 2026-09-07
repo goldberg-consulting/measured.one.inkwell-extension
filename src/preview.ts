@@ -13,9 +13,9 @@ import { InkwellDiagnostics } from "./diagnostics";
 import { parseCodeBlocks, BlockProgress } from "./runner";
 import { prepareForPreview } from "./inject";
 import { getInkwellOutputChannel } from "./inkwell-output";
-import { getInkwellOutputsDir, getInkwellProjectRoot } from "./config";
+import { getInkwellOutputsDir, getInkwellProjectRoot, getDocumentConfig, getResolvedReferences } from "./config";
 import { renderCitations, CitationRenderResult } from "./citations";
-import { splitFrontmatter, extractIndentedBlock, extractIndentedValue } from "./frontmatter";
+import { DocumentConfig, resolveDocumentConfig } from "./document-config";
 import { PreviewRevision, PreviewRun, PreviewState } from "./preview-state";
 
 const md = new MarkdownIt({
@@ -39,7 +39,9 @@ export class InkwellPreviewProvider {
   private readonly previewState = new PreviewState();
   private runRequest: PreviewRun | null = null;
   private nextRunId = 0;
+  private showSequence = 0;
   onRun?: () => Promise<void>;
+  ensureReady?: (document: vscode.TextDocument, allowPrompt?: boolean) => Promise<boolean>;
 
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
@@ -127,6 +129,7 @@ export class InkwellPreviewProvider {
    * unavailable) so we don't spam the log on every keystroke.
    */
   private lastCitationSignature: string | undefined;
+  private lastConfigurationSignature: string | undefined;
   private reportCitationStatus(r: CitationRenderResult, request: PreviewRevision): void {
     const total = r.resolvedKeys.size + r.missingKeys.size;
     if (total === 0) return;
@@ -157,11 +160,16 @@ export class InkwellPreviewProvider {
   }
 
   async show(): Promise<void> {
+    const sequence = ++this.showSequence;
     const editor = vscode.window.activeTextEditor;
     if (!editor || !isCompilable(editor.document)) {
       await vscode.window.showWarningMessage("Open a markdown or LaTeX file first.");
       return;
     }
+    if (this.ensureReady && !await this.ensureReady(editor.document, true)) return;
+    if (sequence !== this.showSequence) return;
+    const activeDocument = vscode.window.activeTextEditor?.document;
+    if (activeDocument && activeDocument.uri.toString() !== editor.document.uri.toString()) return;
 
     this.currentDocument = editor.document;
 
@@ -196,6 +204,7 @@ export class InkwellPreviewProvider {
     this.initialized = false;
 
     this.panel.onDidDispose(() => {
+      this.showSequence++;
       if (this.throttle) {
         clearTimeout(this.throttle);
         this.throttle = undefined;
@@ -244,6 +253,7 @@ export class InkwellPreviewProvider {
     const changeEditor = vscode.window.onDidChangeActiveTextEditor(async (e) => {
       try {
         if (this.panel && e && isCompilable(e.document)) {
+          this.showSequence++;
           this.currentDocument = e.document;
           this.updateResourceRoots(e.document);
           await this.sendContentUpdate(e.document);
@@ -281,6 +291,12 @@ export class InkwellPreviewProvider {
     const request = requested || this.beginRender(document);
     if (!this.isCurrent(request)) return;
     try {
+      if (this.ensureReady && !await this.ensureReady(document, false)) {
+        this.postMessage({ type: "updateContent", html: "<p>Use Inkwell: Open Preview to set up this workspace.</p>", pdfData: null,
+          pdfOutput: null, title: path.basename(document.uri.fsPath), hasCodeBlocks: false, blockCount: 0, layoutCss: "", bodyClasses: [] }, request);
+        return;
+      }
+      if (!this.isCurrent(request)) return;
       await this.renderContentUpdate(document, request);
     } catch (error) {
       if (this.isCurrent(request)) {
@@ -306,7 +322,18 @@ export class InkwellPreviewProvider {
     } else {
       const mermaidMeta = extractMermaidMeta(text);
       const injected = prepareForPreview(text, sourceFile);
-      const fm = stripFrontmatter(injected);
+      const config = getDocumentConfig(injected, sourceFile);
+      const fm = stripFrontmatter(injected, config);
+      const references = getResolvedReferences(config, sourceFile);
+      const diagnostics = [...config.diagnostics, ...references.diagnostics];
+      const diagnosticSignature = JSON.stringify([sourceFile, diagnostics]);
+      if (this.lastConfigurationSignature !== diagnosticSignature) {
+        this.lastConfigurationSignature = diagnosticSignature;
+        for (const diagnostic of diagnostics) {
+          this.sendLogEntry(diagnostic.severity === "error" ? "error" : "warn", diagnostic.message,
+            `${diagnostic.sourcePath}:${diagnostic.line}:${diagnostic.column}`, request);
+        }
+      }
 
       const prefixes = {
         fig: fm.figPrefix || "Figure",
@@ -325,10 +352,11 @@ export class InkwellPreviewProvider {
       const citeResult = await renderCitations(body, {
         sourceFile,
         projectRoot,
-        bibliography: fm.bibliography,
-        csl: fm.csl,
-        linkCitations: fm.linkCitations,
-        referencesHeading: "References",
+        bibliography: [...references.bibliography],
+        csl: references.csl,
+        linkCitations: references.linkCitations,
+        referencesHeading: references.referencesHeading || "References",
+        resolvedReferences: references,
       });
       if (!this.isCurrent(request)) return;
       body = citeResult.body;
@@ -524,6 +552,7 @@ export class InkwellPreviewProvider {
         if (!this.panel || !doc) break;
 
         const request = this.previewState.current;
+        if (this.ensureReady && !await this.ensureReady(doc, true)) break;
         if (!request || !this.isCurrent(request)) break;
         this.postMessage({ type: "compileStarted" }, request);
 
@@ -1858,132 +1887,38 @@ interface FrontmatterResult {
  */
 type SectionNumberingStyle = "decimal" | "legal" | "none";
 
-function stripFrontmatter(text: string): FrontmatterResult {
-  const split = splitFrontmatter(text);
-  if (!split) return { body: text };
-
-  const fm = split.fm;
-  const body = split.body;
-
-  const scalar = (key: string): string | undefined => {
-    const m = fm.match(new RegExp(`^${key}:\\s*['"]?(.+?)['"]?\\s*$`, "m"));
-    return m ? m[1] : undefined;
+export function stripFrontmatter(text: string, config?: DocumentConfig): FrontmatterResult {
+  const resolved = config || resolveDocumentConfig({ text });
+  const metadata = resolved.compatibility;
+  const inkwell = metadata.inkwell && typeof metadata.inkwell === "object" && !Array.isArray(metadata.inkwell)
+    ? metadata.inkwell as Record<string, unknown> : {};
+  const scalar = (value: unknown): string | undefined => typeof value === "string" || typeof value === "number" ? String(value) : undefined;
+  const author = (value: unknown): string | undefined => {
+    if (Array.isArray(value)) return value.map(author).filter(Boolean).join(", ");
+    if (value && typeof value === "object") return scalar((value as Record<string, unknown>).name);
+    return scalar(value);
   };
-
-  const block = (key: string): string | undefined => {
-    const m = fm.match(new RegExp(`^${key}:\\s*\\|\\s*\\n((?:[ \\t]+.+\\n?)+)`, "m"));
-    return m ? m[1].replace(/^[ \t]+/gm, "").trim() : undefined;
-  };
-
-  const list = (key: string): string[] | undefined => {
-    const one = scalar(key);
-    if (one) return [one];
-    const re = new RegExp(`^${key}:\\s*\\n((?:\\s+-\\s+.+\\n?)+)`, "m");
-    const m = fm.match(re);
-    if (!m) return undefined;
-    return m[1]
-      .split("\n")
-      .map((l) => l.replace(/^\s+-\s+/, "").trim())
-      .map((l) => l.replace(/^['"](.*)['"]$/, "$1"))
-      .filter(Boolean);
-  };
-
-  const inkwellBlock = extractIndentedBlock(fm, "inkwell");
-  const tableStyleRaw = inkwellBlock
-    ? extractIndentedValue(inkwellBlock, "tables")
-    : undefined;
-  const tableStyle =
-    tableStyleRaw === "booktabs" || tableStyleRaw === "grid" || tableStyleRaw === "plain"
-      ? tableStyleRaw
-      : undefined;
-  const captionStyleRaw = inkwellBlock
-    ? extractIndentedValue(inkwellBlock, "caption-style")
-    : undefined;
-  const captionStyle =
-    captionStyleRaw === "above" || captionStyleRaw === "below"
-      ? captionStyleRaw
-      : undefined;
-  const tableStripe = inkwellBlock
-    ? extractIndentedValue(inkwellBlock, "table-stripe") === "true"
-    : false;
-  const tableFontSize = inkwellBlock
-    ? extractIndentedValue(inkwellBlock, "table-font-size")
-    : undefined;
-  const mermaidMaxWidth = inkwellBlock
-    ? extractIndentedValue(inkwellBlock, "mermaid-max-width")
-    : undefined;
-  const mermaidMaxHeight = inkwellBlock
-    ? extractIndentedValue(inkwellBlock, "mermaid-max-height")
-    : undefined;
-  const headingFont = inkwellBlock
-    ? extractIndentedValue(inkwellBlock, "heading-font")
-    : undefined;
-  const headingColor = inkwellBlock
-    ? extractIndentedValue(inkwellBlock, "heading-color")
-    : undefined;
-  const headingWeight = inkwellBlock
-    ? extractIndentedValue(inkwellBlock, "heading-weight")
-    : undefined;
-  const headingScaleRaw = inkwellBlock
-    ? extractIndentedValue(inkwellBlock, "heading-scale")
-    : undefined;
-  const headingScale = headingScaleRaw ? parseFloat(headingScaleRaw) : undefined;
-  const codeFontSize = inkwellBlock
-    ? extractIndentedValue(inkwellBlock, "code-font-size")
-    : undefined;
-  const captionFontSize = inkwellBlock
-    ? extractIndentedValue(inkwellBlock, "caption-font-size")
-    : undefined;
-  const sectionNumberingRaw = inkwellBlock
-    ? extractIndentedValue(inkwellBlock, "section-numbering")
-    : undefined;
-  const sectionNumbering: SectionNumberingStyle =
-    sectionNumberingRaw === "legal" || sectionNumberingRaw === "outline"
-      ? "legal"
-      : sectionNumberingRaw === "none" || sectionNumberingRaw === "off"
-      ? "none"
-      : "decimal";
-
-  const linkCitRaw = scalar("link-citations");
-  const linkCitations =
-    linkCitRaw === undefined ? undefined : linkCitRaw.toLowerCase() !== "false";
-
-  return {
-    body,
-    title: scalar("title"),
-    subtitle: scalar("subtitle"),
-    author: scalar("author"),
-    date: scalar("date"),
-    abstract: block("abstract") || scalar("abstract"),
-    mainfont: scalar("mainfont"),
-    monofont: scalar("monofont"),
-    figPrefix: scalar("figPrefix"),
-    tblPrefix: scalar("tblPrefix"),
-    eqnPrefix: scalar("eqnPrefix"),
-    secPrefix: scalar("secPrefix"),
-    geometry: scalar("geometry"),
-    papersize: scalar("papersize"),
-    fontsize: scalar("fontsize"),
-    linestretch: scalar("linestretch"),
-    documentclass: scalar("documentclass"),
-    pagestyle: scalar("pagestyle"),
-    tableStyle,
-    tableStripe,
-    tableFontSize,
-    captionStyle,
-    mermaidMaxWidth,
-    mermaidMaxHeight,
-    headingFont,
-    headingColor,
-    headingWeight,
-    headingScale: Number.isFinite(headingScale) && headingScale! > 0 ? headingScale : undefined,
-    codeFontSize,
-    captionFontSize,
-    sectionNumbering,
-    bibliography: list("bibliography"),
-    csl: scalar("csl"),
-    linkCitations,
-  };
+  const result: FrontmatterResult = { body: resolved.body, author: author(metadata.author) };
+  for (const key of ["title", "subtitle", "date", "abstract", "mainfont", "monofont", "figPrefix", "tblPrefix", "eqnPrefix", "secPrefix", "geometry", "papersize", "fontsize", "linestretch", "documentclass", "pagestyle"] as const) {
+    result[key] = scalar(metadata[key]);
+  }
+  const keys = {
+    tableFontSize: "table-font-size", mermaidMaxWidth: "mermaid-max-width", mermaidMaxHeight: "mermaid-max-height",
+    headingFont: "heading-font", headingColor: "heading-color", headingWeight: "heading-weight",
+    codeFontSize: "code-font-size", captionFontSize: "caption-font-size",
+  } as const;
+  for (const key of Object.keys(keys) as (keyof typeof keys)[]) result[key] = scalar(inkwell[keys[key]]);
+  const table = inkwell.tables && typeof inkwell.tables === "object" ? (inkwell.tables as Record<string, unknown>).preset : inkwell.tables;
+  if (["booktabs", "grid", "plain"].includes(String(table))) result.tableStyle = table as FrontmatterResult["tableStyle"];
+  result.tableStripe = inkwell["table-stripe"] === true;
+  if (inkwell["caption-style"] === "above" || inkwell["caption-style"] === "below") result.captionStyle = inkwell["caption-style"];
+  if (typeof inkwell["heading-scale"] === "number") result.headingScale = inkwell["heading-scale"];
+  const numbering = inkwell["section-numbering"];
+  result.sectionNumbering = numbering === "legal" || numbering === "outline" ? "legal" : numbering === "none" || numbering === "off" ? "none" : "decimal";
+  result.bibliography = typeof metadata.bibliography === "string" ? [metadata.bibliography] : Array.isArray(metadata.bibliography) ? metadata.bibliography.filter((value): value is string => typeof value === "string") : undefined;
+  result.csl = scalar(metadata.csl);
+  if (typeof metadata["link-citations"] === "boolean") result.linkCitations = metadata["link-citations"];
+  return result;
 }
 
 function addDataLineAttrs(html: string): string {

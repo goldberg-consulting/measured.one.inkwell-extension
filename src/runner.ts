@@ -4,8 +4,8 @@
 
 import * as path from "path";
 import * as fs from "fs";
-import { getInkwellProjectRoot } from "./config";
-import { splitFrontmatter, extractIndentedBlock, extractIndentedValue } from "./frontmatter";
+import { getDocumentConfig, getInkwellProjectRoot } from "./config";
+import { applyBlockOverrides, ConfigDiagnostic, DocumentConfig, resolveDocumentConfig } from "./document-config";
 import { executeRunProcess, RunCancellation, ProcessOutcome } from "./run-process";
 import { fingerprintBlock, resolveRunSource, RunStore } from "./run-store";
 export { RunCancellation } from "./run-process";
@@ -32,6 +32,9 @@ export interface CodeBlock {
   id?: string;
   inputs?: string[];
   dependsOn?: string[];
+  attributes?: Record<string, string>;
+  configDiagnostics?: ConfigDiagnostic[];
+  timeoutMs?: number;
   lang: string;
   source: string;
   file?: string;
@@ -53,6 +56,11 @@ export interface RunConfig {
   defaultDisplay?: DisplayMode;
   timeoutMs?: number;
   maxBuffer?: number;
+  cache?: boolean;
+  inputs?: string[];
+  dependsOn?: string[];
+  diagnostics?: ConfigDiagnostic[];
+  documentConfig?: DocumentConfig;
 }
 
 export interface BlockResult {
@@ -86,29 +94,35 @@ const LANG_COMMANDS: Record<string, string[]> = {
 // Quarto/Pandoc-style fenced code blocks: ```{python file="..." output="plot"}
 const BLOCK_PATTERN = /^```\{(\w+)([^}]*)\}\s*\n([\s\S]*?)^```/gm;
 
-export function parseRunConfig(markdown: string): RunConfig {
-  const config: RunConfig = {};
-  const fm = splitFrontmatter(markdown);
-  if (!fm) return config;
+export function parseRunConfig(markdown: string, sourceFile?: string): RunConfig {
+  const config = sourceFile ? getDocumentConfig(markdown, sourceFile) : resolveDocumentConfig({ text: markdown });
+  return {
+    pythonEnv: config.runs.pythonEnv, rEnv: config.runs.rEnv, nodeEnv: config.runs.nodeEnv,
+    defaultDisplay: config.runs.display, cache: config.runs.cache,
+    timeoutMs: config.runs.timeoutSeconds === undefined ? undefined : config.runs.timeoutSeconds * 1000,
+    inputs: [...config.runs.inputs], dependsOn: [...config.runs.dependsOn], diagnostics: [...config.diagnostics], documentConfig: config,
+  };
+}
 
-  const block = extractIndentedBlock(fm.fm, "inkwell");
-  if (!block) return config;
-
-  const pyEnv = extractIndentedValue(block, "python-env");
-  if (pyEnv) config.pythonEnv = pyEnv;
-
-  const rEnv = extractIndentedValue(block, "r-env");
-  if (rEnv) config.rEnv = rEnv;
-
-  const nodeEnv = extractIndentedValue(block, "node-env");
-  if (nodeEnv) config.nodeEnv = nodeEnv;
-
-  const display = extractIndentedValue(block, "code-display");
-  if (display && ["output", "both", "code", "none"].includes(display)) {
-    config.defaultDisplay = display as DisplayMode;
-  }
-
-  return config;
+function applyRunDefaults(blocks: CodeBlock[], config: RunConfig): CodeBlock[] {
+  return blocks.map(block => {
+    const attributes: Record<string, unknown> = { ...block.attributes };
+    if (block.inputs !== undefined) attributes.inputs = block.inputs;
+    if (block.dependsOn !== undefined) attributes["depends-on"] = block.dependsOn;
+    if (attributes.cache === "no") attributes.cache = false;
+    if (attributes.cache === "yes") attributes.cache = true;
+    const effective = applyBlockOverrides(config.documentConfig!, attributes);
+    return { ...block,
+      display: effective.runs.display,
+      file: effective.runs.file, id: effective.runs.id, output: effective.runs.output,
+      caption: effective.runs.caption, label: effective.runs.label,
+      noCache: !effective.runs.cache,
+      inputs: effective.runs.inputs.length ? [...effective.runs.inputs] : undefined,
+      dependsOn: effective.runs.dependsOn.length ? [...effective.runs.dependsOn] : undefined,
+      timeoutMs: effective.runs.timeoutSeconds === undefined ? undefined : effective.runs.timeoutSeconds * 1000,
+      configDiagnostics: effective.diagnostics.map(diagnostic => config.diagnostics?.includes(diagnostic) ? diagnostic : { ...diagnostic, line: block.startLine }),
+    };
+  });
 }
 
 export function parseCodeBlocks(markdown: string): CodeBlock[] {
@@ -131,11 +145,12 @@ export function parseCodeBlocks(markdown: string): CodeBlock[] {
     const attrs = parseQuotedAttrs(attrsStr);
 
     const display = (attrs.display as DisplayMode) || undefined;
-    const noCache = attrs.cache === "false" || attrs.cache === "no";
+    const noCache = attrs.cache === undefined ? undefined : attrs.cache === "false" || attrs.cache === "no";
 
     blocks.push({
       index: index++,
       id: attrs.id,
+      attributes: attrs,
       inputs: attrs.inputs?.split(/[,;]+/).map(value => value.trim()).filter(Boolean),
       dependsOn: attrs["depends-on"]?.split(/[,;\s]+/).filter(Boolean),
       lang,
@@ -146,7 +161,7 @@ export function parseCodeBlocks(markdown: string): CodeBlock[] {
       display,
       caption: attrs.caption,
       label: attrs.label,
-      noCache: noCache || undefined,
+      noCache,
       startLine,
       endLine,
       raw,
@@ -317,7 +332,7 @@ export async function runBlock(
   const interpreter = resolveInterpreter(langKey, block.env, runConfig, projectRoot, docDir);
   const executable = fingerprintBlock(block, docDir, projectRoot, interpreter).interpreter.path;
   const outcome = await executeRunProcess(executable, [...interpreter.args, scriptPath], {
-    cwd: projectRoot, timeoutMs: runConfig.timeoutMs, maxBuffer: runConfig.maxBuffer,
+    cwd: projectRoot, timeoutMs: block.timeoutMs ?? runConfig.timeoutMs, maxBuffer: runConfig.maxBuffer,
     env: { ...process.env, ...interpreter.envVars, INKWELL_OUTPUT_DIR: outputDir, INKWELL_BLOCK_INDEX: String(block.index) },
   }, cancel);
   return { block, ...outcome, process: outcome,
@@ -341,11 +356,13 @@ export function blockLabel(block: CodeBlock): string {
 
 /** Read-only validation used by both compilation and preview. */
 export function readCurrentRunResults(markdown: string, sourceFile: string): BlockResult[] {
-  const blocks = parseCodeBlocks(markdown);
+  const runConfig = parseRunConfig(markdown, sourceFile);
+  const blocks = applyRunDefaults(parseCodeBlocks(markdown), runConfig);
   const projectRoot = getInkwellProjectRoot(sourceFile);
   const docDir = path.dirname(sourceFile);
   const store = new RunStore(projectRoot, sourceFile);
-  const runConfig = parseRunConfig(markdown);
+  const invalid = runConfig.diagnostics?.filter(diagnostic => diagnostic.severity === "error");
+  if (invalid?.length) return blocks.map(block => failedResult(block, invalid.map(diagnostic => diagnostic.message).join("\n")));
   let ids: string[];
   try { ids = store.assignBlockIds(blocks); } catch (error) { return blocks.map(block => failedResult(block, String(error))); }
   const byName = new Map(blocks.filter(block => block.id || block.label).map(block => [block.id || block.label!, block]));
@@ -354,6 +371,11 @@ export function readCurrentRunResults(markdown: string, sourceFile: string): Blo
     const existing = results.get(block.index); if (existing) return existing;
     if (visiting.has(block.index)) return failedResult(block, "Cyclic run dependency");
     visiting.add(block.index);
+    const invalid = block.configDiagnostics?.filter(diagnostic => diagnostic.severity === "error");
+    if (invalid?.length) {
+      const result = failedResult(block, invalid.map(diagnostic => `Line ${diagnostic.line}: ${diagnostic.message}`).join("\n"));
+      visiting.delete(block.index); results.set(block.index, result); return result;
+    }
     const upstream: Record<string, string> = {};
     let error: string | undefined;
     for (const dependency of block.dependsOn || []) {
@@ -378,10 +400,17 @@ export async function runAllBlocks(
   markdown: string, sourceFile: string, cancel?: RunCancellation,
   onProgress?: (progress: BlockProgress) => void,
 ): Promise<BlockResult[]> {
-  const blocks = parseCodeBlocks(markdown); if (!blocks.length) return [];
+  const runConfig = parseRunConfig(markdown, sourceFile);
+  const blocks = applyRunDefaults(parseCodeBlocks(markdown), runConfig); if (!blocks.length) return [];
   const projectRoot = getInkwellProjectRoot(sourceFile); const docDir = path.dirname(sourceFile);
   const store = new RunStore(projectRoot, sourceFile);
-  const runConfig = parseRunConfig(markdown); const ids = store.assignBlockIds(blocks, true);
+  const invalid = runConfig.diagnostics?.filter(diagnostic => diagnostic.severity === "error");
+  if (invalid?.length) return blocks.map(block => {
+    const result = failedResult(block, invalid.map(diagnostic => diagnostic.message).join("\n"));
+    onProgress?.({ index: block.index, total: blocks.length, lang: block.lang, label: blockLabel(block), status: "failed", error: result.stderr });
+    return result;
+  });
+  const ids = store.assignBlockIds(blocks, true);
   const byName = new Map(blocks.filter(block => block.id || block.label).map(block => [block.id || block.label!, block]));
   const results = new Map<number, BlockResult>(); const visiting = new Set<number>();
   const execute = async (block: CodeBlock): Promise<BlockResult> => {
@@ -393,6 +422,11 @@ export async function runAllBlocks(
       interpreter: result?.interpreter, warning: result?.warning, noCache: block.noCache,
       error: result?.exitCode ? result.stderr.split("\n")[0] : undefined,
     });
+    const invalid = block.configDiagnostics?.filter(diagnostic => diagnostic.severity === "error");
+    if (invalid?.length) {
+      const result = failedResult(block, invalid.map(diagnostic => `Line ${diagnostic.line}: ${diagnostic.message}`).join("\n"));
+      report("failed", result); visiting.delete(block.index); results.set(block.index, result); return result;
+    }
     const upstream: Record<string, string> = {}; let dependencyError: string | undefined;
     for (const dependency of block.dependsOn || []) {
       const upstreamBlock = byName.get(dependency); const result = upstreamBlock ? await execute(upstreamBlock) : undefined;

@@ -15,7 +15,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import { spawn } from "child_process";
-import { findBibFiles, findCslFile, getInkwellProjectRoot } from "./config";
+import { getDocumentConfig, getResolvedReferences, getInkwellProjectRoot, ResolvedReferences } from "./config";
 import { findBinaryViaShell } from "./shell-env";
 
 function runPandoc(
@@ -78,6 +78,7 @@ function runPandoc(
 export interface CitationOptions {
   sourceFile: string;
   projectRoot: string;
+  resolvedReferences?: ResolvedReferences;
   bibliography?: string[];
   csl?: string;
   linkCitations?: boolean;
@@ -632,40 +633,29 @@ async function renderWithFallback(
 
 // ── Public entry point ────────────────────────────────────────────────
 
+/** Shared path resolution, with a compatibility bridge for existing programmatic callers. */
+export function resolveCitationReferences(markdown: string, opts: CitationOptions): ResolvedReferences {
+  if (opts.resolvedReferences) return opts.resolvedReferences;
+  const config = getDocumentConfig(markdown, opts.sourceFile);
+  const overrides: Record<string, unknown> = {};
+  if (opts.bibliography !== undefined) overrides.bibliography = opts.bibliography;
+  if (opts.csl !== undefined) overrides.csl = opts.csl;
+  if (opts.linkCitations !== undefined) overrides["link-citations"] = opts.linkCitations;
+  if (opts.referencesHeading !== undefined) overrides["reference-section-title"] = opts.referencesHeading;
+  return getResolvedReferences({ ...config,
+    compatibility: { ...config.compatibility, ...overrides },
+    documentMetadata: { ...config.documentMetadata, ...overrides },
+  }, opts.sourceFile);
+}
+
 export async function renderCitations(
   markdown: string,
   opts: CitationOptions,
 ): Promise<CitationRenderResult> {
   const tokens = extractCitations(markdown);
 
-  // Resolve candidate .bib files. Frontmatter wins (may be absolute or
-  // relative to the document directory); otherwise discover via config.
-  const docDir = path.dirname(opts.sourceFile);
-  const bibFiles: string[] = [];
-  const seen = new Set<string>();
-
-  const addBib = (p: string): void => {
-    let resolved = p;
-    if (!path.isAbsolute(resolved)) {
-      const fromDoc = path.resolve(docDir, resolved);
-      const fromRoot = path.resolve(opts.projectRoot, resolved);
-      if (fs.existsSync(fromDoc)) resolved = fromDoc;
-      else if (fs.existsSync(fromRoot)) resolved = fromRoot;
-      else resolved = fromDoc;
-    }
-    if (!seen.has(resolved) && fs.existsSync(resolved)) {
-      seen.add(resolved);
-      bibFiles.push(resolved);
-    }
-  };
-
-  if (opts.bibliography?.length) {
-    for (const b of opts.bibliography) addBib(b);
-  }
-  if (!bibFiles.length) {
-    for (const b of findBibFiles(opts.projectRoot)) addBib(b);
-  }
-
+  const references = resolveCitationReferences(markdown, opts);
+  const bibFiles = [...references.bibliography];
   if (!tokens.length) {
     return {
       body: markdown,
@@ -675,18 +665,8 @@ export async function renderCitations(
     };
   }
 
-  let cslFile: string | undefined;
-  if (opts.csl) {
-    cslFile = findCslFile(opts.projectRoot, opts.csl);
-  } else {
-    // Parity with the compile pipeline: without a declared csl the PDF
-    // uses the bundled numeric style ([1,2,3]), so the preview should
-    // render the same numbers rather than Chicago author-date.
-    const bundled = path.join(__dirname, "..", "csl", "inkwell-numeric.csl");
-    if (fs.existsSync(bundled)) cslFile = bundled;
-  }
-
-  const linkCitations = opts.linkCitations !== false;
+  const cslFile = references.csl;
+  const linkCitations = references.linkCitations;
 
   const key = cacheKey(tokens, bibFiles, cslFile, linkCitations);
   let cached = readCache(opts.projectRoot, key);
@@ -727,7 +707,7 @@ export async function renderCitations(
     }
   }
 
-  const refsHeading = opts.referencesHeading || "References";
+  const refsHeading = references.referencesHeading || "References";
   let referencesHtml: string | undefined;
   if (cached.referencesHtml && cached.referencesHtml.trim()) {
     referencesHtml = `<section class="references-section"><h2 class="references-heading">${escapeHtmlCit(refsHeading)}</h2>${cached.referencesHtml}</section>`;

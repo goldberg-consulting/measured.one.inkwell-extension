@@ -14,16 +14,21 @@ function host(t, renderCitations = async (body) => emptyCitations(body), compile
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'inkwell-preview-test-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const messages = [];
+  const vscode = { Uri: { file: uri }, window: {} };
   const webview = { postMessage: async (message) => { messages.push(message); return true; }, asWebviewUri: (u) => u, cspSource: 'test:', options: {} };
   const original = Module._load;
   Module._load = function(request, parent, ...args) {
-    if (request === 'vscode') return { Uri: { file: uri }, window: {} };
+    if (request === 'vscode') return vscode;
     if (parent?.filename === path.join(extensionRoot, 'out/preview.js')) {
       if (request === './compiler') return { compile, readLastSuccessfulOutput: () => undefined, detectMode: () => 'pandoc', isCompilable: () => true };
       if (request === './runner') return { parseCodeBlocks: () => [] };
       if (request === './inject') return { prepareForPreview: (text) => text };
       if (request === './inkwell-output') return { getInkwellOutputChannel: () => ({ clear() {}, appendLine() {} }) };
-      if (request === './config') return { getInkwellProjectRoot: () => root, getInkwellOutputsDir: () => root };
+      if (request === './config') return {
+        getInkwellProjectRoot: () => root, getInkwellOutputsDir: () => root,
+        getDocumentConfig: (text, sourcePath) => require('../out/document-config').resolveDocumentConfig({ text, sourcePath }),
+        getResolvedReferences: config => ({ bibliography: config.references.bibliography, scope: config.references.scope, linkCitations: config.references.links, diagnostics: [] }),
+      };
       if (request === './citations') return { renderCitations };
     }
     return original.call(this, request, parent, ...args);
@@ -37,7 +42,7 @@ function host(t, renderCitations = async (body) => emptyCitations(body), compile
   provider.panel = { webview, title: '' };
   provider.initialized = true;
   const document = (name, text, version = 1) => ({ uri: uri(path.join(root, name)), version, getText: () => text });
-  return { provider, messages, webview, root, document };
+  return { provider, messages, webview, root, document, vscode };
 }
 
 function deferred() {
@@ -106,6 +111,56 @@ test('a delayed old citation render cannot replace the newest document revision'
   const updates = h.messages.filter((m) => m.type === 'updateContent');
   assert.match(updates.at(-1).html, /new/);
   assert.equal(updates.some((m) => m.html.includes('old')), false);
+});
+
+test('blocked readiness clears a switched preview without rendering or compiling its content', async t => {
+  let renders = 0, compiles = 0;
+  const h = host(t, async body => { renders++; return emptyCitations(body); }, async () => { compiles++; });
+  const document = h.document('plain.md', 'private unconfigured content');
+  h.provider.currentDocument = document;
+  h.provider.ensureReady = async () => false;
+  await h.provider.sendContentUpdate(document);
+  await h.provider.handleCompile();
+  assert.equal(renders, 0);
+  assert.equal(compiles, 0);
+  const update = h.messages.find(message => message.type === 'updateContent');
+  assert.equal(update.pdfData, null);
+  assert.doesNotMatch(update.html, /private unconfigured/);
+});
+
+test('a delayed readiness result cannot republish a previous document', async t => {
+  const wait = deferred();
+  const h = host(t);
+  const a = h.document('a.md', 'old document');
+  const b = h.document('b.md', 'current document');
+  h.provider.ensureReady = document => document === a ? wait.promise : Promise.resolve(true);
+  h.provider.currentDocument = a;
+  const old = h.provider.sendContentUpdate(a);
+  h.provider.currentDocument = b;
+  await h.provider.sendContentUpdate(b);
+  wait.resolve(false);
+  await old;
+  assert.equal(h.messages.filter(message => message.type === 'updateContent').length, 1);
+  assert.match(h.messages.at(-1).html, /current document/);
+});
+
+test('a delayed Open Preview setup prompt cannot switch back to the previously active document', async t => {
+  const pending = deferred();
+  const h = host(t);
+  const a = h.document('a.md', 'previous document');
+  const b = h.document('b.md', 'current document');
+  h.provider.currentDocument = a;
+  h.vscode.window.activeTextEditor = { document: a };
+  h.provider.ensureReady = async document => document === a ? pending.promise : true;
+  const opening = h.provider.show();
+  h.vscode.window.activeTextEditor = { document: b };
+  h.provider.currentDocument = b;
+  await h.provider.sendContentUpdate(b);
+  pending.resolve(true);
+  await opening;
+  assert.equal(h.provider.getDocument(), b);
+  assert.equal(h.messages.filter(message => message.type === 'updateContent').length, 1);
+  assert.match(h.messages.at(-1).html, /current document/);
 });
 
 test('switching documents clears PDF, citations, and run output before a slow new render completes', async (t) => {

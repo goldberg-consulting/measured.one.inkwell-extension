@@ -11,8 +11,9 @@ import * as os from "os";
 import * as crypto from "crypto";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { findBibFiles, findCslFile, findDefaultsYaml, getInkwellProjectRoot } from "./config";
-import { splitFrontmatter, extractIndentedBlock } from "./frontmatter";
+import { findDefaultsYaml, getDocumentConfig, getResolvedReferences, getInkwellProjectRoot } from "./config";
+import { DocumentConfig, Metadata, parseDocumentFrontmatter, stripResolvedConfigFields } from "./document-config";
+import { stringify as stringifyYaml } from "yaml";
 import { InkwellDiagnostics, CompileError } from "./diagnostics";
 import { getTemplateForDocument, copySupportingFiles, PdfEngine, ResolvedTemplate, collectAllFeatures } from "./templates";
 import { prepareForCompilation } from "./inject";
@@ -51,7 +52,6 @@ const TEX_ENV = {
 // (both the tsc tree and the esbuild bundle), so these resolve to the
 // extension's top-level filters/ and csl/ directories.
 const SECTION_BIBS_FILTER = path.join(__dirname, "..", "filters", "section-bibliographies.lua");
-const DEFAULT_NUMERIC_CSL = path.join(__dirname, "..", "csl", "inkwell-numeric.csl");
 
 function safeReadFile(file: string): string {
   try {
@@ -530,6 +530,46 @@ function checkTemplateFeatures(
   return { warnings, logLines };
 }
 
+function canonicalMetadata(value: unknown): string {
+  const canonical = (item: unknown): unknown => Array.isArray(item) ? item.map(canonical)
+    : item !== null && typeof item === "object" ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)).map(([key, entry]) => [key, canonical(entry)])) : item;
+  return JSON.stringify(canonical(value));
+}
+
+/** Only the staged source changes; unknown metadata and header-includes stay intact. */
+export function serializeDocumentForPandoc(markdown: string, config: DocumentConfig): string {
+  if (canonicalMetadata(config.compatibility) === canonicalMetadata(config.documentMetadata)) return markdown;
+  return `---\n${stringifyYaml(config.compatibility, { lineWidth: 0 })}---\n${config.body}`;
+}
+
+/** Raw Pandoc variables must not override values already resolved by Inkwell. */
+export function sanitizePandocDefaults(text: string, sourcePath?: string): Metadata {
+  const parsed = parseDocumentFrontmatter(`---\n${text}\n---\n`, "<defaults.yaml>");
+  if (parsed.diagnostics.some(diagnostic => diagnostic.severity === "error")) throw new Error("Cannot prepare malformed Pandoc defaults.");
+  const defaults = stripResolvedConfigFields(parsed.metadata);
+  for (const section of ["metadata", "variables"]) {
+    const value = parsed.metadata[section];
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+      const remaining = stripResolvedConfigFields(value as Metadata);
+      if (Object.keys(remaining).length) defaults[section] = remaining;
+      else delete defaults[section];
+    }
+  }
+  // The effective file lives in staging; retain Pandoc's original ${.} path context.
+  if (sourcePath) {
+    const base = path.dirname(sourcePath);
+    const rebase = (value: unknown): unknown => typeof value === "string" ? value.replaceAll("${.}", base)
+      : Array.isArray(value) ? value.map(rebase)
+      : value !== null && typeof value === "object" ? Object.fromEntries(Object.entries(value).map(([key, item]) => [key, rebase(item)])) : value;
+    for (const key of ["filters", "lua-filter", "filter", "input-files", "output-file", "metadata-file", "metadata-files", "include-in-header", "include-before-body", "include-after-body", "resource-path", "data-dir", "reference-doc", "syntax-definitions", "epub-cover-image", "epub-metadata", "epub-fonts", "highlight-style"]) {
+      if (Object.hasOwn(defaults, key)) defaults[key] = rebase(defaults[key]);
+    }
+  }
+  // Citation mode belongs to the resolved document scope and selected filter.
+  delete defaults.citeproc;
+  return defaults;
+}
+
 async function compilePandoc(
   document: vscode.TextDocument,
   attempt: CompileAttempt
@@ -586,7 +626,30 @@ async function compilePandoc(
   const rawText = document.getText();
   const featureCheck = checkTemplateFeatures(rawText, template, document.uri);
   const pipelineWarnings: CompileError[] = [];
+  const originalConfig = getDocumentConfig(rawText, sourceFile);
+  const invalid = originalConfig.diagnostics.filter(diagnostic => diagnostic.severity === "error");
+  if (invalid.length) return { success: false, pdfPath: undefined,
+    errors: invalid.map(diagnostic => ({ line: diagnostic.line, message: diagnostic.message, severity: diagnostic.severity })),
+    log: invalid.map(diagnostic => diagnostic.message).join("\n"), duration: (Date.now() - start) / 1000 };
   const { injected, unresolvedVars } = prepareForCompilation(rawText, sourceFile);
+  // Bindings may occur in metadata too, so resolve their injected values before planning Pandoc.
+  const documentConfig = getDocumentConfig(injected, sourceFile);
+  const references = getResolvedReferences(documentConfig, sourceFile);
+  const configDiagnostics = [...documentConfig.diagnostics, ...references.diagnostics,
+    ...documentConfig.deferredBindings.map(binding => ({
+      sourcePath: binding.sourcePath, line: binding.line, column: binding.column,
+      code: "unresolved-config-binding", severity: "error" as const,
+      message: `Setting "${binding.metadataKey}" still contains ${binding.tokens.join(", ")} after evaluating run results. Run the code blocks that export these values or correct the binding names.`,
+    })),
+  ];
+  for (const diagnostic of configDiagnostics) pipelineWarnings.push({
+    line: diagnostic.line, message: diagnostic.message, severity: diagnostic.severity,
+  });
+  if (configDiagnostics.some(diagnostic => diagnostic.severity === "error")) return {
+    success: false, pdfPath: undefined, errors: pipelineWarnings,
+    log: configDiagnostics.map(diagnostic => diagnostic.message).join("\n"), duration: (Date.now() - start) / 1000,
+  };
+  const effectiveSource = serializeDocumentForPandoc(injected, documentConfig);
   for (const key of unresolvedVars) {
     const token = `{{${key}}}`;
     const idx = rawText.indexOf(token);
@@ -598,7 +661,9 @@ async function compilePandoc(
   }
 
   const tmpSource = path.join(cacheDir, path.basename(sourceFile));
-  fs.writeFileSync(tmpSource, injected, "utf-8");
+  const sourceExt = path.extname(sourceFile).toLowerCase();
+  const markdownInput = sourceExt !== ".rst" && sourceExt !== ".org";
+  fs.writeFileSync(tmpSource, markdownInput ? effectiveSource : injected, "utf-8");
 
   // Two-stage compile:
   //   1. pandoc  ->  .tex  (runs the template, pandoc-crossref, citeproc)
@@ -636,12 +701,18 @@ async function compilePandoc(
     "numbersections=true",
   ];
 
+  if (!markdownInput && Object.keys(documentConfig.compatibility).length) {
+    const metadataFile = path.join(cacheDir, "document-metadata.json");
+    fs.writeFileSync(metadataFile, JSON.stringify(documentConfig.compatibility), "utf8");
+    pandocArgs.push("--metadata-file", metadataFile);
+  }
+
   // `top-level-division` is a Pandoc *option*, not a template variable, so
   // a frontmatter `top-level-division: chapter` is silently ignored unless
   // forwarded as a CLI flag. Book/report templates (tufte-book-vdqi) need
   // it for `#` headings to become \chapter instead of \section.
-  const division = extractTopLevelDivision(rawText);
-  if (division) {
+  const division = documentConfig.compatibility["top-level-division"];
+  if (typeof division === "string" && ["chapter", "part", "section"].includes(division)) {
     pandocArgs.push(`--top-level-division=${division}`);
   }
 
@@ -651,7 +722,7 @@ async function compilePandoc(
   // so the old -H path silently dropped user preamble commands (fonts,
   // spacing, citation overrides) whenever any inkwell: style key was
   // set. See preamble.ts for the merge contract.
-  const preambleText = generatePreambleText(rawText);
+  const preambleText = generatePreambleText(effectiveSource);
   let preambleMode = "none";
   if (preambleText) {
     const templateText = fs.readFileSync(templateDst, "utf-8");
@@ -660,7 +731,7 @@ async function compilePandoc(
       fs.writeFileSync(templateDst, injection.text, "utf-8");
       preambleMode = "merged into template copy";
     } else {
-      const preambleFile = writePreambleFile(rawText, cacheDir);
+      const preambleFile = writePreambleFile(effectiveSource, cacheDir);
       if (preambleFile) {
         pandocArgs.push("-H", preambleFile);
         preambleMode = "-H fallback (no header-includes marker in template; document header-includes will be overridden)";
@@ -680,7 +751,7 @@ async function compilePandoc(
   // section (configurable via `section-bibs-level`) so each chapter or
   // section carries its own reference list. Passing both would render
   // every citation and bibliography twice.
-  const bibScope = extractBibliographyScope(rawText);
+  const bibScope = references.scope;
   let citationMode = "document (--citeproc)";
   if (bibScope === "section" && fs.existsSync(SECTION_BIBS_FILTER)) {
     pandocArgs.push("--lua-filter", SECTION_BIBS_FILTER);
@@ -696,72 +767,20 @@ async function compilePandoc(
     pandocArgs.push("--citeproc");
   }
 
-  // Explicit --bibliography flags override the document's own
-  // `bibliography:` metadata (pandoc: command line beats document), so
-  // discovery alone silently broke any document that declared its own
-  // file outside the scanned locations — citations stopped resolving
-  // without an error. Forward the declared files as flags too, ahead of
-  // the discovered ones, and warn when a declared file does not exist.
-  const declaredBibs = extractDocumentBibliographies(rawText);
-  const resolvedDeclared: string[] = [];
-  for (const declared of declaredBibs) {
-    const candidates = path.isAbsolute(declared)
-      ? [path.normalize(declared)]
-      : [path.resolve(sourceDir, declared), path.resolve(projectRoot, declared)];
-    const hit = candidates.find((c) => fs.existsSync(c));
-    if (hit) {
-      resolvedDeclared.push(hit);
-    } else {
-      const idx = rawText.indexOf(declared);
-      pipelineWarnings.push({
-        line: idx >= 0 ? rawText.slice(0, idx).split("\n").length : undefined,
-        message: `Declared bibliography not found: ${declared} (checked the document directory and the project root). Its citations will not resolve.`,
-        severity: "warning",
-      });
-    }
-  }
-  const bibFiles = [...new Set([...resolvedDeclared, ...findBibFiles(projectRoot)])];
-  for (const bib of bibFiles) {
-    pandocArgs.push("--bibliography", bib);
-  }
+  // Preview and PDF consume the same ordered, resolved reference set.
+  const bibFiles = [...references.bibliography];
+  for (const bib of bibFiles) pandocArgs.push("--bibliography", bib);
   const defaults = findDefaultsYaml(projectRoot);
   if (defaults) {
-    pandocArgs.push("--defaults", defaults);
-  }
-
-  // Citation style. Priority: frontmatter `csl:` > defaults.yaml `csl:` >
-  // the bundled numeric style ([1,2,3] with a numbered reference list).
-  // Without the bundled default, pandoc falls back to Chicago author-date.
-  let cslMode = "bundled numeric default";
-  const declaredCsl = extractDeclaredCsl(rawText);
-  if (declaredCsl) {
-    const resolvedCsl =
-      findCslFile(projectRoot, declaredCsl) ??
-      [path.resolve(sourceDir, declaredCsl)].find((c) => fs.existsSync(c));
-    if (resolvedCsl) {
-      pandocArgs.push("--csl", resolvedCsl);
-      cslMode = resolvedCsl;
-    } else {
-      // Could be a pandoc data-dir style name; only a path-looking value
-      // that resolves nowhere is worth a warning. Passing no flag lets
-      // pandoc try the metadata value itself.
-      cslMode = `declared "${declaredCsl}" (not found by Inkwell; left to pandoc)`;
-      if (declaredCsl.endsWith(".csl")) {
-        const idx = rawText.indexOf(declaredCsl);
-        pipelineWarnings.push({
-          line: idx >= 0 ? rawText.slice(0, idx).split("\n").length : undefined,
-          message: `Declared csl file not found: ${declaredCsl} (checked .inkwell/csl/, csl/, the project root, references/, and the document directory).`,
-          severity: "warning",
-        });
-      }
+    const effectiveDefaults = sanitizePandocDefaults(fs.readFileSync(defaults, "utf8"), defaults);
+    if (Object.keys(effectiveDefaults).length) {
+      const defaultsFile = path.join(cacheDir, "pandoc-defaults.yaml");
+      fs.writeFileSync(defaultsFile, stringifyYaml(effectiveDefaults, { lineWidth: 0 }), "utf8");
+      pandocArgs.push("--defaults", defaultsFile);
     }
-  } else if (defaults && /^csl:/m.test(safeReadFile(defaults))) {
-    cslMode = "from defaults.yaml";
-  } else if (fs.existsSync(DEFAULT_NUMERIC_CSL)) {
-    pandocArgs.push("--csl", DEFAULT_NUMERIC_CSL);
-  } else {
-    cslMode = "pandoc default (bundled numeric style missing)";
   }
+  const cslMode = references.csl || "pandoc default (bundled numeric style missing)";
+  if (references.csl) pandocArgs.push("--csl", references.csl);
 
   copySiblingFiles(sourceDir, projectRoot, cacheDir);
   fs.rmSync(tmpOutput, { force: true });
@@ -898,60 +917,6 @@ async function compilePandoc(
       (logContent ? "\n\n--- engine log (excerpt) ---\n" + extractEngineLogExcerpt(logContent) : ""),
     duration,
   };
-}
-
-/**
- * Frontmatter `bibliography:` — a scalar path or a list of paths. Exported
- * to the pipeline as explicit --bibliography flags because pandoc lets
- * command-line flags beat document metadata: without forwarding, the
- * discovery flags would override the document's own declaration.
- */
-function extractDocumentBibliographies(text: string): string[] {
-  const fm = splitFrontmatter(text);
-  if (!fm) return [];
-
-  const scalar = fm.fm.match(/^bibliography:[ \t]*["']?([^"'\n#]+?)["']?[ \t]*(?:#.*)?$/m);
-  if (scalar) return [scalar[1].trim()];
-
-  const block = extractIndentedBlock(fm.fm, "bibliography");
-  if (!block) return [];
-  const out: string[] = [];
-  for (const line of block.split("\n")) {
-    const m = line.match(/^[ \t]*-[ \t]*["']?([^"'\n#]+?)["']?[ \t]*$/);
-    if (m) out.push(m[1].trim());
-  }
-  return out;
-}
-
-/**
- * Frontmatter `bibliography-scope: document|section`. `section` swaps
- * --citeproc for the bundled per-section Lua filter; anything else (or
- * absence) keeps the single document-level bibliography.
- */
-function extractBibliographyScope(text: string): "section" | undefined {
-  const fm = splitFrontmatter(text);
-  if (!fm) return undefined;
-  const m = fm.fm.match(/^bibliography-scope:\s*['"]?(document|section)['"]?\s*(?:#.*)?$/m);
-  return m && m[1] === "section" ? "section" : undefined;
-}
-
-/** Frontmatter `csl:` scalar (a path or a pandoc data-dir style name). */
-function extractDeclaredCsl(text: string): string | undefined {
-  const fm = splitFrontmatter(text);
-  if (!fm) return undefined;
-  const m = fm.fm.match(/^csl:[ \t]*["']?([^"'\n#]+?)["']?[ \t]*(?:#.*)?$/m);
-  return m ? m[1].trim() : undefined;
-}
-
-/**
- * Frontmatter `top-level-division: chapter|part|section`, validated so a
- * typo can't inject an arbitrary CLI argument into the pandoc invocation.
- */
-function extractTopLevelDivision(text: string): string | undefined {
-  const fm = splitFrontmatter(text);
-  if (!fm) return undefined;
-  const m = fm.fm.match(/^top-level-division:\s*['"]?(chapter|part|section)['"]?\s*(?:#.*)?$/m);
-  return m ? m[1] : undefined;
 }
 
 /**

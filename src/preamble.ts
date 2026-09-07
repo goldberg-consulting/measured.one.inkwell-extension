@@ -15,7 +15,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { splitFrontmatter, extractIndentedBlock, extractIndentedValue } from "./frontmatter";
+import { DocumentConfig, resolveDocumentConfig } from "./document-config";
 
 export interface InkwellStyle {
   "code-bg"?: string;
@@ -30,49 +30,22 @@ export interface InkwellStyle {
   "caption-style"?: "above" | "below";
 }
 
-export function parseInkwellStyle(text: string): InkwellStyle {
-  const fm = splitFrontmatter(text);
-  if (!fm) return {};
-
+export function parseInkwellStyle(text: string, resolved?: DocumentConfig): InkwellStyle {
+  const metadata = (resolved || resolveDocumentConfig({ text })).compatibility;
+  const raw = metadata.inkwell;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const values = raw as Record<string, unknown>;
   const style: InkwellStyle = {};
-
-  const inkwellBlock = extractIndentedBlock(fm.fm, "inkwell");
-  if (!inkwellBlock) return style;
-
-  const codeBg = extractIndentedValue(inkwellBlock, "code-bg");
-  if (codeBg) style["code-bg"] = codeBg;
-
-  const codeBorder = extractIndentedValue(inkwellBlock, "code-border");
-  if (codeBorder === "true") style["code-border"] = true;
-
-  const codeFontSize = extractIndentedValue(inkwellBlock, "code-font-size");
-  if (codeFontSize) style["code-font-size"] = codeFontSize;
-
-  const codeRounded = extractIndentedValue(inkwellBlock, "code-rounded");
-  if (codeRounded === "true") style["code-rounded"] = true;
-
-  const tables = extractIndentedValue(inkwellBlock, "tables");
-  if (tables === "booktabs" || tables === "grid" || tables === "plain") {
-    style.tables = tables;
+  for (const key of ["code-bg", "code-font-size", "table-font-size"] as const) {
+    if (typeof values[key] === "string") style[key] = values[key];
   }
-
-  const tableFontSize = extractIndentedValue(inkwellBlock, "table-font-size");
-  if (tableFontSize) style["table-font-size"] = tableFontSize;
-
-  const tableStripe = extractIndentedValue(inkwellBlock, "table-stripe");
-  if (tableStripe === "true") style["table-stripe"] = true;
-
-  const hangingIndent = extractIndentedValue(inkwellBlock, "hanging-indent");
-  if (hangingIndent === "true") style["hanging-indent"] = true;
-
-  const columns = extractIndentedValue(inkwellBlock, "columns");
-  if (columns) style.columns = parseInt(columns, 10) || undefined;
-
-  const captionStyle = extractIndentedValue(inkwellBlock, "caption-style");
-  if (captionStyle === "above" || captionStyle === "below") {
-    style["caption-style"] = captionStyle;
+  for (const key of ["code-border", "code-rounded", "table-stripe", "hanging-indent"] as const) {
+    if (typeof values[key] === "boolean") style[key] = values[key];
   }
-
+  const table = values.tables && typeof values.tables === "object" ? (values.tables as Record<string, unknown>).preset : values.tables;
+  if (table === "booktabs" || table === "grid" || table === "plain") style.tables = table;
+  if (typeof values.columns === "number") style.columns = values.columns;
+  if (values["caption-style"] === "above" || values["caption-style"] === "below") style["caption-style"] = values["caption-style"];
   return style;
 }
 

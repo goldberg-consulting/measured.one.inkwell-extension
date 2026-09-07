@@ -7,8 +7,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
-import { findInkwellRoot } from "./config";
-import { splitFrontmatter } from "./frontmatter";
+import { findInkwellRoot, getDocumentConfig } from "./config";
 
 export type PdfEngine = "xelatex" | "pdflatex" | "lualatex";
 
@@ -60,7 +59,6 @@ const SUPPORTING_EXTENSIONS = new Set([
 
 function globalTemplatesDir(): string {
   const dir = path.join(os.homedir(), ".inkwell", "templates");
-  fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
 
@@ -219,59 +217,16 @@ function outputChannel(): vscode.OutputChannel {
 export function getTemplateForDocument(
   document: vscode.TextDocument
 ): ResolvedTemplate {
-  const text = document.getText();
-  const fmTemplate = extractFrontmatterTemplate(text);
-
-  if (fmTemplate) {
-    const resolved = resolveTemplate(fmTemplate, document.uri);
-    if (resolved) {
-      outputChannel().appendLine(
-        `[template] ${path.basename(document.fileName)}: using frontmatter template "${fmTemplate}"`
-      );
-      return resolved;
-    }
-    outputChannel().appendLine(
-      `[template] ${path.basename(document.fileName)}: frontmatter says "${fmTemplate}" but template not found, falling through`
-    );
+  const config = getDocumentConfig(document.getText(), document.uri.fsPath);
+  const resolved = resolveTemplate(config.template, document.uri);
+  if (resolved) {
+    outputChannel().appendLine(`[template] ${path.basename(document.uri.fsPath)}: using resolved template "${config.template}"`);
+    return resolved;
   }
-
-  const root = findInkwellRoot(document.uri);
-  if (root) {
-    const manifestPath = path.join(root, ".inkwell", "manifest.json");
-    try {
-      const raw = fs.readFileSync(manifestPath, "utf-8");
-      const manifest = JSON.parse(raw);
-      if (manifest.template) {
-        const resolved = resolveTemplate(manifest.template, document.uri);
-        if (resolved) {
-          outputChannel().appendLine(
-            `[template] ${path.basename(document.fileName)}: using manifest template "${manifest.template}" (${manifestPath})`
-          );
-          return resolved;
-        }
-      }
-    } catch {}
-  }
-
-  outputChannel().appendLine(
-    `[template] ${path.basename(document.fileName)}: using built-in default`
-  );
+  outputChannel().appendLine(`[template] Template "${config.template}" is unavailable; using built-in default. Check the document configuration diagnostic.`);
   const fallback = resolveTemplate("inkwell", document.uri);
-  if (!fallback) {
-    throw new Error(
-      "Inkwell built-in template not found. The extension may be corrupted; try reinstalling."
-    );
-  }
+  if (!fallback) throw new Error("Inkwell built-in template is missing. Run Setup / Repair or reinstall the extension.");
   return fallback;
-}
-
-function extractFrontmatterTemplate(text: string): string | undefined {
-  const fm = splitFrontmatter(text);
-  if (!fm) return undefined;
-  // Keep the comment-stripping value pattern: a bare `template: foo  # note`
-  // should resolve to `foo`, which a generic scalar parser would not strip.
-  const templateMatch = fm.fm.match(/^template:\s*['"]?([^#'"}\n]+?)['"]?\s*$/m);
-  return templateMatch ? templateMatch[1].trim() : undefined;
 }
 
 export function copySupportingFiles(
