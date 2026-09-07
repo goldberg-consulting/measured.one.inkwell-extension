@@ -344,7 +344,18 @@ inkwell:
 
 `inkwell:` styles compose with your own `header-includes:` block — Inkwell merges its generated preamble into the template ahead of your commands, so custom LaTeX always renders and wins any conflict. (Previously, setting any `inkwell:` style key silently discarded the document's `header-includes`.)
 
-Document typography also passes through frontmatter: `fontsize`, `geometry`, `linestretch`, and `mainfont` / `sansfont` / `monofont` work on the XeLaTeX templates, including ETH Report — whose class hardcodes 12 pt, its own margins, and one-half spacing, all three now overridable per document.
+Use **Inkwell: Configure Document Style** to choose a font, physical point size,
+spacing, or heading/code/table/caption/reference size. Save the choice as one
+undoable frontmatter edit or as project defaults. Default and ETH Report support
+these controls; fixed templates show their locked effective values. Legacy
+`fontsize`, `mainfont`, `sansfont`, `monofont`, and flat style keys remain readable.
+See [document styling](docs/style.md) for supported values and compatibility.
+
+The preview toolbar's **A− / A+ / Reset** controls change readability from 50% to
+200%, independently of the document. The workspace remembers the preference;
+`inkwell.preview.fontScale` supplies its initial value. PDF **Fit width**, **Fit
+page**, and **Custom zoom** are separate controls. These viewer controls never
+change the PDF or saved document.
 
 ### Self-contained `.inkwell/` workspace
 

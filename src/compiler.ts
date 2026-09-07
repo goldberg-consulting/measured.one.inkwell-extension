@@ -23,6 +23,7 @@ import { tlmgrPackageForFile } from "./toolchain";
 import { getInkwellOutputChannel } from "./inkwell-output";
 import { executeRunProcess } from "./run-process";
 import { publishPdf, validatePdf } from "./pdf-publication";
+import { hasTypographyOverride } from "./style-model";
 
 const exec = promisify(execFile);
 
@@ -52,6 +53,7 @@ const TEX_ENV = {
 // (both the tsc tree and the esbuild bundle), so these resolve to the
 // extension's top-level filters/ and csl/ directories.
 const SECTION_BIBS_FILTER = path.join(__dirname, "..", "filters", "section-bibliographies.lua");
+const BODY_TYPOGRAPHY_FILTER = path.join(__dirname, "..", "filters", "body-typography.lua");
 
 function safeReadFile(file: string): string {
   try {
@@ -722,7 +724,7 @@ async function compilePandoc(
   // so the old -H path silently dropped user preamble commands (fonts,
   // spacing, citation overrides) whenever any inkwell: style key was
   // set. See preamble.ts for the merge contract.
-  const preambleText = generatePreambleText(effectiveSource);
+  const preambleText = generatePreambleText(effectiveSource, documentConfig);
   let preambleMode = "none";
   if (preambleText) {
     const templateText = fs.readFileSync(templateDst, "utf-8");
@@ -731,7 +733,7 @@ async function compilePandoc(
       fs.writeFileSync(templateDst, injection.text, "utf-8");
       preambleMode = "merged into template copy";
     } else {
-      const preambleFile = writePreambleFile(effectiveSource, cacheDir);
+      const preambleFile = writePreambleFile(effectiveSource, cacheDir, documentConfig);
       if (preambleFile) {
         pandocArgs.push("-H", preambleFile);
         preambleMode = "-H fallback (no header-includes marker in template; document header-includes will be overridden)";
@@ -744,6 +746,9 @@ async function compilePandoc(
   const crossref = await findBinary("pandoc-crossref");
   if (crossref) {
     pandocArgs.push("--filter", crossref);
+  }
+  if (hasTypographyOverride(documentConfig, "tableSize")) {
+    pandocArgs.push("--lua-filter", BODY_TYPOGRAPHY_FILTER, "--metadata", "inkwell-body-table-typography=true");
   }
 
   // Citation rendering. `bibliography-scope: section` swaps --citeproc

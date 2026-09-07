@@ -80,6 +80,23 @@
   actual VSIX contents and exact release tag. The separate Homebrew tap draft
   uses supported installer/uninstaller scripts and mocked lifecycle tests.
 
+### Typography and viewer controls (Phase 4)
+
+- Draft and Print View have keyboard-accessible A−, A+, and Reset controls from
+  50% to 200%. Workspace/webview state remembers the preference; it never enters
+  frontmatter, project defaults, or generated TeX. PDF fit width, fit page, and
+  custom zoom are separate controls. `inkwell.preview.fontScale` sets the initial
+  viewer preference.
+- Configure Document Style offers an undoable frontmatter edit or an atomic
+  project-default update, preserving comments, unknown metadata, and user edits.
+  Template locks show their effective values. Body, heading, code, table, caption,
+  and reference typography use shared physical-point calculations and supported
+  PDF adapters. Document fonts are scoped to the article; controls and logs keep
+  the editor UI font.
+- Explicit font selection now uses its requested physical size instead of
+  inheriting Default's implicit `Scale=MatchLowercase`. Unsupported custom font
+  scaling is diagnosed. Documents without font overrides keep their TeX behavior.
+
 This is unreleased work toward 0.5. The final release artifact, tap checksum,
 architecture-specific installation checks, clean-machine install, and activation
 benchmark remain release gates. Mocked tests and artifact audits do not establish

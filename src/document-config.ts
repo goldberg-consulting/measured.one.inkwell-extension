@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { isMap, isScalar, isSeq, LineCounter, parseDocument } from "yaml";
-import { getTemplateCapabilities, TemplateCapabilities } from "./template-capabilities";
+import { constrainTypographyCapabilities, getTemplateCapabilities, TemplateCapabilities } from "./template-capabilities";
+import { normalizeFontFamily, normalizeHeadingWeight, normalizeTypographyColor, sizeInPoints } from "./style-model";
 
 export type Metadata = Record<string, unknown>;
 export type ConfigSource = "builtin" | "template" | "editor" | "defaults" | "project" | "document" | "block";
@@ -252,15 +253,15 @@ const FIELDS: readonly Field[] = [
   field("presentation.legacyHangingIndent", "inkwell.hanging-indent", [], boolean, "true or false"),
   field("presentation.mermaidMaxWidth", "inkwell.mermaid-max-width", [], string, "a CSS length"),
   field("presentation.mermaidMaxHeight", "inkwell.mermaid-max-height", [], string, "a CSS length"),
-  field("typography.bodyFont", "mainfont", ["fontFamily", "body-font", "typography.fontFamily", "typography.bodyFontFamily"], string, "a font family name"),
+  field("typography.bodyFont", "mainfont", ["fontFamily", "body-font", "typography.fontFamily", "typography.bodyFontFamily"], normalizeFontFamily, "a font family name without TeX commands or CSS declarations"),
   field("typography.bodySize", "fontsize", ["fontSize", "body-font-size", "typography.fontSize", "typography.bodyFontSize"], parseSize, "a positive size with units or a named LaTeX size"),
   field("typography.lineSpacing", "linestretch", ["lineSpacing", "line-height", "typography.lineHeight"], number(0.1, 10), "a positive line-spacing multiplier"),
-  field("typography.sansFont", "sansfont", [], string, "a sans-serif font family"),
-  field("typography.monoFont", "monofont", [], string, "a monospace font family"),
-  field("typography.headingFont", "inkwell.heading-font", ["heading-font"], string, "a heading font family"),
-  field("typography.headingWeight", "inkwell.heading-weight", ["heading-weight"], (value) => enumeration(["normal", "bold", "lighter", "bolder"])(value) ?? number(100, 900, true)(value), "normal, bold, lighter, bolder, or a numeric weight from 100 to 900"),
+  field("typography.sansFont", "sansfont", [], normalizeFontFamily, "a sans-serif font family name"),
+  field("typography.monoFont", "monofont", [], normalizeFontFamily, "a monospace font family name"),
+  field("typography.headingFont", "inkwell.heading-font", ["heading-font"], normalizeFontFamily, "a heading font family name"),
+  field("typography.headingWeight", "inkwell.heading-weight", ["heading-weight"], normalizeHeadingWeight, "normal (400) or bold (700), the weights supported by both preview and PDF"),
   field("typography.headingScale", "inkwell.heading-scale", ["heading-scale"], number(0.1, 4), "a heading-size multiplier from 0.1 to 4"),
-  field("typography.headingColor", "inkwell.heading-color", ["heading-color"], string, "a color string"),
+  field("typography.headingColor", "inkwell.heading-color", ["heading-color"], normalizeTypographyColor, "a hex color, rgb(red, green, blue), or a standard named color"),
   field("typography.codeSize", "inkwell.code-font-size", ["code-font-size", "typography.codeFontSize"], parseSize, "a font size", ["code-font-size"]),
   field("typography.captionSize", "inkwell.caption-font-size", ["caption-font-size", "typography.captionFontSize"], parseSize, "a font size", ["caption-font-size"]),
   field("typography.tableSize", "inkwell.table-font-size", ["table-font-size", "tables.fontSize", "typography.tableFontSize"], parseSize, "a font size", ["table-font-size"]),
@@ -429,6 +430,12 @@ function resolveFields(layers: Layer[], capabilities: TemplateCapabilities, diag
       if (fallback) put(values, field.key, fallback.value);
       continue;
     }
+    if (field.key === "typography.bodySize") {
+      const baseline = parseSize(get(capabilities.defaults as Metadata, "typography.bodySize")) || { value: 11, unit: "pt" };
+      const baselinePoints = baseline.unit === "latex" ? 11 : baseline.value;
+      const size = candidate.value as SizeValue;
+      candidate = { ...candidate, value: { value: size.unit === "latex" && size.value === "normalsize" ? baselinePoints : sizeInPoints(size, baselinePoints, baselinePoints), unit: "pt" } };
+    }
     const capability = capabilities.options[field.key];
     if (capability && explicit(candidate.provenance.source)) {
       const allowed = capability.support === "supported" && (!capability.allowed || capability.allowed.includes(legacyValue(candidate.value) as string));
@@ -463,6 +470,22 @@ function resultFrom(
   }
   pruneConfigContainers(compatibility);
   const typography = values.typography as unknown as TypographyConfig;
+  const customScaleOptions = ["mainfontoptions", "sansfontoptions", "monofontoptions"].filter(key => {
+    const raw = compatibility[key];
+    return (Array.isArray(raw) ? raw.map(String) : typeof raw === "string" ? [raw] : []).some(option => /(?:^|,)\s*Scale\s*=/i.test(option));
+  });
+  if (customScaleOptions.length) {
+    const reason = `Custom font scaling in ${customScaleOptions.join(", ")} owns the physical font sizes. Remove Scale= from those options to use typography controls with preview/PDF parity.`;
+    capabilities = { ...capabilities, typographyNotice: reason, options: { ...capabilities.options,
+      ...Object.fromEntries(Object.keys(capabilities.options).filter(key => key.startsWith("typography.")).map(key => {
+        const value = typography[key.slice("typography.".length) as keyof TypographyConfig];
+        return [key, { support: "locked" as const, value: value === undefined ? undefined : legacyValue(value), valueLabel: value === undefined ? "Owned by custom font scaling" : `${legacyValue(value)} (custom font scaling)`, reason }];
+      })),
+    } };
+    if (!diagnostics.some(diagnostic => diagnostic.code === "font-scale-parity")) diagnostics.push({
+      ...(parsed.locations[customScaleOptions[0]] || { sourcePath, line: 1, column: 1 }), code: "font-scale-parity", key: customScaleOptions[0], severity: "warning", message: reason,
+    });
+  }
   const tables = { ...values.tables as TableConfig, ...(typography.tableSize ? { fontSize: typography.tableSize } : {}) };
   const references = { ...values.references as ReferenceConfig, ...(typography.referenceSize ? { fontSize: typography.referenceSize } : {}) };
   const normalized = { template: values.template as string, engine: values.engine as TemplateCapabilities["engine"], columns: values.columns as 1 | 2, typography, tables, references, runs: values.runs as unknown as RunConfig };
@@ -493,7 +516,17 @@ export function resolveDocumentConfig(input: ResolveDocumentConfigInput): Docume
   for (const layer of layers) validateSections(layer, diagnostics);
   const templateCandidates = layers.flatMap((layer) => candidates(FIELDS[0], layer, []));
   const template = String(templateCandidates.at(-1)?.value || "default");
-  const capabilities = input.templateCapabilities || getTemplateCapabilities(template);
+  const contextValue = (key: string) => {
+    const field = FIELDS.find(field => field.key === key);
+    return field ? layers.flatMap(layer => candidates(field, layer, [])).at(-1)?.value : undefined;
+  };
+  const requestedBodySize = contextValue("typography.bodySize") as SizeValue | undefined;
+  const capabilities = constrainTypographyCapabilities(input.templateCapabilities || getTemplateCapabilities(template), {
+    documentClass: contextValue("document.documentClass") as string | undefined,
+    topLevelDivision: contextValue("document.topLevelDivision") as string | undefined,
+    classOptions: layers.map(layer => get(layer.values, "classoption")).filter(value => value !== undefined).at(-1),
+    requestedBodySize: requestedBodySize && typeof requestedBodySize === "object" ? sizeInPoints(requestedBodySize, template === "eth-report" ? 12 : 11) : undefined,
+  });
   if (capabilities.custom) diagnostics.push({ sourcePath, line: 1, column: 1, code: "unknown-template-capabilities", severity: "warning", key: "template", message: `Template ${template} has no capability metadata. Add capabilities to its template.json before using style controls.` });
   layers.splice(1, 0, { values: capabilities.defaults as Metadata, source: "template", sourcePath: `<template:${capabilities.id}>` });
   if (input.blockAttributes) layers.push({ values: input.blockAttributes, source: "block", sourcePath });

@@ -19,6 +19,7 @@ import { getInkwellOutputChannel } from "./inkwell-output";
 import { ProjectReadinessGate } from "./project-readiness-ui";
 import { createSetupUI, registerSetupCommands, SetupUI } from "./setup-ui";
 import { invalidateDoctorCache } from "./doctor";
+import { registerDocumentStyleCommand } from "./document-style-ui";
 
 let diagnostics: InkwellDiagnostics;
 let autoCompileTimer: ReturnType<typeof setInterval> | undefined;
@@ -37,6 +38,7 @@ export function activate(context: vscode.ExtensionContext) {
   registerSetupCommands(context, setup);
 
   const previewProvider = new InkwellPreviewProvider(context);
+  registerDocumentStyleCommand(context, () => previewProvider.refresh());
   previewProvider.setDiagnostics(diagnostics);
   previewProvider.ensureReady = (document, allowPrompt) => ensureAuthoringReady(document, allowPrompt);
 
@@ -53,6 +55,9 @@ export function activate(context: vscode.ExtensionContext) {
   };
 
   context.subscriptions.push(
+    vscode.commands.registerCommand("inkwell.preview.decreaseFontScale", () => previewProvider.changeFontScale("decrease")),
+    vscode.commands.registerCommand("inkwell.preview.increaseFontScale", () => previewProvider.changeFontScale("increase")),
+    vscode.commands.registerCommand("inkwell.preview.resetFontScale", () => previewProvider.changeFontScale("reset")),
     vscode.commands.registerCommand("inkwell.preview", async () => {
       await previewProvider.show();
     }),

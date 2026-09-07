@@ -101,6 +101,26 @@
         "command": "inkwell.setupWorkspace",
         "title": "Inkwell: Setup Workspace",
         "category": "Inkwell"
+      },
+      {
+        "command": "inkwell.configureDocumentStyle",
+        "title": "Configure Document Style",
+        "category": "Inkwell"
+      },
+      {
+        "command": "inkwell.preview.decreaseFontScale",
+        "title": "Decrease Preview Text Size",
+        "category": "Inkwell"
+      },
+      {
+        "command": "inkwell.preview.increaseFontScale",
+        "title": "Increase Preview Text Size",
+        "category": "Inkwell"
+      },
+      {
+        "command": "inkwell.preview.resetFontScale",
+        "title": "Reset Preview Text Size",
+        "category": "Inkwell"
       }
     ],
     "walkthroughs": [
@@ -113,15 +133,23 @@
             "id": "verifySetup",
             "title": "Set up or repair Inkwell",
             "description": "[Run Setup / Repair](command:inkwell.setupRepair) to check the installed tools, review any required installation, and verify a real PDF build.",
-            "media": { "markdown": "media/walkthrough/setup.md" },
-            "completionEvents": ["onContext:inkwell.setupVerified"]
+            "media": {
+              "markdown": "media/walkthrough/setup.md"
+            },
+            "completionEvents": [
+              "onContext:inkwell.setupVerified"
+            ]
           },
           {
             "id": "createDocument",
             "title": "Create your document",
             "description": "[Create a project](command:inkwell.initProject), then [open its preview](command:inkwell.preview). New Project uses the same verified setup flow.",
-            "media": { "markdown": "media/walkthrough/project.md" },
-            "completionEvents": ["onContext:inkwell.projectCreated"]
+            "media": {
+              "markdown": "media/walkthrough/project.md"
+            },
+            "completionEvents": [
+              "onContext:inkwell.projectCreated"
+            ]
           }
         ]
       }
@@ -144,6 +172,24 @@
         "key": "ctrl+alt+r",
         "mac": "cmd+alt+r",
         "when": "editorLangId == markdown"
+      },
+      {
+        "command": "inkwell.preview.decreaseFontScale",
+        "key": "ctrl+alt+-",
+        "mac": "cmd+alt+-",
+        "when": "activeWebviewPanelId == inkwellPreview"
+      },
+      {
+        "command": "inkwell.preview.increaseFontScale",
+        "key": "ctrl+alt+=",
+        "mac": "cmd+alt+=",
+        "when": "activeWebviewPanelId == inkwellPreview"
+      },
+      {
+        "command": "inkwell.preview.resetFontScale",
+        "key": "ctrl+alt+0",
+        "mac": "cmd+alt+0",
+        "when": "activeWebviewPanelId == inkwellPreview"
       }
     ],
     "configuration": {
@@ -186,12 +232,22 @@
             "Hide code blocks entirely"
           ],
           "description": "Default visibility for code blocks in compiled output. Can be overridden per-document (inkwell.code-display in frontmatter) or per-block (display attribute)."
+        },
+        "inkwell.preview.fontScale": {
+          "type": "number",
+          "default": 100,
+          "minimum": 50,
+          "maximum": 200,
+          "description": "Draft and Print View text scale, as a percentage. This viewer preference never changes the saved document or compiled PDF. Toolbar changes are remembered per workspace."
         }
       }
     },
     "menus": {
       "commandPalette": [
-        { "command": "inkwell.setupToolchain", "when": "false" }
+        {
+          "command": "inkwell.setupToolchain",
+          "when": "false"
+        }
       ],
       "editor/title": [
         {

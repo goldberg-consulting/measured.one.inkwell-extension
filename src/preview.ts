@@ -17,6 +17,8 @@ import { getInkwellOutputsDir, getInkwellProjectRoot, getDocumentConfig, getReso
 import { renderCitations, CitationRenderResult } from "./citations";
 import { DocumentConfig, resolveDocumentConfig } from "./document-config";
 import { PreviewRevision, PreviewRun, PreviewState } from "./preview-state";
+import { buildTypographyCss, resolveTypography } from "./style-model";
+import { ViewerState, FontScaleAction, normalizeFontScale, changeFontScale, readViewerState, viewerStateRuntime } from "./viewer-state";
 
 const md = new MarkdownIt({
   html: true,
@@ -40,11 +42,31 @@ export class InkwellPreviewProvider {
   private runRequest: PreviewRun | null = null;
   private nextRunId = 0;
   private showSequence = 0;
+  private viewerState: ViewerState;
+  private viewerStateStored: boolean;
   onRun?: () => Promise<void>;
   ensureReady?: (document: vscode.TextDocument, allowPrompt?: boolean) => Promise<boolean>;
 
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
+    this.viewerStateStored = context.workspaceState?.get("inkwell.viewerState") !== undefined;
+    this.viewerState = readViewerState(context.workspaceState?.get("inkwell.viewerState"),
+      vscode.workspace.getConfiguration("inkwell").get<number>("preview.fontScale", 100));
+  }
+
+  async refresh(): Promise<void> {
+    if (this.currentDocument && this.panel && this.initialized) await this.sendContentUpdate(this.currentDocument);
+  }
+
+  async changeFontScale(action: FontScaleAction): Promise<void> {
+    this.viewerState = { ...this.viewerState, fontScale: changeFontScale(this.viewerState.fontScale, action) };
+    this.viewerStateStored = true;
+    await this.context.workspaceState?.update("inkwell.viewerState", this.viewerState);
+    await this.sendViewerState();
+  }
+
+  private async sendViewerState(): Promise<void> {
+    if (this.panel && this.initialized) await this.panel.webview.postMessage({ type: "viewerState", state: this.viewerState });
   }
 
   setDiagnostics(diagnostics: InkwellDiagnostics): void {
@@ -202,6 +224,13 @@ export class InkwellPreviewProvider {
     );
 
     this.initialized = false;
+    if (vscode.workspace.onDidChangeConfiguration) this.disposables.push(vscode.workspace.onDidChangeConfiguration(event => {
+      if (!event.affectsConfiguration("inkwell.preview.fontScale")) return;
+      this.viewerState = { ...this.viewerState, fontScale: normalizeFontScale(vscode.workspace.getConfiguration("inkwell").get("preview.fontScale", 100)) };
+      this.viewerStateStored = true;
+      Promise.resolve(this.context.workspaceState?.update("inkwell.viewerState", this.viewerState))
+        .then(() => this.sendViewerState()).catch(error => this.outputChannel.appendLine(`Preview preference failed: ${String(error)}`));
+    }));
 
     this.panel.onDidDispose(() => {
       this.showSequence++;
@@ -220,7 +249,11 @@ export class InkwellPreviewProvider {
 
     this.panel.webview.onDidReceiveMessage(async (msg) => {
       try {
-        if (msg.type === "compile") {
+        if (msg.type === "viewerStateChanged") {
+          this.viewerStateStored = true;
+          this.viewerState = readViewerState(msg.state, this.viewerState.fontScale, this.viewerState.selectedTab);
+          await this.context.workspaceState?.update("inkwell.viewerState", this.viewerState);
+        } else if (msg.type === "compile") {
           await this.handleCompile();
         } else if (msg.type === "run") {
           if (this.onRun) {
@@ -230,6 +263,7 @@ export class InkwellPreviewProvider {
           await vscode.commands.executeCommand("inkwell.cancelRun");
         } else if (msg.type === "ready") {
           this.initialized = true;
+          await this.sendViewerState();
           if (this.currentDocument) {
             await this.sendContentUpdate(this.currentDocument);
           }
@@ -423,7 +457,7 @@ export class InkwellPreviewProvider {
       htmlBody = addDataLineAttrs(rendered);
       title = fm.title;
 
-      layout = buildLayoutStyle(fm);
+      layout = buildLayoutStyle(fm, config);
 
       const parts: string[] = [];
       if (fm.title) {
@@ -501,6 +535,7 @@ export class InkwellPreviewProvider {
       blockCount: blocks.length,
       title: title || "",
       layoutCss: layout.cssText,
+      typographyNotice: layout.typographyNotice || "",
       bodyClasses: layout.bodyClasses,
     }, request);
   }
@@ -651,6 +686,7 @@ export class InkwellPreviewProvider {
     const previewActive = defaultToPdf ? "" : " active";
     const pdfActive = defaultToPdf ? " active" : "";
     const initialTab = defaultToPdf ? "pdf" : "preview";
+    if (!this.viewerStateStored) this.viewerState = { ...this.viewerState, selectedTab: initialTab };
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -672,7 +708,7 @@ export class InkwellPreviewProvider {
   <link rel="stylesheet" href="${cssUri}">
   <style>
     :root {
-      --body-font: Georgia, 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+      --body-font: var(--vscode-font-family, sans-serif);
       --heading-font: var(--body-font);
       --mono-font: 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
       --base-size: 16px;
@@ -716,12 +752,12 @@ export class InkwellPreviewProvider {
       display: flex; align-items: center; height: 36px;
       padding: 0 8px; background: var(--code-bg);
       border-bottom: 1px solid var(--border); gap: 2px;
-      flex-shrink: 0; user-select: none;
+      flex-shrink: 0; user-select: none; flex-wrap: wrap; min-height: 36px; height: auto;
     }
     .inkwell-tab {
       padding: 4px 12px; font-size: 12px; font-weight: 500;
       border: none; background: transparent; color: var(--blockquote);
-      cursor: pointer; border-radius: 4px; font-family: var(--body-font);
+      cursor: pointer; border-radius: 4px; font-family: var(--vscode-font-family, sans-serif);
     }
     .inkwell-tab:hover { background: var(--border); }
     .inkwell-tab.active { background: var(--accent); color: #fff; }
@@ -730,12 +766,22 @@ export class InkwellPreviewProvider {
       padding: 3px 10px; font-size: 11px; font-weight: 500;
       border: 1px solid var(--border); background: transparent;
       color: var(--text); cursor: pointer; border-radius: 4px;
-      font-family: var(--body-font); display: flex; align-items: center; gap: 4px;
+      font-family: var(--vscode-font-family, sans-serif); display: flex; align-items: center; gap: 4px;
     }
     .inkwell-compile-btn:hover { background: var(--border); }
     .inkwell-compile-btn:disabled { opacity: 0.5; cursor: default; }
     .inkwell-status { font-size: 11px; color: var(--blockquote); margin-right: 8px; }
 
+    .viewer-controls { display: flex; align-items: center; gap: 3px; font: 11px var(--vscode-font-family, sans-serif); }
+    .viewer-controls button, .viewer-controls select, .viewer-controls input {
+      font: inherit; color: var(--text); background: var(--code-bg); border: 1px solid var(--border); border-radius: 3px; padding: 3px 5px;
+    }
+    .viewer-controls button:focus-visible { outline: 2px solid var(--vscode-focusBorder, var(--accent)); outline-offset: 1px; }
+    #font-scale { min-width: 34px; text-align: center; }
+    #pdf-controls { width: 100%; padding: 6px 12px; flex-shrink: 0; }
+    #pdf-zoom { width: 64px; }
+    .document-notice { font: 12px var(--vscode-font-family, sans-serif); color: var(--blockquote); padding: 8px 0; }
+    .inkwell-document { font-family: var(--body-font, serif); font-size: var(--base-size, 11pt); line-height: var(--line-height, 1.2); }
     .inkwell-content { flex: 1; overflow: hidden; position: relative; }
     .inkwell-pane {
       position: absolute; top: 0; left: 0; right: 0; bottom: 0;
@@ -751,10 +797,10 @@ export class InkwellPreviewProvider {
     .inkwell-pane.pdf-pane embed { width: 100%; height: 100%; border: none; }
     .pdf-canvas-container {
       width: 100%; overflow-y: auto; padding: 8px 0;
-      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      display: flex; flex-direction: column; align-items: safe center; gap: 8px;
     }
     .pdf-canvas-container canvas {
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15); max-width: 100%;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15); flex-shrink: 0;
     }
     .pdf-output-status { font: 11px var(--vscode-font-family, sans-serif); padding: 6px 12px; color: var(--blockquote); }
     .pdf-placeholder { text-align: center; color: var(--blockquote); font-size: 14px; padding: 40px; }
@@ -765,7 +811,7 @@ export class InkwellPreviewProvider {
       font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 12px; line-height: 1.6;
     }
     .compile-errors-header {
-      font-family: var(--body-font); font-weight: 600; font-size: 13px;
+      font-family: var(--vscode-font-family, sans-serif); font-weight: 600; font-size: 13px;
       color: #e05252; margin-bottom: 12px;
     }
     .compile-error-item {
@@ -774,7 +820,7 @@ export class InkwellPreviewProvider {
       border-radius: 2px; color: var(--text); word-wrap: break-word;
     }
     .compile-log-toggle {
-      margin-top: 16px; font-family: var(--body-font); font-size: 12px;
+      margin-top: 16px; font-family: var(--vscode-font-family, sans-serif); font-size: 12px;
       color: var(--accent); cursor: pointer; border: none; background: none;
       padding: 4px 0; text-decoration: underline;
     }
@@ -790,7 +836,7 @@ export class InkwellPreviewProvider {
     .run-panel {
       display: none; flex-direction: column;
       border-bottom: 1px solid var(--border); background: var(--code-bg);
-      font-family: var(--body-font); font-size: 12px;
+      font-family: var(--vscode-font-family, sans-serif); font-size: 12px;
       max-height: 200px; overflow-y: auto; flex-shrink: 0;
     }
     .run-panel.visible { display: flex; }
@@ -809,7 +855,7 @@ export class InkwellPreviewProvider {
     .run-cancel-btn {
       padding: 2px 8px; font-size: 10px; font-weight: 500;
       border: 1px solid #e05252; background: transparent; color: #e05252;
-      cursor: pointer; border-radius: 3px; font-family: var(--body-font);
+      cursor: pointer; border-radius: 3px; font-family: var(--vscode-font-family, sans-serif);
     }
     .run-cancel-btn:hover { background: rgba(224,82,82,0.1); }
     .run-block-list { padding: 4px 12px 8px; }
@@ -842,19 +888,19 @@ export class InkwellPreviewProvider {
     .log-clear-btn {
       padding: 2px 8px; font-size: 10px; border: 1px solid var(--border);
       background: transparent; color: var(--blockquote); cursor: pointer;
-      border-radius: 3px; font-family: var(--body-font);
+      border-radius: 3px; font-family: var(--vscode-font-family, sans-serif);
     }
     .log-clear-btn:hover { background: var(--border); }
     .log-entries {
       flex: 1; overflow-y: auto; padding: 8px 0;
       font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 11px; line-height: 1.5;
     }
-    .log-empty { padding: 40px 16px; text-align: center; color: var(--blockquote); font-family: var(--body-font); font-size: 13px; }
+    .log-empty { padding: 40px 16px; text-align: center; color: var(--blockquote); font-family: var(--vscode-font-family, sans-serif); font-size: 13px; }
     .log-entry { padding: 4px 16px; border-bottom: 1px solid rgba(128,128,128,0.08); }
     .log-entry:last-child { border-bottom: none; }
     .log-entry-header {
       display: flex; align-items: center; gap: 6px; margin-bottom: 2px;
-      font-family: var(--body-font); font-size: 10px; color: var(--blockquote);
+      font-family: var(--vscode-font-family, sans-serif); font-size: 10px; color: var(--blockquote);
     }
     .log-tag {
       padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: 600;
@@ -868,7 +914,7 @@ export class InkwellPreviewProvider {
     .log-entry-body { white-space: pre-wrap; word-wrap: break-word; color: var(--text); }
     .log-entry-body.is-error { color: #e05252; }
     .log-entry-toggle {
-      font-family: var(--body-font); font-size: 10px; color: var(--accent);
+      font-family: var(--vscode-font-family, sans-serif); font-size: 10px; color: var(--accent);
       cursor: pointer; border: none; background: none; padding: 2px 0;
       text-decoration: underline;
     }
@@ -1011,6 +1057,7 @@ export class InkwellPreviewProvider {
       html, body { overflow: visible !important; height: auto !important; background: #fff !important; }
       .inkwell-toolbar, .run-panel, #pane-pdf, #pane-log, #pane-print, .inkwell-spacer { display: none !important; }
       .inkwell-content, .inkwell-pane.preview-pane { position: static !important; display: block !important; overflow: visible !important; padding: 0 !important; }
+      .inkwell-document { zoom: 1 !important; }
       #article-content { max-width: none !important; color: #000 !important; }
     }
     /* When the webview body carries .printing, only the preview pane prints. */
@@ -1030,6 +1077,12 @@ export class InkwellPreviewProvider {
       <button class="inkwell-tab" data-tab="print">Print View</button>
       <button class="inkwell-tab${pdfActive}" data-tab="pdf">PDF</button>
       <button class="inkwell-tab" data-tab="log">Log<span class="log-badge" id="log-badge"></span></button>
+      <div class="viewer-controls" role="group" aria-label="Draft readability">
+        <button id="font-decrease" title="Decrease preview text size" aria-label="Decrease preview text size">A−</button>
+        <output id="font-scale" aria-live="polite">100%</output>
+        <button id="font-increase" title="Increase preview text size" aria-label="Increase preview text size">A+</button>
+        <button id="font-reset" title="Reset preview text size to 100%">Reset</button>
+      </div>
       <div class="inkwell-spacer"></div>
       <span class="inkwell-status" id="compile-status"></span>
       <button class="inkwell-compile-btn" id="print-btn" title="Print / Save as PDF">
@@ -1053,12 +1106,18 @@ export class InkwellPreviewProvider {
     </div>
     <div class="inkwell-content">
       <div class="inkwell-pane preview-pane${previewActive}" id="pane-preview">
-        <article id="article-content"></article>
+        <div class="document-notice" id="typography-notice" role="status" style="display:none;"></div>
+        <article class="inkwell-document" id="article-content"></article>
       </div>
       <div class="inkwell-pane print-pane" id="pane-print">
-        <div class="print-page-stage" id="print-page-stage"></div>
+        <div class="print-page-stage inkwell-document" id="print-page-stage"></div>
       </div>
       <div class="inkwell-pane pdf-pane${pdfActive}" id="pane-pdf">
+        <div class="viewer-controls" id="pdf-controls" role="group" aria-label="PDF zoom">
+          <label for="pdf-fit-mode">PDF view</label>
+          <select id="pdf-fit-mode"><option value="width">Fit width</option><option value="page">Fit page</option><option value="custom">Custom zoom</option></select>
+          <label for="pdf-zoom">Zoom</label><input id="pdf-zoom" type="number" min="25" max="400" step="10" value="100" aria-label="PDF zoom percentage"><span>%</span>
+        </div>
         <div class="pdf-output-status" id="pdf-output-status" role="status" style="display:none;"></div>
         <div class="pdf-placeholder" id="pdf-placeholder">
           <p>No PDF yet.</p>
@@ -1095,7 +1154,11 @@ export class InkwellPreviewProvider {
   <script nonce="${nonce}">
   (function() {
     var vscodeApi = acquireVsCodeApi();
-    var currentTab = "${initialTab}";
+    var viewerApi = (${viewerStateRuntime.toString()})();
+    var changeFontScale = viewerApi.changeFontScale;
+    var readViewerState = viewerApi.readViewerState;
+    var viewerState = readViewerState(vscodeApi.getState ? vscodeApi.getState() : undefined, ${this.viewerState.fontScale}, "${initialTab}");
+    var currentTab = viewerState.selectedTab;
     var currentPdfData = null;
     var currentPdfDoc = null;
     var pdfRenderVersion = 0;
@@ -1148,8 +1211,42 @@ export class InkwellPreviewProvider {
       cancelled: "\\u2014"
     };
 
-    function switchTab(tab) {
+    function persistViewerState(notify) {
+      if (vscodeApi.setState) vscodeApi.setState(viewerState);
+      if (notify !== false) vscodeApi.postMessage({ type: "viewerStateChanged", state: viewerState });
+    }
+
+    function applyViewerState(next, notify) {
+      var previous = viewerState;
+      viewerState = readViewerState(next);
+      articleEl.style.zoom = String(viewerState.fontScale / 100);
+      printStage.style.zoom = String(viewerState.fontScale / 100);
+      document.getElementById("font-scale").textContent = viewerState.fontScale + "%";
+      document.getElementById("font-decrease").disabled = viewerState.fontScale <= 50;
+      document.getElementById("font-increase").disabled = viewerState.fontScale >= 200;
+      document.getElementById("pdf-fit-mode").value = viewerState.pdfFitMode;
+      document.getElementById("pdf-zoom").value = String(viewerState.pdfZoom);
+      if (viewerState.selectedTab !== currentTab) switchTab(viewerState.selectedTab, false);
+      else if (currentTab === "pdf" && currentPdfData && (previous.pdfFitMode !== viewerState.pdfFitMode || previous.pdfZoom !== viewerState.pdfZoom)) renderPdf(currentPdfData);
+      persistViewerState(notify);
+    }
+
+    ["decrease", "increase", "reset"].forEach(function(action) {
+      document.getElementById("font-" + action).addEventListener("click", function() {
+        applyViewerState(Object.assign({}, viewerState, { fontScale: changeFontScale(viewerState.fontScale, action) }));
+      });
+    });
+    document.getElementById("pdf-fit-mode").addEventListener("change", function(event) {
+      applyViewerState(Object.assign({}, viewerState, { pdfFitMode: event.target.value }));
+    });
+    document.getElementById("pdf-zoom").addEventListener("change", function(event) {
+      applyViewerState(Object.assign({}, viewerState, { pdfFitMode: "custom", pdfZoom: Number(event.target.value) }));
+    });
+
+    function switchTab(tab, notify) {
       currentTab = tab;
+      viewerState = Object.assign({}, viewerState, { selectedTab: tab });
+      persistViewerState(notify);
       tabs.forEach(function(t) {
         t.classList.toggle("active", t.getAttribute("data-tab") === tab);
       });
@@ -1256,9 +1353,10 @@ export class InkwellPreviewProvider {
 
     var paginateResizeTimer = null;
     window.addEventListener("resize", function() {
-      if (currentTab !== "print") return;
+      if (currentTab !== "print" && currentTab !== "pdf") return;
       if (paginateResizeTimer) clearTimeout(paginateResizeTimer);
       paginateResizeTimer = setTimeout(function() {
+        if (currentTab === "pdf") { if (currentPdfData) renderPdf(currentPdfData); return; }
         printPaginated = false;
         paginateForPrint();
       }, 300);
@@ -1359,6 +1457,7 @@ export class InkwellPreviewProvider {
 
     function resetDocument() {
       articleEl.innerHTML = "";
+      document.getElementById("typography-notice").style.display = "none";
       if (printStage) printStage.innerHTML = "";
       printPaginated = false;
       docTitle = "";
@@ -1411,11 +1510,13 @@ export class InkwellPreviewProvider {
           return;
         }
         currentPdfDoc = pdf;
-        var scale = 1.5;
         for (var pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
           (function(num) {
             pdf.getPage(num).then(function(page) {
               if (version !== pdfRenderVersion) return;
+              var natural = page.getViewport({ scale: 1 });
+              var widthScale = Math.max(0.1, (pdfPane.clientWidth - 24) / natural.width);
+              var scale = viewerState.pdfFitMode === "custom" ? viewerState.pdfZoom / 100 : viewerState.pdfFitMode === "page" ? Math.min(widthScale, Math.max(0.1, (pdfPane.clientHeight - 90) / natural.height)) : widthScale;
               var viewport = page.getViewport({ scale: scale });
               var canvas = document.createElement("canvas");
               canvas.width = viewport.width;
@@ -1647,6 +1748,7 @@ export class InkwellPreviewProvider {
 
     window.addEventListener("message", function(event) {
       var msg = event.data;
+      if (msg && msg.type === "viewerState") { applyViewerState(msg.state, false); return; }
       if (!msg || typeof msg.revision !== "number" || typeof msg.documentUri !== "string") return;
       var startsRender = msg.type === "renderStarted" || msg.type === "updateContent";
       if (msg.revision < contentRevision) return;
@@ -1692,6 +1794,9 @@ export class InkwellPreviewProvider {
           document.head.appendChild(layoutStyleEl);
         }
         layoutStyleEl.textContent = msg.layoutCss || "";
+        var typographyNotice = document.getElementById("typography-notice");
+        typographyNotice.textContent = msg.typographyNotice || "";
+        typographyNotice.style.display = msg.typographyNotice ? "block" : "none";
 
         document.body.className = document.body.className
           .split(" ")
@@ -1827,6 +1932,8 @@ export class InkwellPreviewProvider {
       }
     });
 
+    applyViewerState(viewerState, false);
+    switchTab(viewerState.selectedTab, false);
     vscodeApi.postMessage({ type: "ready" });
   })();
   </script>
@@ -2257,22 +2364,13 @@ function cleanLatexCell(cell: string): string {
 }
 
 interface LayoutPayload {
+  typographyNotice?: string;
   cssText: string;
   bodyClasses: string[];
 }
 
-function buildLayoutStyle(fm: FrontmatterResult): LayoutPayload {
+function buildLayoutStyle(fm: FrontmatterResult, config: DocumentConfig): LayoutPayload {
   const vars: string[] = [];
-
-  if (fm.mainfont) {
-    const safe = fm.mainfont.replace(/'/g, "\\'");
-    vars.push(`--body-font: '${safe}', Georgia, 'Palatino Linotype', serif`);
-    vars.push(`--heading-font: '${safe}', Georgia, 'Palatino Linotype', serif`);
-  }
-  if (fm.monofont) {
-    const safe = fm.monofont.replace(/'/g, "\\'");
-    vars.push(`--mono-font: '${safe}', 'SF Mono', Menlo, Consolas, monospace`);
-  }
 
   const paper = parsePaperSize(fm.papersize);
   if (paper) {
@@ -2287,51 +2385,10 @@ function buildLayoutStyle(fm: FrontmatterResult): LayoutPayload {
   vars.push(`--page-margin-bottom: ${margins.bottom}`);
   vars.push(`--page-margin-left: ${margins.left}`);
 
-  if (fm.fontsize) {
-    const fs = parseFontSize(fm.fontsize);
-    if (fs) vars.push(`--base-size: ${fs}`);
-  }
-  if (fm.linestretch) {
-    const n = parseFloat(fm.linestretch);
-    if (!Number.isNaN(n) && n > 0) vars.push(`--line-height: ${n}`);
-  }
-
-  if (fm.tableFontSize) {
-    const tfs = tableFontSizeToCss(fm.tableFontSize);
-    if (tfs) vars.push(`--table-font-size: ${tfs}`);
-  }
-
   const mmw = fm.mermaidMaxWidth ? sanitizeCssLength(fm.mermaidMaxWidth) : undefined;
   if (mmw) vars.push(`--mermaid-max-width: ${mmw}`);
   const mmh = fm.mermaidMaxHeight ? sanitizeCssLength(fm.mermaidMaxHeight) : undefined;
   if (mmh) vars.push(`--mermaid-max-height: ${mmh}`);
-
-  // Heading typography (separate from body font so the author can
-  // pair, say, a serif body with a sans display face for headings).
-  if (fm.headingFont) {
-    const safe = fm.headingFont.replace(/'/g, "\\'");
-    // Overrides the --heading-font set by mainfont above.
-    vars.push(`--heading-font: '${safe}', Georgia, 'Palatino Linotype', serif`);
-  }
-  if (fm.headingColor && /^[#a-zA-Z0-9(),.\s%-]+$/.test(fm.headingColor)) {
-    vars.push(`--heading-color: ${fm.headingColor}`);
-  }
-  if (fm.headingWeight && /^(\d{3}|normal|bold|lighter|bolder)$/.test(fm.headingWeight)) {
-    vars.push(`--heading-weight: ${fm.headingWeight}`);
-  }
-  if (fm.headingScale && fm.headingScale > 0 && fm.headingScale < 4) {
-    vars.push(`--heading-scale: ${fm.headingScale}`);
-  }
-
-  // Code and caption font-size controls.
-  if (fm.codeFontSize) {
-    const cfs = tableFontSizeToCss(fm.codeFontSize);
-    if (cfs) vars.push(`--code-font-size: ${cfs}`);
-  }
-  if (fm.captionFontSize) {
-    const capfs = tableFontSizeToCss(fm.captionFontSize);
-    if (capfs) vars.push(`--caption-font-size: ${capfs}`);
-  }
 
   const tableStyle = fm.tableStyle || "booktabs";
   vars.push(`--table-style: "${tableStyle}"`);
@@ -2349,8 +2406,13 @@ function buildLayoutStyle(fm: FrontmatterResult): LayoutPayload {
   if (fm.pagestyle) bodyClasses.push(`pagestyle-${fm.pagestyle.replace(/[^\w-]/g, "")}`);
   bodyClasses.push(`section-numbering-${fm.sectionNumbering || "decimal"}`);
 
-  const cssText = vars.length ? `:root { ${vars.join("; ")}; }` : "";
-  return { cssText, bodyClasses };
+  vars.push(buildTypographyCss(config));
+  vars.push("--body-font: var(--inkwell-body-font)", "--mono-font: var(--inkwell-mono-font)", "--heading-font: var(--inkwell-heading-font)",
+    "--base-size: var(--inkwell-body-size)", "--line-height: var(--inkwell-line-spacing)", "--code-font-size: var(--inkwell-code-size)",
+    "--table-font-size: var(--inkwell-table-size)", "--caption-font-size: var(--inkwell-caption-size)",
+    "--heading-color: var(--inkwell-heading-color)", "--heading-weight: var(--inkwell-heading-weight)");
+  const cssText = `.inkwell-document { ${vars.join("; ")}; }`;
+  return { cssText, bodyClasses, typographyNotice: config.capabilities.typographyNotice || resolveTypography(config).approximation };
 }
 
 interface PaperSize {
@@ -2410,29 +2472,6 @@ function parseGeometry(raw: string | undefined): Margins {
     }
   }
   return margins;
-}
-
-function parseFontSize(raw: string): string | undefined {
-  const s = raw.trim().toLowerCase();
-  // Numeric like "11pt" or "12" — assume pt when unitless.
-  const num = s.match(/^(\d+(?:\.\d+)?)(pt|px|em|rem)?$/);
-  if (num) {
-    const n = parseFloat(num[1]);
-    const unit = num[2] || "pt";
-    return `${n}${unit}`;
-  }
-  return undefined;
-}
-
-function tableFontSizeToCss(size: string): string | undefined {
-  const map: Record<string, string> = {
-    tiny: "0.62em",
-    scriptsize: "0.72em",
-    footnotesize: "0.82em",
-    small: "0.9em",
-    normalsize: "1em",
-  };
-  return map[size];
 }
 
 function applyBooktabsClasses(html: string): string {

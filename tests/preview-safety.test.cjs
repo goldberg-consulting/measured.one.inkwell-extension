@@ -14,7 +14,9 @@ function host(t, renderCitations = async (body) => emptyCitations(body), compile
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'inkwell-preview-test-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const messages = [];
-  const vscode = { Uri: { file: uri }, window: {} };
+  const vscode = { Uri: { file: uri }, window: {},
+    workspace: { getConfiguration: () => ({ get: (_key, fallback) => fallback }) },
+  };
   const webview = { postMessage: async (message) => { messages.push(message); return true; }, asWebviewUri: (u) => u, cspSource: 'test:', options: {} };
   const original = Module._load;
   Module._load = function(request, parent, ...args) {

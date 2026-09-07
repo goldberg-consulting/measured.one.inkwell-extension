@@ -16,6 +16,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { DocumentConfig, resolveDocumentConfig } from "./document-config";
+import { buildTypographyPreamble } from "./style-model";
 
 export interface InkwellStyle {
   "code-bg"?: string;
@@ -174,9 +175,14 @@ export function generatePreamble(style: InkwellStyle): string {
 }
 
 /** The generated preamble for a document, or "" when no style keys are set. */
-export function generatePreambleText(text: string): string {
-  const style = parseInkwellStyle(text);
-  const preamble = generatePreamble(style);
+export function generatePreambleText(text: string, resolved?: DocumentConfig): string {
+  const config = resolved || resolveDocumentConfig({ text });
+  const style = parseInkwellStyle(text, config);
+  // Font sizes use the shared model. In particular, body tables must never
+  // install the old global tabular/longtable hooks that also style title pages.
+  delete style["code-font-size"];
+  delete style["table-font-size"];
+  const preamble = [generatePreamble(style), buildTypographyPreamble(config)].filter(Boolean).join("\n");
   return preamble.trim() ? preamble : "";
 }
 
@@ -217,9 +223,10 @@ export function injectPreambleIntoTemplate(
 
 export function writePreambleFile(
   text: string,
-  cacheDir: string
+  cacheDir: string,
+  resolved?: DocumentConfig,
 ): string | undefined {
-  const preamble = generatePreambleText(text);
+  const preamble = generatePreambleText(text, resolved);
   if (!preamble) return undefined;
 
   const file = path.join(cacheDir, "inkwell-preamble.tex");

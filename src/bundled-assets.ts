@@ -48,6 +48,7 @@ export function validateBundledAssets(assetRoot: string): AssetDiagnostic[] {
 export const BUNDLED_ASSET_PATHS: readonly string[] = [
   ".cursor/agents/inkwell-guide.md",
   "csl/inkwell-numeric.csl",
+  "docs/style.md",
   "examples/demo-default.md",
   "examples/demo-eth-report.md",
   "examples/demo-hipster-cv.md",
@@ -59,6 +60,7 @@ export const BUNDLED_ASSET_PATHS: readonly string[] = [
   "examples/demo-tufte-book-vdqi.md",
   "examples/demo-tufte.md",
   "examples/requirements.txt",
+  "filters/body-typography.lua",
   "filters/section-bibliographies.lua",
   "guide.md",
   "out/extension.js",

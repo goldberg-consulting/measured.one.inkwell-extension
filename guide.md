@@ -2,6 +2,19 @@
 
 Complete reference for writing Inkwell documents. Covers YAML frontmatter, code blocks, inline data binding, math, citations, cross-references, tables, and template-specific fields.
 
+## Document style and preview readability
+
+Use **Inkwell: Configure Document Style** to update document frontmatter with an
+undoable edit or set project defaults. The picker reports template locks and
+preserves existing metadata. Default and ETH Report support physical body sizes
+of 10, 11, and 12 pt and configurable heading, code, table, caption, and reference
+sizes. The picker identifies supported values and template limitations.
+
+Use **A−**, **A+**, and **Reset** in the preview for a remembered 50–200% readability
+scale. The command palette provides the same controls. This does not change
+frontmatter or the compiled PDF. The PDF pane has its own fit-width, fit-page,
+and custom zoom controls.
+
 ## Setup and health checks
 
 Use **Inkwell: Setup / Repair** to inspect the installed tools, review any system

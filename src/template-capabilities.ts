@@ -18,6 +18,8 @@ export interface TemplateCapabilities {
   defaults: Readonly<Record<string, unknown>>;
   /** Unknown user templates require their own explicit adapter metadata. */
   custom?: boolean;
+  /** Draft approximation when author-provided class/font options own layout. */
+  typographyNotice?: string;
 }
 
 const supported = (allowed?: TemplateOptionCapability["allowed"]): TemplateOptionCapability => ({ support: "supported", ...(allowed ? { allowed } : {}) });
@@ -47,6 +49,23 @@ const sharedOptions: Readonly<Record<string, TemplateOptionCapability>> = {
   "tables.captionPosition": pending("Caption placement requires the scoped body-table adapter."),
 };
 
+const typographyAdapterOptions: Readonly<Record<string, TemplateOptionCapability>> = {
+  "typography.headingFont": supported(),
+  "typography.headingWeight": supported(["normal", "bold"]),
+  "typography.headingScale": supported(),
+  "typography.headingColor": supported(),
+  "typography.codeSize": supported(),
+  "typography.captionSize": supported(),
+  "typography.tableSize": supported(),
+  "typography.referenceSize": supported(),
+};
+const lockedFamilies: Record<string, string> = {
+  "hipster-cv": "Latin Modern Roman (class-owned)", "kth-letter": "Times (class-owned)",
+  ludus: "Source Sans 3; Helvetica Neue or Latin Modern Sans fallback", rho: "STIX Two Text (class-owned)",
+  rmxaa: "STIX Two Text (class-owned)", tmsce: "Latin Modern Roman (class-owned)",
+  tufte: "Palatino (class-owned)", "tufte-book-vdqi": "Palatino (class-owned)",
+};
+
 function capabilities(
   id: string, name: string, engine: TemplateCapabilities["engine"], columns: 1 | 2,
   bodySize: string, bodyFonts: boolean, lineSpacing: number | undefined,
@@ -54,10 +73,11 @@ function capabilities(
   const reason = `${name} owns this option. Choose the Default template to customize it.`;
   const options = {
     ...sharedOptions,
-    "typography.bodyFont": bodyFonts ? supported() : locked(undefined, reason),
-    "typography.sansFont": bodyFonts ? supported() : locked(undefined, reason),
-    "typography.monoFont": bodyFonts ? supported() : locked(undefined, reason),
-    "typography.bodySize": bodyFonts ? supported(id === "default" ? ["10pt", "11pt", "12pt"] : undefined) : locked(bodySize, reason),
+    ...(id === "default" || id === "eth-report" ? typographyAdapterOptions : {}),
+    "typography.bodyFont": bodyFonts ? supported() : { ...locked(undefined, reason), valueLabel: lockedFamilies[id] || "Class-owned font" },
+    "typography.sansFont": bodyFonts ? supported() : { ...locked(undefined, reason), valueLabel: "Class-owned sans-serif font" },
+    "typography.monoFont": bodyFonts ? supported() : { ...locked(undefined, reason), valueLabel: "Class-owned monospace font" },
+    "typography.bodySize": bodyFonts ? supported(["10pt", "11pt", "12pt"]) : locked(bodySize, reason),
     "typography.lineSpacing": bodyFonts ? supported() : locked(lineSpacing, reason),
     "columns": locked(columns, reason),
     "engine": locked(engine, `${name} requires ${engine}. Select a compatible template to change the engine.`),
@@ -97,4 +117,38 @@ export function getTemplateCapabilities(templateId: string): TemplateCapabilitie
       pending(`Custom template ${id} has no declared support for ${key}. Add capability metadata to its template.json.`),
     ]))),
   });
+}
+
+/** Author class choices can supersede the bundled wrapper's size/hierarchy. */
+export function constrainTypographyCapabilities(base: TemplateCapabilities, context: {
+  documentClass?: string; topLevelDivision?: string; classOptions?: unknown; requestedBodySize?: number;
+}): TemplateCapabilities {
+  const options = { ...base.options };
+  const defaults = structuredClone(base.defaults) as Record<string, any>;
+  const rawOptions = Array.isArray(context.classOptions) ? context.classOptions.map(String) : typeof context.classOptions === "string" ? context.classOptions.split(",") : [];
+  const sizes = rawOptions.map(option => option.trim()).filter(option => /^(?:9|10|11|12)pt$/.test(option)).map(parseFloat);
+  let classSize = sizes.length ? `${Math.max(...sizes)}pt` : undefined;
+  if (base.id === "default" && sizes.length) {
+    // Standard classes process declared options in ascending size order. The
+    // wrapper always emits fontsize (11pt when absent) before classoption.
+    classSize = `${Math.max(context.requestedBodySize || 11, ...sizes)}pt`;
+  } else if (["rho", "rmxaa"].includes(base.id) && rawOptions.length && !sizes.length) {
+    // Supplying classoption suppresses the wrapper's entire 9pt default list;
+    // extarticle then chooses its own 10pt default.
+    classSize = "10pt";
+  }
+  if (classSize && ["default", "kth-letter", "rho", "rmxaa"].includes(base.id)) {
+    defaults.typography = { ...defaults.typography, bodySize: classSize };
+    options["typography.bodySize"] = { support: "locked", value: classSize, valueLabel: `${classSize} from classoption`,
+      reason: "classoption selects the effective class size. Remove its size option to use the document font-size control." };
+  }
+  const customClass = base.id === "default" && context.documentClass && context.documentClass !== "article";
+  const customHierarchy = context.topLevelDivision && context.topLevelDivision !== "section";
+  let typographyNotice = base.typographyNotice;
+  if ((base.id === "default" || base.id === "eth-report") && (customClass || customHierarchy)) {
+    const reason = "The heading adapter supports article sections. Use documentclass: article with top-level-division: section, or keep the class-owned heading design.";
+    for (const field of ["headingFont", "headingWeight", "headingScale", "headingColor"]) options[`typography.${field}`] = { support: "unsupported", reason, valueLabel: "Class-owned headings" };
+    typographyNotice = "Custom document class or heading hierarchy: Draft approximates the class-owned heading layout. The compiled PDF is authoritative.";
+  }
+  return immutable({ ...base, options, defaults, ...(typographyNotice ? { typographyNotice } : {}) });
 }

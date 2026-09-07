@@ -36,3 +36,18 @@ Baseline safety reproductions were run before source edits: six PDF-publication,
 eight runner, three preview, and three Python/scaffold regressions failed. Further
 review added revision coalescing, process descendants, symlink source identity,
 index-dependent scripts, and clearing during active multi-block runs.
+
+Phase 4 adds `phase4-validation.json` (all ten committed demos, zero unresolved
+references) and `phase4-typography.json` (six real Default/ETH PDFs at 10/11/12 pt).
+The typography report compares extracted font faces, point sizes, RGB heading
+color, and baseline positions with the shared style model. It also checks a
+separate template-layout table sentinel. Installed test fonts are Times New
+Roman, Arial, and Courier New; Linux font portability and actual browser font
+loading remain separate release gates. To rerun the PDF fixture on a configured
+machine, set `INKWELL_TYPOGRAPHY_PDF=1` and `INKWELL_PDF_PYTHON` to an interpreter
+with PyMuPDF before running `tests/typography-pdf.test.cjs`.
+
+The viewer suite runs the shipped inline client and its minified state module.
+`INKWELL_CHROME_BIN` enables a real headless browser check with a temporary profile
+for PDF fit resizing and reachable page edges at high zoom. It never opens the
+user's normal browser profile or fetches external preview scripts.

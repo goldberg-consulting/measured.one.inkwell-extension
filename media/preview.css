@@ -53,9 +53,9 @@
 * { box-sizing: border-box; }
 
 body {
-    font-family: var(--body-font);
-    font-size: var(--base-size);
-    line-height: var(--line-height);
+    font-family: var(--vscode-font-family, sans-serif);
+    font-size: var(--vscode-font-size, 13px);
+    line-height: 1.5;
     color: var(--text);
     background: var(--bg);
     margin: 0;
@@ -478,3 +478,22 @@ em { font-style: italic; }
 
     .citation-missing { color: #000 !important; }
 }
+
+/* Normalized document typography. Physical point sizes match the selected
+   PDF class; viewer scaling is applied outside these document values. */
+.inkwell-document h1:not(.title-block h1) { font-size: var(--inkwell-heading-1-size); }
+.inkwell-document h2 { font-size: var(--inkwell-heading-2-size); }
+.inkwell-document h3 { font-size: var(--inkwell-heading-3-size); }
+.inkwell-document h4 { font-size: var(--inkwell-heading-4-size); }
+.inkwell-document h5 { font-size: var(--inkwell-heading-5-size); }
+.inkwell-document h6 { font-size: var(--inkwell-heading-6-size); }
+.inkwell-document :is(h1, h2, h3, h4, h5, h6):not(.title-block h1) {
+    font-family: var(--inkwell-heading-font);
+    font-weight: var(--inkwell-heading-weight);
+    color: var(--inkwell-heading-color);
+    font-style: normal;
+}
+.inkwell-document pre code,
+.inkwell-document pre code.hljs,
+.inkwell-document pre code span { font-size: var(--inkwell-code-size); }
+.inkwell-document :is(.references, .references-section, .csl-bib-body) { font-size: var(--inkwell-reference-size); }
