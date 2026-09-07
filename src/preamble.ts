@@ -143,6 +143,7 @@ export function generatePreamble(style: InkwellStyle): string {
     if (style["code-font-size"]) {
       const size = style["code-font-size"];
       if (VALID_LATEX_FONT_SIZES.includes(size)) {
+        lines.push("\\usepackage{fvextra}");
         // breaklines/breakanywhere must be restated: this redefinition
         // replaces the template's own Highlighting environment, and
         // dropping them silently re-enables overfull code lines.

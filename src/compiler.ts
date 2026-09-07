@@ -20,6 +20,8 @@ import { generatePreambleText, injectPreambleIntoTemplate, writePreambleFile } f
 import { buildTexInvocationPath, texBinSearchDirs } from "./shell-env";
 import { tlmgrPackageForFile } from "./toolchain";
 import { getInkwellOutputChannel } from "./inkwell-output";
+import { executeRunProcess } from "./run-process";
+import { publishPdf, validatePdf } from "./pdf-publication";
 
 const exec = promisify(execFile);
 
@@ -59,12 +61,48 @@ function safeReadFile(file: string): string {
   }
 }
 
-export interface CompileResult {
+interface CompileDetails {
   success: boolean;
   pdfPath: string | undefined;
   errors: CompileError[];
   log: string;
   duration: number;
+}
+
+export type CompilePhase = "preflight" | "pandoc" | "tex" | "bibliography" | "validation" | "publication" | "complete";
+
+export interface LastSuccessfulOutput {
+  pdfPath: string;
+  sourceVersion: number;
+  sourceHash: string;
+  publishedAt: string;
+  pdfHash: string;
+}
+
+export interface CompileResult extends CompileDetails {
+  sourceVersion: number;
+  sourceHash: string;
+  phase: CompilePhase;
+  exitCode: number | null;
+  signal?: string;
+  message: string;
+  logPath?: string;
+  lastSuccessfulOutput?: LastSuccessfulOutput;
+}
+
+interface CompileAttempt {
+  sourceFile: string;
+  sourceText: string;
+  sourceVersion: number;
+  sourceHash: string;
+  cacheDir: string;
+  pdfOutput: string;
+  phase: CompilePhase;
+  exitCode: number | null;
+  signal?: string;
+  failure?: string;
+  processLog: string[];
+  lastSuccessfulOutput?: LastSuccessfulOutput;
 }
 
 export type CompileMode = "pandoc" | "xelatex";
@@ -88,12 +126,6 @@ function getCacheDir(sourceFile: string): string {
   return dir;
 }
 
-const TEX_ARTIFACT_EXTS = new Set([
-  ".pdf", ".aux", ".log", ".toc", ".lof", ".lot", ".out",
-  ".idx", ".ind", ".ilg", ".bbl", ".blg", ".bcf", ".run.xml",
-  ".nav", ".snm", ".fls", ".fdb_latexmk", ".synctex.gz",
-]);
-
 export function purgeAllCacheDirs(): void {
   const root = path.join(os.tmpdir(), "inkwell-vscode");
   try {
@@ -101,11 +133,89 @@ export function purgeAllCacheDirs(): void {
   } catch {}
 }
 
-function purgeCompileArtifacts(cacheDir: string, baseName: string): void {
-  for (const ext of TEX_ARTIFACT_EXTS) {
-    const file = path.join(cacheDir, `${baseName}${ext}`);
-    try { fs.unlinkSync(file); } catch {}
+function successMetadataPath(sourceFile: string, pdfPath: string): string {
+  const key = crypto.createHash("sha256").update(path.resolve(pdfPath)).digest("hex").slice(0, 16);
+  return path.join(getCacheDir(sourceFile), `success-${key}.json`);
+}
+
+/** Metadata is only trusted while it still describes the public PDF bytes. */
+export function readLastSuccessfulOutput(sourceFile: string, pdfPath?: string): LastSuccessfulOutput | undefined {
+  const target = pdfPath || path.join(path.dirname(sourceFile), `${path.basename(sourceFile, path.extname(sourceFile))}.pdf`);
+  try {
+    const value = JSON.parse(fs.readFileSync(successMetadataPath(sourceFile, target), "utf8"));
+    if (value.pdfPath !== target || typeof value.sourceVersion !== "number" || typeof value.sourceHash !== "string" ||
+        typeof value.publishedAt !== "string" || !Number.isFinite(Date.parse(value.publishedAt))) return undefined;
+    return value.pdfHash === crypto.createHash("sha256").update(fs.readFileSync(target)).digest("hex") ? value : undefined;
+  } catch {
+    return undefined;
   }
+}
+
+async function runCompileProcess(
+  attempt: CompileAttempt,
+  phase: "pandoc" | "tex" | "bibliography",
+  command: string,
+  args: string[],
+  options: { cwd: string; timeout: number; env: NodeJS.ProcessEnv }
+): Promise<{ stdout: string; stderr: string } | undefined> {
+  attempt.phase = phase;
+  attempt.processLog.push(`[inkwell] ${phase}: ${command} ${args.join(" ")}`);
+  try {
+    const result = await executeRunProcess(command, args, { cwd: options.cwd, env: options.env, timeoutMs: options.timeout });
+    attempt.exitCode = result.signal || result.timedOut || result.cancelled || result.maxBufferExceeded ? null : result.exitCode;
+    attempt.signal = result.signal || undefined;
+    attempt.processLog.push(result.stdout, result.stderr);
+    if (result.exitCode !== 0 || result.signal || result.timedOut || result.cancelled || result.maxBufferExceeded) {
+      attempt.failure = `${phase} failed${attempt.signal ? ` (${attempt.signal})` : ` (exit ${result.exitCode})`}: ${result.error || result.stderr || "Process did not exit cleanly"}`;
+      attempt.processLog.push(attempt.failure);
+      return undefined;
+    }
+    return result;
+  } catch (err: any) {
+    attempt.exitCode = typeof err.code === "number" ? err.code : null;
+    attempt.signal = typeof err.signal === "string" ? err.signal : undefined;
+    attempt.failure = `${phase} failed${attempt.signal ? ` (${attempt.signal})` : attempt.exitCode !== null ? ` (exit ${attempt.exitCode})` : ""}: ${err.message || String(err)}`;
+    attempt.processLog.push(String(err.stdout || ""), String(err.stderr || ""), attempt.failure);
+    return undefined;
+  }
+}
+
+function publishCompileOutput(attempt: CompileAttempt, stagedPdf: string): boolean {
+  if (attempt.failure) return false;
+  attempt.phase = "validation";
+  let metadata: LastSuccessfulOutput;
+  try {
+    validatePdf(stagedPdf);
+    metadata = {
+      pdfPath: attempt.pdfOutput,
+      sourceVersion: attempt.sourceVersion,
+      sourceHash: attempt.sourceHash,
+      publishedAt: new Date().toISOString(),
+      pdfHash: crypto.createHash("sha256").update(fs.readFileSync(stagedPdf)).digest("hex"),
+    };
+    attempt.phase = "publication";
+    publishPdf(stagedPdf, attempt.pdfOutput);
+  } catch (err: any) {
+    attempt.failure = `${attempt.phase} failed: ${err.message || String(err)}`;
+    attempt.processLog.push(attempt.failure);
+    return false;
+  }
+  attempt.lastSuccessfulOutput = metadata;
+  let temporary: string | undefined;
+  try {
+    const metadataFile = successMetadataPath(attempt.sourceFile, attempt.pdfOutput);
+    temporary = `${metadataFile}.${crypto.randomUUID()}.tmp`;
+    fs.writeFileSync(temporary, JSON.stringify(metadata), { flag: "wx" });
+    fs.renameSync(temporary, metadataFile);
+  } catch (err: any) {
+    // The PDF has already been published successfully. A metadata failure must
+    // not claim that compilation failed after changing the public document.
+    attempt.processLog.push(`[inkwell] Could not persist output metadata: ${err.message || String(err)}`);
+  } finally {
+    if (temporary) { try { fs.unlinkSync(temporary); } catch {} }
+  }
+  attempt.phase = "complete";
+  return true;
 }
 
 const binaryCache = new Map<string, { result: string | undefined; ts: number }>();
@@ -148,32 +258,84 @@ async function findBinary(name: string): Promise<string | undefined> {
 //   3. preview.handleCompile does the same for the webview compile button.
 // They are not redundant: the lock here only dedupes identical keys, while
 // the caller-side queues serialize distinct documents.
-const compileLocks = new Map<string, Promise<CompileResult>>();
+const compileLocks = new Map<string, { signature: string; promise: Promise<CompileResult> }>();
 
 export function compile(
   document: vscode.TextDocument,
   outputPath?: string
 ): Promise<CompileResult> {
-  const key = `${document.uri.fsPath}::${outputPath || ""}`;
+  const sourceText = document.getText();
+  const sourceVersion = document.version;
+  const sourceFile = document.uri.fsPath;
+  const pdfOutput = path.resolve(outputPath || path.join(path.dirname(sourceFile), `${path.basename(sourceFile, path.extname(sourceFile))}.pdf`));
+  const key = pdfOutput;
+  const signature = crypto.createHash("sha256").update(JSON.stringify([sourceFile, sourceVersion, sourceText])).digest("hex");
   const existing = compileLocks.get(key);
-  if (existing) return existing;
-
-  const run = (async () => {
-    const mode = detectMode(document);
-    return mode === "xelatex"
-      ? compileTeX(document, outputPath)
-      : compilePandoc(document, outputPath);
+  if (existing?.signature === signature) return existing.promise;
+  // All consumers in this attempt see the same document revision, including
+  // template resolution after asynchronous binary discovery.
+  const snapshot = new Proxy(document, {
+    get(target, property) {
+      if (property === "getText") return () => sourceText;
+      if (property === "version") return sourceVersion;
+      return Reflect.get(target, property);
+    },
+  });
+  const run = (async (): Promise<CompileResult> => {
+    // Different revisions targeting one public file serialize, retaining their
+    // captured source. Unrelated documents can compile independently.
+    if (existing) await existing.promise.catch(() => undefined);
+    const start = Date.now();
+    const sourceHash = crypto.createHash("sha256").update(sourceText).digest("hex");
+    let attempt: CompileAttempt | undefined;
+    let details: CompileDetails;
+    try {
+      attempt = {
+        sourceFile, sourceText, sourceVersion, sourceHash, pdfOutput,
+        cacheDir: fs.mkdtempSync(path.join(getCacheDir(sourceFile), "attempt-")),
+        phase: "preflight", exitCode: null, processLog: [],
+        lastSuccessfulOutput: readLastSuccessfulOutput(sourceFile, pdfOutput),
+      };
+      details = detectMode(snapshot) === "xelatex"
+        ? await compileTeX(snapshot, attempt)
+        : await compilePandoc(snapshot, attempt);
+    } catch (err: any) {
+      const message = `${attempt?.phase || "preflight"} failed: ${err.message || String(err)}`;
+      if (attempt) attempt.failure = message;
+      details = { success: false, pdfPath: undefined, errors: [{ line: undefined, message, severity: "error" }], log: message, duration: (Date.now() - start) / 1000 };
+    }
+    const message = details.success ? "PDF compiled successfully." : attempt?.failure || details.errors.find((error) => error.severity === "error")?.message || "Compilation failed.";
+    if (!details.success && !details.errors.some((error) => error.severity === "error")) {
+      details.errors.push({ line: undefined, message, severity: "error" });
+    }
+    let logPath: string | undefined;
+    if (attempt) {
+      const baseName = path.basename(sourceFile, path.extname(sourceFile));
+      const fullLog = [...attempt.processLog, details.log, safeReadFile(path.join(attempt.cacheDir, `${baseName}.log`))].join("\n");
+      try {
+        logPath = path.join(attempt.cacheDir, "compile.log");
+        fs.writeFileSync(logPath, fullLog, "utf8");
+      } catch { logPath = undefined; }
+      details.log = fullLog + (logPath ? `\n[inkwell] full compile log: ${logPath}` : "");
+    }
+    return {
+      ...details, sourceVersion, sourceHash, message, logPath,
+      phase: attempt?.phase || "preflight", exitCode: attempt?.exitCode ?? null,
+      signal: attempt?.signal, lastSuccessfulOutput: attempt?.lastSuccessfulOutput,
+    };
   })();
 
-  compileLocks.set(key, run);
-  run.finally(() => compileLocks.delete(key));
+  compileLocks.set(key, { signature, promise: run });
+  // Avoid an ignored rejecting promise from finally when callers handle run.
+  const release = () => { if (compileLocks.get(key)?.promise === run) compileLocks.delete(key); };
+  void run.then(release, release);
   return run;
 }
 
 async function compileTeX(
   document: vscode.TextDocument,
-  outputPath?: string
-): Promise<CompileResult> {
+  attempt: CompileAttempt
+): Promise<CompileDetails> {
   const start = Date.now();
   const sourceFile = document.uri.fsPath;
   const sourceDir = path.dirname(sourceFile);
@@ -190,10 +352,7 @@ async function compileTeX(
     };
   }
 
-  const cacheDir = getCacheDir(sourceFile);
-  const pdfOutput = outputPath || path.join(sourceDir, `${baseName}.pdf`);
-  purgeCompileArtifacts(cacheDir, baseName);
-  try { fs.unlinkSync(pdfOutput); } catch {}
+  const { cacheDir, pdfOutput } = attempt;
 
   const tmpSource = path.join(cacheDir, path.basename(sourceFile));
   fs.writeFileSync(tmpSource, document.getText(), "utf-8");
@@ -202,6 +361,9 @@ async function compileTeX(
   copySiblingFiles(sourceDir, projectRoot, cacheDir);
   const template = getTemplateForDocument(document);
   copySupportingFiles(template, cacheDir);
+  // A sibling PDF may be a resource, but cannot masquerade as this attempt's
+  // output if the process exits without generating a new document.
+  fs.rmSync(path.join(cacheDir, `${baseName}.pdf`), { force: true });
 
   const args = [
     "-interaction=nonstopmode",
@@ -221,63 +383,46 @@ async function compileTeX(
   // Two passes required: the first resolves cross-references and TOC
   // entries; the second incorporates them into the final PDF.
   for (let pass = 0; pass < 2; pass++) {
-    try {
-      const result = await exec(xelatex, args, {
+    const result = await runCompileProcess(attempt, "tex", xelatex, args, {
         cwd: sourceDir,
         timeout: 120_000,
         env: texEnv,
-      });
-      stdout = result.stdout;
-      stderr = result.stderr;
-    } catch (err: any) {
-      if (err.stdout) stdout = err.stdout;
-      if (err.stderr) stderr = err.stderr;
-      if (pass === 0) break;
-    }
+    });
+    if (!result) break;
+    stdout += result.stdout;
+    stderr += result.stderr;
   }
 
   // Bibliography requires an extra pass: xelatex -> biber/bibtex -> xelatex.
   const hasBib = document.getText().includes("\\bibliography{") ||
     document.getText().includes("\\addbibresource{");
-  if (hasBib) {
+  if (hasBib && !attempt.failure) {
     const biber = await findBinary("biber");
     const bibtex = await findBinary("bibtex");
     const bibTool = biber || bibtex;
     if (bibTool) {
-      try {
-        await exec(bibTool, [path.join(cacheDir, baseName)], {
+      await runCompileProcess(attempt, "bibliography", bibTool, [path.join(cacheDir, baseName)], {
           cwd: cacheDir,
           timeout: 30_000,
           env: texEnv,
-        });
-      } catch (err: any) {
-        if (err.stderr) stderr += "\n" + err.stderr;
-      }
+      });
       // Two passes after the bib tool: the first pulls in the .bbl, the
       // second resolves the now-defined \cite labels and page references.
-      for (let pass = 0; pass < 2; pass++) {
-        try {
-          const result = await exec(xelatex, args, {
-            cwd: sourceDir,
-            timeout: 120_000,
-            env: texEnv,
-          });
-          stdout = result.stdout;
-          stderr += "\n" + result.stderr;
-        } catch (err: any) {
-          if (err.stderr) stderr += "\n" + err.stderr;
-          if (err.stdout) stdout = err.stdout;
-        }
+      for (let pass = 0; pass < 2 && !attempt.failure; pass++) {
+        const result = await runCompileProcess(attempt, "tex", xelatex, args, {
+          cwd: sourceDir,
+          timeout: 120_000,
+          env: texEnv,
+        });
+        if (!result) break;
+        stdout += result.stdout;
+        stderr += "\n" + result.stderr;
       }
     }
   }
 
   const tmpOutput = path.join(cacheDir, `${baseName}.pdf`);
-  const pdfExists = fs.existsSync(tmpOutput);
-
-  if (pdfExists) {
-    fs.copyFileSync(tmpOutput, pdfOutput);
-  }
+  const published = publishCompileOutput(attempt, tmpOutput);
 
   const logFile = path.join(cacheDir, `${baseName}.log`);
   let logContent = "";
@@ -286,12 +431,12 @@ async function compileTeX(
   } catch {}
 
   const combined = stderr + "\n" + stdout + "\n" + logContent;
-  const errors = parseErrors(stderr + "\n" + logContent, stdout);
+  const errors = parseErrors(attempt.processLog.join("\n") + "\n" + logContent, stdout);
   const duration = (Date.now() - start) / 1000;
 
   return {
-    success: pdfExists,
-    pdfPath: pdfExists ? pdfOutput : undefined,
+    success: published,
+    pdfPath: published ? pdfOutput : undefined,
     errors,
     log: combined,
     duration,
@@ -387,8 +532,8 @@ function checkTemplateFeatures(
 
 async function compilePandoc(
   document: vscode.TextDocument,
-  outputPath?: string
-): Promise<CompileResult> {
+  attempt: CompileAttempt
+): Promise<CompileDetails> {
   const start = Date.now();
   const sourceFile = document.uri.fsPath;
   const sourceDir = path.dirname(sourceFile);
@@ -407,10 +552,7 @@ async function compilePandoc(
     };
   }
 
-  const cacheDir = getCacheDir(sourceFile);
-  const pdfOutput = outputPath || path.join(sourceDir, `${baseName}.pdf`);
-  purgeCompileArtifacts(cacheDir, baseName);
-  try { fs.unlinkSync(pdfOutput); } catch {}
+  const { cacheDir, pdfOutput } = attempt;
 
   const template = getTemplateForDocument(document);
   const templateName = path.basename(template.pandocTemplate);
@@ -622,6 +764,7 @@ async function compilePandoc(
   }
 
   copySiblingFiles(sourceDir, projectRoot, cacheDir);
+  fs.rmSync(tmpOutput, { force: true });
 
   let stderr = "";
   let stdout = "";
@@ -658,25 +801,22 @@ async function compilePandoc(
   ].join("\n");
 
   // Stage 1: pandoc -> .tex
-  try {
-    const result = await exec(pandoc, pandocArgs, {
+  const pandocResult = await runCompileProcess(attempt, "pandoc", pandoc, pandocArgs, {
       cwd: sourceDir,
       timeout: 60_000,
       env: texEnv,
-    });
-    stdout += result.stdout;
-    stderr += result.stderr;
-  } catch (err: any) {
-    if (err.stderr) stderr += err.stderr;
-    if (err.stdout) stdout += err.stdout;
+  });
+  if (pandocResult) {
+    stdout += pandocResult.stdout;
+    stderr += pandocResult.stderr;
   }
 
   const texExists = fs.existsSync(tmpTex);
   let logContent = "";
 
   // Stage 2: engine -> .pdf, run twice to resolve cross-references.
-  // Skip if pandoc failed to produce the .tex.
-  if (texExists) {
+  // A failed Pandoc callback is authoritative even if it left a TeX file.
+  if (texExists && !attempt.failure) {
     const engineArgs = [
       "-interaction=nonstopmode",
       "-halt-on-error",
@@ -686,22 +826,14 @@ async function compilePandoc(
 
     for (let pass = 0; pass < 2; pass++) {
       stdout += `\n[inkwell] ${engine} pass ${pass + 1}: ${engine} ${engineArgs.join(" ")}\n`;
-      try {
-        const result = await exec(engine, engineArgs, {
+      const result = await runCompileProcess(attempt, "tex", engine, engineArgs, {
           cwd: sourceDir,
           timeout: 90_000,
           env: texEnv,
-        });
-        stdout += result.stdout;
-        stderr += result.stderr;
-      } catch (err: any) {
-        if (err.stdout) stdout += err.stdout;
-        if (err.stderr) stderr += err.stderr;
-        // First-pass failures are expected (undefined refs, missing
-        // aux entries). Continue to pass 2 in that case; it typically
-        // resolves. Only a pass-2 failure is a real compile error.
-        if (pass === 0) continue;
-      }
+      });
+      if (!result) break;
+      stdout += result.stdout;
+      stderr += result.stderr;
     }
 
     // Bibliography handling for the raw-\cite path. Pandoc's
@@ -711,7 +843,7 @@ async function compilePandoc(
     // raw LaTeX \cite commands still gets served: we detect the
     // macro in the generated .tex and run biber/bibtex + one more
     // engine pass in that case.
-    try {
+    if (!attempt.failure) {
       const texContent = fs.readFileSync(tmpTex, "utf-8");
       const hasBib = /\\(bibliography|addbibresource)\{/.test(texContent);
       if (hasBib) {
@@ -719,34 +851,26 @@ async function compilePandoc(
         const bibtex = await findBinary("bibtex");
         const bibTool = biber || bibtex;
         if (bibTool) {
-          try {
-            await exec(bibTool, [path.join(cacheDir, baseName)], {
-              cwd: cacheDir,
-              timeout: 30_000,
-              env: texEnv,
-            });
-          } catch (err: any) {
-            if (err.stderr) stderr += "\n" + err.stderr;
-          }
+          await runCompileProcess(attempt, "bibliography", bibTool, [path.join(cacheDir, baseName)], {
+            cwd: cacheDir,
+            timeout: 30_000,
+            env: texEnv,
+          });
           // Two passes after the bib tool so the .bbl is pulled in and the
           // resulting \cite / page references resolve in the same compile.
-          for (let pass = 0; pass < 2; pass++) {
-            try {
-              const r = await exec(engine, engineArgs, {
-                cwd: sourceDir,
-                timeout: 90_000,
-                env: texEnv,
-              });
-              stdout += r.stdout;
-              stderr += r.stderr;
-            } catch (err: any) {
-              if (err.stderr) stderr += err.stderr;
-              if (err.stdout) stdout += err.stdout;
-            }
+          for (let pass = 0; pass < 2 && !attempt.failure; pass++) {
+            const r = await runCompileProcess(attempt, "tex", engine, engineArgs, {
+              cwd: sourceDir,
+              timeout: 90_000,
+              env: texEnv,
+            });
+            if (!r) break;
+            stdout += r.stdout;
+            stderr += r.stderr;
           }
         }
       }
-    } catch {}
+    }
 
     const logFile = path.join(cacheDir, `${baseName}.log`);
     try {
@@ -754,22 +878,19 @@ async function compilePandoc(
     } catch {}
   }
 
-  const pdfExists = fs.existsSync(tmpOutput);
-  if (pdfExists) {
-    fs.copyFileSync(tmpOutput, pdfOutput);
-  }
+  const published = publishCompileOutput(attempt, tmpOutput);
 
   const errors = [
     ...featureCheck.warnings,
     ...pipelineWarnings,
-    ...parseErrors(stderr + "\n" + logContent, stdout, { generatedTex: true }),
+    ...parseErrors(attempt.processLog.join("\n") + "\n" + logContent, stdout, { generatedTex: true }),
   ];
   const duration = (Date.now() - start) / 1000;
 
   const logFile = path.join(cacheDir, `${baseName}.log`);
   return {
-    success: pdfExists,
-    pdfPath: pdfExists ? pdfOutput : undefined,
+    success: published,
+    pdfPath: published ? pdfOutput : undefined,
     errors,
     log: diagnosticLog +
       `\n[inkwell] full engine log: ${logFile}` +
