@@ -194,10 +194,13 @@
     "test:errors": "npm run compile && node scripts/check-error-parsing.mjs",
     "test:preamble": "npm run compile && node scripts/check-preamble-merge.mjs",
     "test:installer": "bash -n scripts/install-inkwell-macos.sh && bash -n scripts/compile-demo.sh && bash -n scripts/compile-all-demos.sh",
-    "verify": "npm run typecheck && npm run lint && npm run test:regressions && npm run test:stability && npm run test:errors && npm run test:preamble && npm run test:installer"
+    "verify": "npm run typecheck && npm run lint && npm run test:regressions && npm run test:stability && npm run test:errors && npm run test:preamble && npm run test:installer && npm run test:behavior",
+    "test:behavior": "npm run compile && node --test tests/*.test.cjs tests/*.test.mjs",
+    "test:demos": "bash scripts/compile-all-demos.sh"
   },
   "dependencies": {
-    "markdown-it": "^14.1.0"
+    "markdown-it": "^14.1.0",
+    "yaml": "2.9.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

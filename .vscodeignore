@@ -3,6 +3,9 @@
 .husky/**
 src/**
 scripts/**
+tests/**
+benchmarks/**
+INKWELL_0.5_IMPLEMENTATION_BRIEF.md
 node_modules/**
 venv/**
 tsconfig.json

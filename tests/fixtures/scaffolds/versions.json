@@ -1,0 +1,1 @@
+{"versions":[0,1,2,3,4],"legacy":{"name":"Preserve me","settings":{"fontsize":"11pt"},"documentSettings":{"fontSize":12},"custom":{"unknown":true}},"malformed":"{\"schemaVersion\":3, broken}","unsafeNames":["..","../outside","a/b","a\\b","a\"b","a\nb","a'b"],"modifiedManagedFile":"User bytes must remain exact.\r\n"}

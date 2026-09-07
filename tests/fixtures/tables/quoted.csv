@@ -1,0 +1,4 @@
+name,description,value
+"comma, name","a ""quoted"" value",12
+"multiline","first line
+second line | pipe",23
