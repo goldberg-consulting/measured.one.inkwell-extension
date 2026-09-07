@@ -13,9 +13,10 @@ import * as path from "path";
 import * as fs from "fs";
 import * as crypto from "crypto";
 import { execFileSync } from "child_process";
-import { BlockResult, CodeBlock, DisplayMode, discoverArtifacts, parseCodeBlocks, parseQuotedAttrs, parseRunConfig, resolveVenvPython, RunConfig } from "./runner";
+import { BlockResult, CodeBlock, DisplayMode, readCurrentRunResults, parseCodeBlocks, parseQuotedAttrs, parseRunConfig, resolveVenvPython, RunConfig } from "./runner";
 import { buildCodeBlockPath, findBinaryViaShell } from "./shell-env";
 import { getInkwellOutputChannel } from "./inkwell-output";
+import { fingerprintBlock } from "./run-store";
 import {
   getInkwellCompiledPath,
   getInkwellOutputsDir,
@@ -362,36 +363,7 @@ export function gatherCachedResults(
   markdown: string,
   sourceFile: string,
 ): BlockResult[] {
-  const cacheDir = getInkwellOutputsDir(sourceFile);
-
-  const blocks = parseCodeBlocks(markdown);
-  const results: BlockResult[] = [];
-
-  for (const block of blocks) {
-    const blockDir = path.join(cacheDir, `block_${block.index}`);
-    const hasBlockDir = fs.existsSync(blockDir);
-    let stdout = "";
-    try {
-      stdout = fs.readFileSync(path.join(blockDir, "stdout.txt"), "utf-8");
-    } catch {}
-
-    const artifacts = discoverArtifacts(blockDir);
-
-    const cacheStatus: "hit" | "miss" =
-      hasBlockDir && (stdout.trim().length > 0 || artifacts.size > 0) ? "hit" : "miss";
-
-    results.push({
-      block,
-      stdout,
-      stderr: "",
-      exitCode: 0,
-      artifacts,
-      cached: cacheStatus === "hit",
-      cacheStatus,
-    });
-  }
-
-  return results;
+  return readCurrentRunResults(markdown, sourceFile);
 }
 
 // ── Layer 2: Inline expressions ───────────────────────────────────────
@@ -425,9 +397,15 @@ export function evaluateInlineExpressions(
   const exprs = matches.map((e) => e.expr);
 
   const h = crypto.createHash("sha256");
+  h.update("inline-evaluation-v2");
   h.update(JSON.stringify(exprs));
   for (const [k, v] of vars) h.update(`\0${k}=${v}`);
-  const hash = h.digest("hex").substring(0, 16);
+  const python = resolvePython(runConfig, docDir, projectRoot);
+  const interpreter = { cmd: python, args: ["-u"], envVars: { PYTHONDONTWRITEBYTECODE: "1" }, label: python };
+  const context = fingerprintBlock({ index: 0, lang: "python", source: JSON.stringify(exprs),
+    startLine: 0, endLine: 0, raw: "" }, docDir, projectRoot, interpreter);
+  h.update(context.hash);
+  const hash = h.digest("hex");
 
   const evalDir = path.join(cacheDir, "inline_eval");
   fs.mkdirSync(evalDir, { recursive: true });
@@ -461,11 +439,9 @@ export function evaluateInlineExpressions(
   const scriptPath = path.join(evalDir, "eval.py");
   fs.writeFileSync(scriptPath, script, "utf-8");
 
-  const python = resolvePython(runConfig, docDir, projectRoot);
-
   let stdout: string;
   try {
-    stdout = execFileSync(python, ["-u", scriptPath], {
+    stdout = execFileSync(context.interpreter.path, ["-u", scriptPath], {
       cwd: projectRoot,
       timeout: 30_000,
       encoding: "utf-8",

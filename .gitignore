@@ -9,6 +9,7 @@ examples/*.pdf
 # Tracked under root .inkwell/: manifest.json, scripts/, references/, figures/.gitkeep
 # Everything else under .inkwell/ is generated at runtime
 .inkwell/outputs/
+.inkwell/runs/
 .inkwell/compiled/
 .inkwell/mermaid/
 .inkwell/figures/*.pdf

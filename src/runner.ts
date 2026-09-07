@@ -1,39 +1,14 @@
-// Code block runner. Parses fenced ```{lang ...} blocks from markdown,
-// resolves the correct interpreter (system or venv), executes each block
-// sequentially, and caches results keyed by content hash. Supports
-// Python, R, Node, and shell; other languages fall through with a clear
-// error rather than silent failure.
+// Code block runner. Executes dependency-ordered blocks in fresh attempts,
+// then publishes successful, fingerprint-validated products through RunStore.
+// Python, R, Node and shell are supported with system or project interpreters.
 
 import * as path from "path";
 import * as fs from "fs";
-import { execFile, ChildProcess } from "child_process";
-import { getBlockHash, loadCache, saveCache } from "./cache";
-import { getInkwellOutputsDir, getInkwellProjectRoot, resolveBlockFilePath } from "./config";
+import { getInkwellProjectRoot } from "./config";
 import { splitFrontmatter, extractIndentedBlock, extractIndentedValue } from "./frontmatter";
-
-export class RunCancellation {
-  private _cancelled = false;
-  private _activeProcess: ChildProcess | undefined;
-
-  get cancelled(): boolean {
-    return this._cancelled;
-  }
-
-  cancel(): void {
-    this._cancelled = true;
-    if (this._activeProcess && !this._activeProcess.killed) {
-      this._activeProcess.kill("SIGTERM");
-    }
-  }
-
-  setProcess(proc: ChildProcess): void {
-    this._activeProcess = proc;
-  }
-
-  clearProcess(): void {
-    this._activeProcess = undefined;
-  }
-}
+import { executeRunProcess, RunCancellation, ProcessOutcome } from "./run-process";
+import { fingerprintBlock, resolveRunSource, RunStore } from "./run-store";
+export { RunCancellation } from "./run-process";
 
 export type BlockStatus = "pending" | "running" | "cached" | "done" | "failed" | "cancelled";
 
@@ -54,6 +29,9 @@ export type DisplayMode = "output" | "both" | "code" | "none";
 
 export interface CodeBlock {
   index: number;
+  id?: string;
+  inputs?: string[];
+  dependsOn?: string[];
   lang: string;
   source: string;
   file?: string;
@@ -73,10 +51,17 @@ export interface RunConfig {
   rEnv?: string;
   nodeEnv?: string;
   defaultDisplay?: DisplayMode;
+  timeoutMs?: number;
+  maxBuffer?: number;
 }
 
 export interface BlockResult {
   block: CodeBlock;
+  runId?: string;
+  blockId?: string;
+  fingerprint?: string;
+  resultHash?: string;
+  process?: ProcessOutcome;
   stdout: string;
   stderr: string;
   exitCode: number;
@@ -150,6 +135,9 @@ export function parseCodeBlocks(markdown: string): CodeBlock[] {
 
     blocks.push({
       index: index++,
+      id: attrs.id,
+      inputs: attrs.inputs?.split(/[,;]+/).map(value => value.trim()).filter(Boolean),
+      dependsOn: attrs["depends-on"]?.split(/[,;\s]+/).filter(Boolean),
       lang,
       source: source.trimEnd(),
       file: attrs.file,
@@ -171,10 +159,10 @@ export function parseCodeBlocks(markdown: string): CodeBlock[] {
 /** Parse `key="value"` attribute pairs from a fenced-block info string. */
 export function parseQuotedAttrs(str: string): Record<string, string> {
   const attrs: Record<string, string> = {};
-  const pattern = /(\w+)="([^"]+)"/g;
+  const pattern = /([\w-]+)=(?:"([^"]*)"|'([^']*)'|([^\s]+))/g;
   let m: RegExpExecArray | null;
   while ((m = pattern.exec(str)) !== null) {
-    attrs[m[1]] = m[2];
+    attrs[m[1]] = m[2] ?? m[3] ?? m[4];
   }
   return attrs;
 }
@@ -212,7 +200,7 @@ export interface ResolvedInterpreter {
 // Resolves the interpreter binary for a given language and optional
 // virtualenv. Falls back to the system interpreter if the env is missing
 // and reports a warning so the user knows what happened.
-function resolveInterpreter(
+export function resolveInterpreter(
   langKey: string,
   envPath: string | undefined,
   runConfig: RunConfig,
@@ -303,238 +291,144 @@ function resolveInterpreter(
   };
 }
 
-export async function runBlock(
-  block: CodeBlock,
-  projectRoot: string,
-  docDir: string,
-  outputDir: string,
-  cancel?: RunCancellation,
-  runConfig?: RunConfig,
-): Promise<BlockResult> {
-  fs.mkdirSync(outputDir, { recursive: true });
-
-  if (cancel?.cancelled) {
-    return {
-      block, stdout: "", stderr: "Cancelled", exitCode: 130,
-      artifacts: new Map(), cached: false,
-    };
-  }
-
-  const langKey = block.lang.toLowerCase();
-  const commandParts = LANG_COMMANDS[langKey];
-  if (!commandParts) {
-    return {
-      block, stdout: "", stderr: `Unsupported language: ${block.lang}`,
-      exitCode: 1, artifacts: new Map(), cached: false,
-    };
-  }
-
-  let scriptPath: string;
-
-  if (block.file) {
-    scriptPath = resolveBlockFilePath(block.file, docDir, projectRoot);
-    if (!fs.existsSync(scriptPath)) {
-      return {
-        block, stdout: "", stderr: `File not found: ${block.file}`,
-        exitCode: 1, artifacts: new Map(), cached: false,
-      };
-    }
-  } else {
-    const ext = langKey === "python" || langKey === "python3" ? ".py"
-      : langKey === "r" ? ".R"
-      : langKey === "node" || langKey === "javascript" ? ".js"
-      : ".sh";
-    scriptPath = path.join(outputDir, `block_${block.index}${ext}`);
-    fs.writeFileSync(scriptPath, block.source, "utf-8");
-  }
-
-  const interp = resolveInterpreter(langKey, block.env, runConfig || {}, projectRoot, docDir);
-
-  const env = {
-    ...process.env,
-    ...interp.envVars,
-    INKWELL_OUTPUT_DIR: outputDir,
-    INKWELL_BLOCK_INDEX: String(block.index),
-  };
-
-  const cmd = interp.cmd;
-  const args = [...interp.args, scriptPath];
-
-  let stdout: string;
-  let stderr: string;
-  let exitCode = 0;
-
-  try {
-    const proc = execFile(cmd, args, {
-      cwd: projectRoot,
-      timeout: 300_000,
-      env,
-      maxBuffer: 10 * 1024 * 1024,
-    }, () => {});
-
-    if (cancel) cancel.setProcess(proc);
-
-    // We wrap execFile in a manual promise so we can stream stdout/stderr
-  // incrementally and still capture partial output on non-zero exit.
-  const result = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
-      let out = "";
-      let err = "";
-      proc.stdout?.on("data", (d: Buffer) => { out += d.toString(); });
-      proc.stderr?.on("data", (d: Buffer) => { err += d.toString(); });
-      proc.on("close", (code) => {
-        if (code === 0 || code === null) {
-          resolve({ stdout: out, stderr: err });
-        } else {
-          const e: any = new Error(`Process exited with code ${code}`);
-          e.stdout = out;
-          e.stderr = err;
-          e.code = code;
-          reject(e);
-        }
-      });
-      proc.on("error", (e: any) => {
-        e.stdout = out;
-        e.stderr = err;
-        reject(e);
-      });
-    });
-
-    if (cancel) cancel.clearProcess();
-    stdout = result.stdout;
-    stderr = result.stderr;
-  } catch (err: any) {
-    if (cancel) cancel.clearProcess();
-    stdout = err.stdout || "";
-    stderr = err.stderr || "";
-    exitCode = err.code ?? 1;
-    if (cancel?.cancelled) exitCode = 130;
-  }
-
-  fs.writeFileSync(path.join(outputDir, "stdout.txt"), stdout, "utf-8");
-  if (stderr) {
-    fs.writeFileSync(path.join(outputDir, "stderr.txt"), stderr, "utf-8");
-  }
-
-  const artifacts = discoverArtifacts(outputDir);
-
-  return {
-    block, stdout, stderr, exitCode, artifacts, cached: false,
-    interpreter: interp.label,
-    warning: interp.warning,
-  };
+function failedResult(block: CodeBlock, message: string, exitCode = 1): BlockResult {
+  return { block, stdout: "", stderr: message, exitCode, artifacts: new Map(), cached: false, cacheStatus: "miss" };
 }
 
+export async function runBlock(
+  block: CodeBlock, projectRoot: string, docDir: string, outputDir: string,
+  cancel?: RunCancellation, runConfig: RunConfig = {},
+): Promise<BlockResult> {
+  fs.mkdirSync(outputDir, { recursive: true });
+  if (cancel?.cancelled) return failedResult(block, "Cancelled", 130);
+  const langKey = block.lang.toLowerCase();
+  if (!LANG_COMMANDS[langKey]) return failedResult(block, `Unsupported language: ${block.lang}`);
+  let scriptPath: string;
+  if (block.file) {
+    scriptPath = resolveRunSource(block.file, docDir, projectRoot);
+    if (!fs.existsSync(scriptPath)) return failedResult(block, `File not found: ${block.file}`);
+  } else {
+    const ext = langKey.startsWith("python") ? ".py" : langKey === "r" ? ".R"
+      : ["node", "javascript"].includes(langKey) ? ".js" : ".sh";
+    // Source stays outside the published artifacts directory.
+    scriptPath = path.join(path.dirname(outputDir), `source${ext}`);
+    fs.writeFileSync(scriptPath, block.source, "utf8");
+  }
+  const interpreter = resolveInterpreter(langKey, block.env, runConfig, projectRoot, docDir);
+  const executable = fingerprintBlock(block, docDir, projectRoot, interpreter).interpreter.path;
+  const outcome = await executeRunProcess(executable, [...interpreter.args, scriptPath], {
+    cwd: projectRoot, timeoutMs: runConfig.timeoutMs, maxBuffer: runConfig.maxBuffer,
+    env: { ...process.env, ...interpreter.envVars, INKWELL_OUTPUT_DIR: outputDir, INKWELL_BLOCK_INDEX: String(block.index) },
+  }, cancel);
+  return { block, ...outcome, process: outcome,
+    artifacts: outcome.exitCode === 0 ? discoverArtifacts(outputDir) : new Map(),
+    cached: false, interpreter: interpreter.label, warning: interpreter.warning };
+}
+
+/** Used only to discover a fresh attempt; readers must go through RunStore.current. */
 export function discoverArtifacts(outputDir: string): Map<string, string> {
   const artifacts = new Map<string, string>();
-  const skip = new Set(["stdout.txt", "stderr.txt"]);
-
-  try {
-    for (const entry of fs.readdirSync(outputDir)) {
-      if (skip.has(entry) || entry.startsWith("block_")) continue;
-      const full = path.join(outputDir, entry);
-      if (fs.statSync(full).isFile()) {
-        const name = path.basename(entry, path.extname(entry));
-        artifacts.set(name, full);
-      }
-    }
-  } catch {}
-
+  if (!fs.existsSync(outputDir)) return artifacts;
+  for (const entry of fs.readdirSync(outputDir, { withFileTypes: true })) {
+    if (entry.isFile()) artifacts.set(path.basename(entry.name, path.extname(entry.name)), path.join(outputDir, entry.name));
+  }
   return artifacts;
 }
 
 export function blockLabel(block: CodeBlock): string {
-  if (block.file) return block.file;
-  const preview = block.source.split("\n")[0].substring(0, 40);
-  return preview || `${block.lang} block`;
+  return block.file || block.source.split("\n")[0].substring(0, 40) || `${block.lang} block`;
+}
+
+/** Read-only validation used by both compilation and preview. */
+export function readCurrentRunResults(markdown: string, sourceFile: string): BlockResult[] {
+  const blocks = parseCodeBlocks(markdown);
+  const projectRoot = getInkwellProjectRoot(sourceFile);
+  const docDir = path.dirname(sourceFile);
+  const store = new RunStore(projectRoot, sourceFile);
+  const runConfig = parseRunConfig(markdown);
+  let ids: string[];
+  try { ids = store.assignBlockIds(blocks); } catch (error) { return blocks.map(block => failedResult(block, String(error))); }
+  const byName = new Map(blocks.filter(block => block.id || block.label).map(block => [block.id || block.label!, block]));
+  const results = new Map<number, BlockResult>(); const visiting = new Set<number>();
+  const read = (block: CodeBlock): BlockResult => {
+    const existing = results.get(block.index); if (existing) return existing;
+    if (visiting.has(block.index)) return failedResult(block, "Cyclic run dependency");
+    visiting.add(block.index);
+    const upstream: Record<string, string> = {};
+    let error: string | undefined;
+    for (const dependency of block.dependsOn || []) {
+      const upstreamBlock = byName.get(dependency);
+      const result = upstreamBlock ? read(upstreamBlock) : undefined;
+      if (!result?.resultHash || result.exitCode !== 0) error = `Run dependency is missing or stale: ${dependency}`;
+      else upstream[dependency] = result.resultHash;
+    }
+    let result: BlockResult;
+    try {
+      const interpreter = resolveInterpreter(block.lang.toLowerCase(), block.env, runConfig, projectRoot, docDir);
+      const fingerprint = fingerprintBlock(block, docDir, projectRoot, interpreter, upstream);
+      if (Object.values(fingerprint.inputs).some(hash => hash === "missing")) error = "A declared input is missing.";
+      result = error ? failedResult(block, error) : store.current(block, ids[block.index], fingerprint) || failedResult(block, "Run output is missing or stale. Run this block again.");
+    } catch (reason) { result = failedResult(block, String(reason)); }
+    visiting.delete(block.index); results.set(block.index, result); return result;
+  };
+  return blocks.map(read);
 }
 
 export async function runAllBlocks(
-  markdown: string,
-  sourceFile: string,
-  cancel?: RunCancellation,
-  onProgress?: (p: BlockProgress) => void,
+  markdown: string, sourceFile: string, cancel?: RunCancellation,
+  onProgress?: (progress: BlockProgress) => void,
 ): Promise<BlockResult[]> {
-  const blocks = parseCodeBlocks(markdown);
-  if (!blocks.length) return [];
-
-  const docDir = path.dirname(sourceFile);
-  const projectRoot = getInkwellProjectRoot(sourceFile);
-  const cacheDir = getInkwellOutputsDir(sourceFile);
-  fs.mkdirSync(cacheDir, { recursive: true });
-
-  const runConfig = parseRunConfig(markdown);
-  const cache = loadCache(cacheDir);
-  const results: BlockResult[] = [];
-  const total = blocks.length;
-
-  for (const block of blocks) {
-    if (cancel?.cancelled) {
-      onProgress?.({
-        index: block.index, total, lang: block.lang,
-        label: blockLabel(block), status: "cancelled",
-      });
-      results.push({
-        block, stdout: "", stderr: "Cancelled", exitCode: 130,
-        artifacts: new Map(), cached: false,
-      });
-      continue;
+  const blocks = parseCodeBlocks(markdown); if (!blocks.length) return [];
+  const projectRoot = getInkwellProjectRoot(sourceFile); const docDir = path.dirname(sourceFile);
+  const store = new RunStore(projectRoot, sourceFile);
+  const runConfig = parseRunConfig(markdown); const ids = store.assignBlockIds(blocks, true);
+  const byName = new Map(blocks.filter(block => block.id || block.label).map(block => [block.id || block.label!, block]));
+  const results = new Map<number, BlockResult>(); const visiting = new Set<number>();
+  const execute = async (block: CodeBlock): Promise<BlockResult> => {
+    const existing = results.get(block.index); if (existing) return existing;
+    if (visiting.has(block.index)) return failedResult(block, "Cyclic run dependency");
+    visiting.add(block.index);
+    const report = (status: BlockStatus, result?: BlockResult, elapsed?: number) => onProgress?.({
+      index: block.index, total: blocks.length, lang: block.lang, label: blockLabel(block), status, elapsed,
+      interpreter: result?.interpreter, warning: result?.warning, noCache: block.noCache,
+      error: result?.exitCode ? result.stderr.split("\n")[0] : undefined,
+    });
+    const upstream: Record<string, string> = {}; let dependencyError: string | undefined;
+    for (const dependency of block.dependsOn || []) {
+      const upstreamBlock = byName.get(dependency); const result = upstreamBlock ? await execute(upstreamBlock) : undefined;
+      if (!result?.resultHash || result.exitCode !== 0) dependencyError = `Run dependency failed or is missing: ${dependency}`;
+      else upstream[dependency] = result.resultHash;
     }
-
-    const hash = getBlockHash(block, docDir, projectRoot);
-    const blockDir = path.join(cacheDir, `block_${block.index}`);
-    const cached = cache.blocks[block.index];
-
-    if (!block.noCache && cached && cached.hash === hash && cached.exitCode === 0) {
-      const artifacts = discoverArtifacts(blockDir);
-      let stdout = "";
+    if (!store.isCurrentGeneration()) {
+      const result = failedResult(block, "Run cache was cleared; remaining blocks were discarded.");
+      report("cancelled", result); visiting.delete(block.index); results.set(block.index, result); return result;
+    }
+    const interpreter = resolveInterpreter(block.lang.toLowerCase(), block.env, runConfig, projectRoot, docDir);
+    const fingerprint = fingerprintBlock(block, docDir, projectRoot, interpreter, upstream);
+    if (Object.values(fingerprint.inputs).some(hash => hash === "missing")) dependencyError = "A declared input is missing. Check the block inputs attribute.";
+    let result = !block.noCache && !cancel?.cancelled && !dependencyError ? store.current(block, ids[block.index], fingerprint) : undefined;
+    if (result) report("cached", result);
+    else {
+      const attempt = store.begin(ids[block.index]); report("running");
       try {
-        stdout = fs.readFileSync(path.join(blockDir, "stdout.txt"), "utf-8");
-      } catch {}
-
-      onProgress?.({
-        index: block.index, total, lang: block.lang,
-        label: blockLabel(block), status: "cached",
-      });
-
-      results.push({
-        block, stdout, stderr: "", exitCode: 0,
-        artifacts, cached: true, cacheStatus: "hit",
-      });
-      continue;
+        result = dependencyError ? failedResult(block, dependencyError)
+          : await runBlock(block, projectRoot, docDir, attempt.artifactsDir, cancel, runConfig);
+      } catch (error) { result = failedResult(block, String(error)); }
+      const outcome: ProcessOutcome = result.process || { stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode,
+        rawExitCode: null, signal: null, timedOut: false, cancelled: Boolean(cancel?.cancelled), maxBufferExceeded: false };
+      if (outcome.exitCode === 0 && fingerprintBlock(block, docDir, projectRoot, interpreter, upstream).hash !== fingerprint.hash) {
+        outcome.exitCode = 1; outcome.stderr = "Source, inputs, or environment changed during execution; run again.";
+      }
+      const argv = [...interpreter.args, block.file ? fingerprint.sourcePath : path.join(attempt.directory, `source${block.lang.toLowerCase().startsWith("python") ? ".py" : block.lang.toLowerCase() === "r" ? ".R" : ["node", "javascript"].includes(block.lang.toLowerCase()) ? ".js" : ".sh"}`)];
+      try { store.finish(attempt, fingerprint, argv, outcome); }
+      catch (error) { outcome.exitCode = 1; outcome.error = String(error); outcome.stderr = String(error); }
+      const published = outcome.exitCode === 0 ? store.current(block, ids[block.index], fingerprint) : undefined;
+      result = published ? { ...published, cached: false, interpreter: interpreter.label, warning: interpreter.warning }
+        : { ...result, ...outcome, artifacts: new Map(), cached: false, cacheStatus: "miss" };
+      report(outcome.cancelled ? "cancelled" : result.exitCode === 0 ? "done" : "failed", result, Date.now() - Date.parse(attempt.startedAt));
     }
-
-    onProgress?.({
-      index: block.index, total, lang: block.lang,
-      label: blockLabel(block), status: "running",
-      noCache: block.noCache,
-    });
-
-    const t0 = Date.now();
-    fs.mkdirSync(blockDir, { recursive: true });
-    const result = await runBlock(block, projectRoot, docDir, blockDir, cancel, runConfig);
-    const elapsed = Date.now() - t0;
-
-    const status: BlockStatus = cancel?.cancelled ? "cancelled"
-      : result.exitCode === 0 ? "done" : "failed";
-
-    onProgress?.({
-      index: block.index, total, lang: block.lang,
-      label: blockLabel(block), status, elapsed,
-      error: result.exitCode !== 0 ? result.stderr.split("\n")[0] : undefined,
-      interpreter: result.interpreter,
-      warning: result.warning,
-      noCache: block.noCache,
-    });
-
-    results.push(result);
-
-    cache.blocks[block.index] = {
-      hash,
-      exitCode: result.exitCode,
-      timestamp: Date.now(),
-    };
-    saveCache(cacheDir, cache);
-  }
-
-  return results;
+    visiting.delete(block.index); results.set(block.index, result); return result;
+  };
+  for (const block of blocks) await execute(block);
+  return blocks.map(block => results.get(block.index)!);
 }
