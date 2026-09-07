@@ -8,7 +8,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 import MarkdownIt from "markdown-it";
-import { compile, detectMode, isCompilable } from "./compiler";
+import { compile, detectMode, isCompilable, readLastSuccessfulOutput } from "./compiler";
 import { InkwellDiagnostics } from "./diagnostics";
 import { parseCodeBlocks, BlockProgress } from "./runner";
 import { prepareForPreview } from "./inject";
@@ -16,6 +16,7 @@ import { getInkwellOutputChannel } from "./inkwell-output";
 import { getInkwellOutputsDir, getInkwellProjectRoot } from "./config";
 import { renderCitations, CitationRenderResult } from "./citations";
 import { splitFrontmatter, extractIndentedBlock, extractIndentedValue } from "./frontmatter";
+import { PreviewRevision, PreviewRun, PreviewState } from "./preview-state";
 
 const md = new MarkdownIt({
   html: true,
@@ -35,6 +36,9 @@ export class InkwellPreviewProvider {
   private pdfCache: { path: string; mtimeMs: number; base64: string } | undefined;
   private compileInFlight = false;
   private compileQueued = false;
+  private readonly previewState = new PreviewState();
+  private runRequest: PreviewRun | null = null;
+  private nextRunId = 0;
   onRun?: () => Promise<void>;
 
   constructor(context: vscode.ExtensionContext) {
@@ -49,32 +53,71 @@ export class InkwellPreviewProvider {
     return this.currentDocument;
   }
 
-  notifyBlocksRan(): void {
-    if (!this.panel || !this.initialized) return;
-    if (this.currentDocument) {
-      void this.sendContentUpdate(this.currentDocument);
-    }
+  async notifyBlocksRan(document = this.currentDocument, request = this.runRequest): Promise<void> {
+    if (!document || !this.panel || !this.initialized) return;
+    if (!request || !this.isCurrent(request)) return;
+    if (document.uri.toString() !== this.currentDocument?.uri.toString()) return;
+    await this.sendContentUpdate(document);
   }
 
-  sendRunStarted(blockCount: number): void {
-    if (!this.panel || !this.initialized) return;
-    this.panel.webview.postMessage({ type: "runStarted", blockCount });
+  sendRunStarted(blockCount: number, document = this.currentDocument): PreviewRun | null {
+    if (!this.panel || !this.initialized || !document) return null;
+    const current = this.previewState.current;
+    if (!current || current.documentUri !== document.uri.toString() || current.sourceVersion !== document.version) return null;
+    this.runRequest = Object.freeze({ ...current, runId: ++this.nextRunId });
+    this.postMessage({ type: "runStarted", blockCount }, this.runRequest);
+    return this.runRequest;
   }
 
-  sendBlockProgress(progress: BlockProgress): void {
-    if (!this.panel || !this.initialized) return;
-    this.panel.webview.postMessage({ type: "blockProgress", ...progress });
+  sendBlockProgress(progress: BlockProgress, request = this.runRequest): void {
+    if (!request) return;
+    this.postMessage({ type: "blockProgress", ...progress }, request);
   }
 
   sendRunComplete(
     outcome: "done" | "failed" | "cancelled",
-    ran: number, cached: number, cancelled?: number, failed?: number
+    ran: number, cached: number, cancelled?: number, failed?: number,
+    request = this.runRequest,
   ): void {
-    if (!this.panel || !this.initialized) return;
-    this.panel.webview.postMessage({
+    if (!request) return;
+    this.postMessage({
       type: "runComplete", outcome, ran, cached,
       cancelled: cancelled || 0, failed: failed || 0,
-    });
+    }, request);
+  }
+
+  private isCurrent(request: PreviewRevision): boolean {
+    return !!this.panel && this.initialized && this.previewState.isCurrent(request) &&
+      (!("runId" in request) || request.runId === this.runRequest?.runId) &&
+      this.currentDocument?.uri.toString() === request.documentUri &&
+      this.currentDocument.version === request.sourceVersion;
+  }
+
+  private postMessage(message: Record<string, unknown>, request: PreviewRevision | null | undefined = this.previewState.current): void {
+    if (!request || !this.isCurrent(request)) return;
+    // VS Code returns a Thenable. Observe rejection even when called from a
+    // synchronous progress callback; an already disposed view is harmless.
+    const report = (error: unknown) => {
+      this.outputChannel.appendLine(`Preview message failed: ${String(error)}`);
+    };
+    try {
+      Promise.resolve(this.panel!.webview.postMessage({ ...message, ...request })).catch(report);
+    } catch (error) {
+      report(error);
+    }
+  }
+
+  private beginRender(document: vscode.TextDocument): PreviewRevision {
+    const previous = this.previewState.current;
+    const request = this.previewState.begin(document.uri.toString(), document.version);
+    const documentChanged = previous?.documentUri !== request.documentUri;
+    if (documentChanged) {
+      this.pdfCache = undefined;
+      this.lastCitationSignature = undefined;
+      this.runRequest = null;
+    }
+    this.postMessage({ type: "renderStarted", documentChanged }, request);
+    return request;
   }
 
   /**
@@ -84,7 +127,7 @@ export class InkwellPreviewProvider {
    * unavailable) so we don't spam the log on every keystroke.
    */
   private lastCitationSignature: string | undefined;
-  private reportCitationStatus(r: CitationRenderResult): void {
+  private reportCitationStatus(r: CitationRenderResult, request: PreviewRevision): void {
     const total = r.resolvedKeys.size + r.missingKeys.size;
     if (total === 0) return;
 
@@ -98,26 +141,25 @@ export class InkwellPreviewProvider {
       this.sendLogEntry(
         "warn",
         `Citations: ${r.resolvedKeys.size} resolved, ${r.missingKeys.size} unresolved via ${r.engine}. Missing keys: ${sample}${extra}`,
+        undefined, request,
       );
     } else if (r.engine === "none") {
       this.sendLogEntry(
         "warn",
         `Citations present in document but no bibliography or pandoc available to resolve them.`,
+        undefined, request,
       );
     }
   }
 
-  sendLogEntry(tag: string, message: string, details?: string): void {
-    if (!this.panel || !this.initialized) return;
-    this.panel.webview.postMessage({
-      type: "logEntry", tag, message, details: details || "",
-    });
+  sendLogEntry(tag: string, message: string, details?: string, request: PreviewRevision | null | undefined = this.previewState.current): void {
+    this.postMessage({ type: "logEntry", tag, message, details: details || "" }, request);
   }
 
-  show(): void {
+  async show(): Promise<void> {
     const editor = vscode.window.activeTextEditor;
     if (!editor || !isCompilable(editor.document)) {
-      vscode.window.showWarningMessage("Open a markdown or LaTeX file first.");
+      await vscode.window.showWarningMessage("Open a markdown or LaTeX file first.");
       return;
     }
 
@@ -125,7 +167,8 @@ export class InkwellPreviewProvider {
 
     if (this.panel) {
       this.panel.reveal(vscode.ViewColumn.Beside);
-      this.sendContentUpdate(editor.document);
+      this.updateResourceRoots(editor.document);
+      await this.sendContentUpdate(editor.document);
       return;
     }
 
@@ -157,6 +200,8 @@ export class InkwellPreviewProvider {
         clearTimeout(this.throttle);
         this.throttle = undefined;
       }
+      this.previewState.clear();
+      this.runRequest = null;
       this.panel = undefined;
       this.currentDocument = undefined;
       this.initialized = false;
@@ -165,19 +210,23 @@ export class InkwellPreviewProvider {
     });
 
     this.panel.webview.onDidReceiveMessage(async (msg) => {
-      if (msg.type === "compile") {
-        await this.handleCompile();
-      } else if (msg.type === "run") {
-        if (this.onRun) {
-          await this.onRun();
+      try {
+        if (msg.type === "compile") {
+          await this.handleCompile();
+        } else if (msg.type === "run") {
+          if (this.onRun) {
+            await this.onRun();
+          }
+        } else if (msg.type === "cancelRun") {
+          await vscode.commands.executeCommand("inkwell.cancelRun");
+        } else if (msg.type === "ready") {
+          this.initialized = true;
+          if (this.currentDocument) {
+            await this.sendContentUpdate(this.currentDocument);
+          }
         }
-      } else if (msg.type === "cancelRun") {
-        await vscode.commands.executeCommand("inkwell.cancelRun");
-      } else if (msg.type === "ready") {
-        this.initialized = true;
-        if (this.currentDocument) {
-          void this.sendContentUpdate(this.currentDocument);
-        }
+      } catch (error) {
+        this.sendLogEntry("error", "Preview action failed", String(error));
       }
     });
 
@@ -192,11 +241,15 @@ export class InkwellPreviewProvider {
       }
     });
 
-    const changeEditor = vscode.window.onDidChangeActiveTextEditor((e) => {
-      if (this.panel && e && isCompilable(e.document)) {
-        this.currentDocument = e.document;
-        this.updateResourceRoots(e.document);
-        void this.sendContentUpdate(e.document);
+    const changeEditor = vscode.window.onDidChangeActiveTextEditor(async (e) => {
+      try {
+        if (this.panel && e && isCompilable(e.document)) {
+          this.currentDocument = e.document;
+          this.updateResourceRoots(e.document);
+          await this.sendContentUpdate(e.document);
+        }
+      } catch (error) {
+        this.sendLogEntry("error", "Preview could not switch documents", String(error));
       }
     });
 
@@ -223,9 +276,20 @@ export class InkwellPreviewProvider {
     };
   }
 
-  private async sendContentUpdate(document: vscode.TextDocument): Promise<void> {
+  private async sendContentUpdate(document: vscode.TextDocument, requested?: PreviewRevision): Promise<void> {
     if (!this.panel || !this.initialized) return;
+    const request = requested || this.beginRender(document);
+    if (!this.isCurrent(request)) return;
+    try {
+      await this.renderContentUpdate(document, request);
+    } catch (error) {
+      if (this.isCurrent(request)) {
+        this.sendLogEntry("error", "Preview could not be updated", String(error), request);
+      }
+    }
+  }
 
+  private async renderContentUpdate(document: vscode.TextDocument, request: PreviewRevision): Promise<void> {
     const text = document.getText();
     const sourceFile = document.uri.fsPath;
     const mode = detectMode(document);
@@ -266,8 +330,9 @@ export class InkwellPreviewProvider {
         linkCitations: fm.linkCitations,
         referencesHeading: "References",
       });
+      if (!this.isCurrent(request)) return;
       body = citeResult.body;
-      this.reportCitationStatus(citeResult);
+      this.reportCitationStatus(citeResult, request);
 
       // If the author marked a references slot with Pandoc's fenced-div
       // `::: {#refs} ... :::` syntax (or similar variants such as
@@ -396,18 +461,20 @@ export class InkwellPreviewProvider {
     const blocks = isTeX ? [] : parseCodeBlocks(text);
     const hasCodeBlocks = blocks.length > 0;
 
-    this.panel.title = title || path.basename(sourceFile);
-    this.panel.webview.postMessage({
+    if (!this.isCurrent(request)) return;
+    this.panel!.title = title || path.basename(sourceFile);
+    this.postMessage({
       type: "updateContent",
       html: htmlBody,
       pdfData: existingPdfData || null,
+      pdfOutput: existingPdfData ? readLastSuccessfulOutput(sourceFile, pdfPath) || null : null,
       isTeX,
       hasCodeBlocks,
       blockCount: blocks.length,
       title: title || "",
       layoutCss: layout.cssText,
       bodyClasses: layout.bodyClasses,
-    });
+    }, request);
   }
 
   private convertLocalImages(html: string, document: vscode.TextDocument): string {
@@ -435,7 +502,11 @@ export class InkwellPreviewProvider {
   // re-rendering on every keystroke during rapid editing.
   private scheduleUpdate(document: vscode.TextDocument): void {
     if (this.throttle) clearTimeout(this.throttle);
-    this.throttle = setTimeout(() => void this.sendContentUpdate(document), 150);
+    const request = this.beginRender(document);
+    this.throttle = setTimeout(() => {
+      this.throttle = undefined;
+      void this.sendContentUpdate(document, request);
+    }, 150);
   }
 
   private async handleCompile(): Promise<void> {
@@ -452,7 +523,9 @@ export class InkwellPreviewProvider {
         const doc = this.currentDocument;
         if (!this.panel || !doc) break;
 
-        this.panel.webview.postMessage({ type: "compileStarted" });
+        const request = this.previewState.current;
+        if (!request || !this.isCurrent(request)) break;
+        this.postMessage({ type: "compileStarted" }, request);
 
         try {
           const result = await compile(doc);
@@ -478,41 +551,53 @@ export class InkwellPreviewProvider {
             this.diagnostics.report(doc.uri, result.errors);
           }
 
-          if (result.success && result.pdfPath && this.panel) {
+          if (!this.isCurrent(request)) continue;
+
+          if (result.success && result.pdfPath) {
             const pdfData = fs.readFileSync(result.pdfPath).toString("base64");
-            this.panel.webview.postMessage({
+            this.postMessage({
               type: "compileDone",
+              success: true,
               pdfData,
+              pdfOutput: result.lastSuccessfulOutput || null,
               duration: result.duration,
               errors: [],
               log: "",
-            });
+            }, request);
             const warnings = result.errors.filter(e => e.severity === "warning");
             for (const w of warnings) {
               const loc = w.line ? `line ${w.line}: ` : "";
-              this.sendLogEntry("warn", `${loc}${w.message}`);
+              this.sendLogEntry("warn", `${loc}${w.message}`, undefined, request);
             }
-          } else if (this.panel) {
-            this.panel.webview.postMessage({
+          } else {
+            const retained = result.lastSuccessfulOutput;
+            const existingPath = retained?.pdfPath || path.join(path.dirname(doc.uri.fsPath), `${path.basename(doc.uri.fsPath, path.extname(doc.uri.fsPath))}.pdf`);
+            // An older installation (or lost metadata cache) can leave a valid
+            // existing PDF with unknown provenance. Keep it for this document.
+            const pdfData = fs.existsSync(existingPath) ? fs.readFileSync(existingPath).toString("base64") : null;
+            this.postMessage({
               type: "compileDone",
-              pdfUri: null,
+              success: false,
+              pdfData,
+              pdfOutput: retained || null,
               duration: result.duration,
               errors: result.errors.map((e) => {
                 const loc = e.line ? `Line ${e.line}: ` : "";
                 return `${loc}${e.message}`;
               }),
               log: result.log,
-            });
+            }, request);
           }
         } catch (err) {
-          if (this.panel) {
-            this.panel.webview.postMessage({
+          if (this.isCurrent(request)) {
+            this.postMessage({
               type: "compileDone",
-              pdfData: null,
+              success: false,
+              retainPdf: true,
               duration: 0,
               errors: [String(err)],
               log: "",
-            });
+            }, request);
           }
         }
       } while (this.compileQueued);
@@ -642,6 +727,7 @@ export class InkwellPreviewProvider {
     .pdf-canvas-container canvas {
       box-shadow: 0 2px 8px rgba(0,0,0,0.15); max-width: 100%;
     }
+    .pdf-output-status { font: 11px var(--vscode-font-family, sans-serif); padding: 6px 12px; color: var(--blockquote); }
     .pdf-placeholder { text-align: center; color: var(--blockquote); font-size: 14px; padding: 40px; }
     .pdf-placeholder p { margin: 8px 0; }
 
@@ -944,6 +1030,7 @@ export class InkwellPreviewProvider {
         <div class="print-page-stage" id="print-page-stage"></div>
       </div>
       <div class="inkwell-pane pdf-pane${pdfActive}" id="pane-pdf">
+        <div class="pdf-output-status" id="pdf-output-status" role="status" style="display:none;"></div>
         <div class="pdf-placeholder" id="pdf-placeholder">
           <p>No PDF yet.</p>
           <p>Click <strong>Compile</strong> to build.</p>
@@ -983,6 +1070,11 @@ export class InkwellPreviewProvider {
     var currentPdfData = null;
     var currentPdfDoc = null;
     var pdfRenderVersion = 0;
+    var contentRevision = 0;
+    var documentUri = null;
+    var sourceVersion = null;
+    var currentPdfOutput = null;
+    var runId = 0;
 
     if (typeof pdfjsLib !== "undefined") {
       pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -999,6 +1091,7 @@ export class InkwellPreviewProvider {
     var compileIcon = document.getElementById("compile-icon");
     var compileStatus = document.getElementById("compile-status");
     var pdfPlaceholder = document.getElementById("pdf-placeholder");
+    var pdfOutputStatus = document.getElementById("pdf-output-status");
     var compileErrors = document.getElementById("compile-errors");
     var runBtn = document.getElementById("run-btn");
     var runIcon = document.getElementById("run-icon");
@@ -1190,6 +1283,67 @@ export class InkwellPreviewProvider {
       }
     }
 
+    function destroyPdf(pdf) {
+      if (!pdf) return;
+      try { Promise.resolve(pdf.destroy()).catch(function() {}); } catch (e) {}
+    }
+
+    function clearPdf() {
+      currentPdfData = null;
+      currentPdfOutput = null;
+      pdfRenderVersion++;
+      destroyPdf(currentPdfDoc);
+      currentPdfDoc = null;
+      var existing = pdfPane.querySelector(".pdf-canvas-container");
+      if (existing) existing.remove();
+      var embed = pdfPane.querySelector("embed");
+      if (embed) embed.remove();
+      compileErrors.style.display = "none";
+      compileErrors.innerHTML = "";
+      pdfOutputStatus.textContent = "";
+      pdfOutputStatus.style.display = "none";
+      pdfPlaceholder.innerHTML = "<p>No PDF yet.</p><p>Click <strong>Compile</strong> to build.</p>";
+      pdfPlaceholder.style.display = "block";
+    }
+
+    function labelPdf() {
+      if (!currentPdfData) return;
+      var label = "Last successful output";
+      if (currentPdfOutput) {
+        label += " — source version " + currentPdfOutput.sourceVersion +
+          " — " + new Date(currentPdfOutput.publishedAt).toLocaleString();
+      } else {
+        label = "Existing PDF — source version and build time unavailable";
+      }
+      pdfOutputStatus.textContent = label;
+      pdfOutputStatus.style.display = "block";
+    }
+
+    function updatePdf(data, output) {
+      if (data === null) { clearPdf(); return; }
+      if (typeof data !== "string") return;
+      currentPdfData = data;
+      currentPdfOutput = output || null;
+      labelPdf();
+      if (currentTab === "pdf") renderPdf(data);
+    }
+
+    function resetDocument() {
+      articleEl.innerHTML = "";
+      if (printStage) printStage.innerHTML = "";
+      printPaginated = false;
+      docTitle = "";
+      clearPdf();
+      runPanel.classList.remove("visible");
+      runBlockList.innerHTML = "";
+      runSummary.textContent = "";
+      runBtn.style.display = "none";
+      logEntries.innerHTML = '<div class="log-empty">No output yet.</div>';
+      logErrorCount = 0;
+      logBadge.classList.remove("visible");
+      logBadge.textContent = "";
+    }
+
     function renderPdf(base64Data) {
       currentPdfData = base64Data;
       pdfRenderVersion++;
@@ -1202,7 +1356,7 @@ export class InkwellPreviewProvider {
       if (existing) existing.remove();
 
       if (currentPdfDoc) {
-        currentPdfDoc.destroy();
+        destroyPdf(currentPdfDoc);
         currentPdfDoc = null;
       }
 
@@ -1224,7 +1378,7 @@ export class InkwellPreviewProvider {
 
       pdfjsLib.getDocument({ data: bytes }).promise.then(function(pdf) {
         if (version !== pdfRenderVersion) {
-          pdf.destroy();
+          destroyPdf(pdf);
           return;
         }
         currentPdfDoc = pdf;
@@ -1238,10 +1392,14 @@ export class InkwellPreviewProvider {
               canvas.width = viewport.width;
               canvas.height = viewport.height;
               container.appendChild(canvas);
-              page.render({
+              return page.render({
                 canvasContext: canvas.getContext("2d"),
                 viewport: viewport
-              });
+              }).promise;
+            }).catch(function(err) {
+              if (version !== pdfRenderVersion) return;
+              pdfPlaceholder.textContent = "Failed to render PDF page: " + String(err);
+              pdfPlaceholder.style.display = "block";
             });
           })(pageNum);
         }
@@ -1329,6 +1487,8 @@ export class InkwellPreviewProvider {
     var mermaidRenderCounter = 0;
 
     function renderMermaid() {
+      var revision = contentRevision;
+      var uri = documentUri;
       if (!articleEl || typeof mermaid === "undefined") return;
 
       var isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
@@ -1367,6 +1527,7 @@ export class InkwellPreviewProvider {
         try {
           var result = mermaid.render(id, src);
           var handleResult = function(r) {
+            if (revision !== contentRevision || uri !== documentUri) return;
             var svg = typeof r === "string" ? r : r.svg;
             wrapper.innerHTML = svg;
             wrapper.setAttribute("data-processed", "true");
@@ -1377,6 +1538,7 @@ export class InkwellPreviewProvider {
           };
           if (result && typeof result.then === "function") {
             result.then(handleResult).catch(function(err) {
+              if (revision !== contentRevision || uri !== documentUri) return;
               renderMermaidError(wrapper, src, err);
             });
           } else {
@@ -1456,6 +1618,39 @@ export class InkwellPreviewProvider {
 
     window.addEventListener("message", function(event) {
       var msg = event.data;
+      if (!msg || typeof msg.revision !== "number" || typeof msg.documentUri !== "string") return;
+      var startsRender = msg.type === "renderStarted" || msg.type === "updateContent";
+      if (msg.revision < contentRevision) return;
+      if (msg.revision === contentRevision && documentUri !== null && msg.documentUri !== documentUri) return;
+      if (!startsRender && (msg.revision !== contentRevision || msg.documentUri !== documentUri)) return;
+      if (typeof msg.runId === "number") {
+        if (msg.runId < runId) return;
+        runId = msg.runId;
+      }
+      if (startsRender) {
+        var changed = documentUri !== msg.documentUri;
+        var newer = contentRevision !== msg.revision;
+        if (changed) resetDocument();
+        if (changed || newer) {
+          // Pending old PDF loads and status timers lose authority at once.
+          pdfRenderVersion++;
+          compileBtn.disabled = false;
+          compileIcon.textContent = "\\u25B6";
+          compileStatus.textContent = "";
+          if (changed || sourceVersion !== msg.sourceVersion) {
+            isRunning = false;
+            runBtn.disabled = false;
+            runIcon.textContent = "\\u2699";
+            runCancelBtn.style.display = "none";
+            runPanel.classList.remove("visible");
+            runBlockList.innerHTML = "";
+          }
+        }
+        documentUri = msg.documentUri;
+        sourceVersion = msg.sourceVersion;
+        contentRevision = msg.revision;
+      }
+      if (msg.type === "renderStarted") return;
 
       if (msg.type === "updateContent") {
         articleEl.innerHTML = msg.html;
@@ -1489,9 +1684,7 @@ export class InkwellPreviewProvider {
         wireCitationScroll();
         printPaginated = false;
         if (currentTab === "print") paginateForPrint();
-        if (msg.pdfData) {
-          currentPdfData = msg.pdfData;
-        }
+        updatePdf(msg.pdfData, msg.pdfOutput);
         if (msg.hasCodeBlocks) {
           runBtn.style.display = "";
         } else {
@@ -1562,7 +1755,9 @@ export class InkwellPreviewProvider {
         addLogEntry("run", logTag, "Run " + outcomeLabel.toLowerCase() + ": " + parts.join(", "), "");
         if (msg.outcome === "done") {
           compileStatus.textContent = "Run done. Compile to update PDF.";
-          setTimeout(function() { compileStatus.textContent = ""; }, 6000);
+          setTimeout(function() {
+            if (msg.revision === contentRevision && msg.documentUri === documentUri) compileStatus.textContent = "";
+          }, 6000);
         }
       } else if (msg.type === "compileStarted") {
         compileBtn.disabled = true;
@@ -1572,14 +1767,13 @@ export class InkwellPreviewProvider {
       } else if (msg.type === "compileDone") {
         compileBtn.disabled = false;
         compileIcon.textContent = "\\u25B6";
-        if (msg.pdfData) {
+        if (!msg.retainPdf) updatePdf(msg.pdfData, msg.pdfOutput);
+        else labelPdf();
+        if (msg.success && msg.pdfData) {
           compileStatus.textContent = "Done (" + msg.duration.toFixed(1) + "s)";
           addLogEntry("compile", "log-tag-compile", "PDF compiled successfully (" + msg.duration.toFixed(1) + "s)", "");
           if (currentTab !== "pdf") {
-            currentPdfData = msg.pdfData;
             switchTab("pdf");
-          } else {
-            renderPdf(msg.pdfData);
           }
         } else if (msg.errors && msg.errors.length) {
           compileStatus.textContent = msg.errors.length + " error(s)";
@@ -1587,15 +1781,17 @@ export class InkwellPreviewProvider {
             addLogEntry("error", "log-tag-error", msg.errors[ei], "");
           }
           addLogEntry("compile", "log-tag-error", "Compilation failed with " + msg.errors.length + " error(s)", msg.log || "");
-          showErrors(msg.errors, msg.log || "");
+          if (!currentPdfData) showErrors(msg.errors, msg.log || "");
           switchTab("log");
         } else {
           compileStatus.textContent = "Failed";
           addLogEntry("error", "log-tag-error", "Compilation failed", msg.log || "");
-          showErrors(["Compilation failed. Check the Log tab for details."], msg.log || "");
+          if (!currentPdfData) showErrors(["Compilation failed. Check the Log tab for details."], msg.log || "");
           switchTab("log");
         }
-        setTimeout(function() { compileStatus.textContent = ""; }, 8000);
+        setTimeout(function() {
+          if (msg.revision === contentRevision && msg.documentUri === documentUri) compileStatus.textContent = "";
+        }, 8000);
       } else if (msg.type === "logEntry") {
         var lTag = msg.tag === "error" ? "log-tag-error" : msg.tag === "warn" ? "log-tag-warn" : msg.tag === "run" ? "log-tag-run" : msg.tag === "compile" ? "log-tag-compile" : "log-tag-info";
         addLogEntry(msg.tag, lTag, msg.message, msg.details);
