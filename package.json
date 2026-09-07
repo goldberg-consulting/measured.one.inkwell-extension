@@ -2,7 +2,7 @@
   "name": "inkwell",
   "displayName": "Inkwell",
   "description": "Markdown to publication-quality PDF. Live preview, Pandoc + XeLaTeX compilation, runnable code blocks, and LaTeX template management.",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "publisher": "measure-one",
   "icon": "media/icon.png",
   "license": "SEE LICENSE IN LICENSE",
@@ -59,7 +59,12 @@
       },
       {
         "command": "inkwell.setupToolchain",
-        "title": "Inkwell: Check / Install Toolchain (Pandoc, XeLaTeX)",
+        "title": "Inkwell: Setup / Repair",
+        "category": "Inkwell"
+      },
+      {
+        "command": "inkwell.setupRepair",
+        "title": "Inkwell: Setup / Repair",
         "category": "Inkwell"
       },
       {
@@ -96,6 +101,29 @@
         "command": "inkwell.setupWorkspace",
         "title": "Inkwell: Setup Workspace",
         "category": "Inkwell"
+      }
+    ],
+    "walkthroughs": [
+      {
+        "id": "inkwell.firstProject",
+        "title": "Write your first Inkwell document",
+        "description": "Verify the tools, prepare your project, and build a PDF.",
+        "steps": [
+          {
+            "id": "verifySetup",
+            "title": "Set up or repair Inkwell",
+            "description": "[Run Setup / Repair](command:inkwell.setupRepair) to check the installed tools, review any required installation, and verify a real PDF build.",
+            "media": { "markdown": "media/walkthrough/setup.md" },
+            "completionEvents": ["onContext:inkwell.setupVerified"]
+          },
+          {
+            "id": "createDocument",
+            "title": "Create your document",
+            "description": "[Create a project](command:inkwell.initProject), then [open its preview](command:inkwell.preview). New Project uses the same verified setup flow.",
+            "media": { "markdown": "media/walkthrough/project.md" },
+            "completionEvents": ["onContext:inkwell.projectCreated"]
+          }
+        ]
       }
     ],
     "keybindings": [
@@ -162,6 +190,9 @@
       }
     },
     "menus": {
+      "commandPalette": [
+        { "command": "inkwell.setupToolchain", "when": "false" }
+      ],
       "editor/title": [
         {
           "command": "inkwell.preview",
@@ -187,7 +218,10 @@
     "compile": "tsc -p ./",
     "typecheck": "tsc -p ./ --noEmit",
     "watch": "tsc -watch -p ./",
-    "package": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node18 --minify",
+    "package": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node18 --minify && esbuild src/doctor-cli.ts src/install-cli.ts --bundle --outdir=out --format=cjs --platform=node --target=node18 --minify && esbuild src/smoke-cli.ts --bundle --outfile=out/smoke-cli.js --alias:vscode=./src/headless-vscode.ts --format=cjs --platform=node --target=node18 --minify && node scripts/build-asset-manifest.mjs",
+    "package:vsix": "vsce package --no-dependencies",
+    "verify:vsix": "node scripts/verify-vsix.mjs",
+    "doctor": "node out/doctor-cli.js",
     "lint": "eslint src --ext ts",
     "test:regressions": "node scripts/check-template-regressions.mjs",
     "test:stability": "node scripts/check-shortcuts-and-commands.mjs",
@@ -207,6 +241,7 @@
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "3.9.2",
     "esbuild": "^0.27.3",
     "eslint": "^10.0.3",
     "globals": "^17.4.0",

@@ -15,13 +15,15 @@ Brewfile
 .pre-commit-config.yaml
 .gitignore
 *.vsix
-# Only the esbuild bundle ships. Excluding out/ wholesale (instead of a
-# file-by-file list) prevents newly added modules (e.g. citations.ts,
-# frontmatter.ts) from silently leaking tsc output into the VSIX.
-# vscode:prepublish rebuilds out/extension.js as a self-contained
-# bundle, so nothing else under out/ is needed at runtime.
+# Ship only the self-contained runtime bundles and their asset contract.
+# Excluding out/ wholesale prevents individual compiler outputs from
+# silently leaking into the VSIX as modules are added.
 out/**
 !out/extension.js
+!out/doctor-cli.js
+!out/install-cli.js
+!out/smoke-cli.js
+!out/asset-manifest.json
 .cursor/**
 # Keep the agent guide that ships with the extension (consumed by the
 # Setup Workspace command when .cursor/agents/ exists in the user's

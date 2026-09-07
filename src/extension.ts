@@ -8,7 +8,7 @@ import { compile, exportPDF, isCompilable, reportCompileFailure } from "./compil
 import { InkwellDiagnostics } from "./diagnostics";
 import { selectTemplateCommand } from "./templates";
 import { findInkwellRoot, getInkwellOutputsDir, getInkwellProjectRoot, saveManifestField } from "./config";
-import { checkToolchain, installLatexPackage, showToolchainStatus, setExtensionPath } from "./toolchain";
+import { checkToolchain, installLatexPackage, showToolchainStatus, setExtensionPath, setToolchainActions } from "./toolchain";
 import { runAllBlocks, parseCodeBlocks, RunCancellation } from "./runner";
 import { clearCache } from "./cache";
 import { setupWorkspace, initProject } from "./scaffold";
@@ -17,6 +17,8 @@ import * as fs from "fs";
 import { setupPythonEnvironment } from "./python-setup";
 import { getInkwellOutputChannel } from "./inkwell-output";
 import { ProjectReadinessGate } from "./project-readiness-ui";
+import { createSetupUI, registerSetupCommands, SetupUI } from "./setup-ui";
+import { invalidateDoctorCache } from "./doctor";
 
 let diagnostics: InkwellDiagnostics;
 let autoCompileTimer: ReturnType<typeof setInterval> | undefined;
@@ -24,15 +26,19 @@ let activeRunCancel: RunCancellation | undefined;
 let compileInFlight = false;
 let queuedCompile: vscode.TextDocument | undefined;
 let readiness: ProjectReadinessGate;
+let setup: SetupUI;
 
 export function activate(context: vscode.ExtensionContext) {
   setExtensionPath(context.extensionPath);
   diagnostics = new InkwellDiagnostics();
   readiness = new ProjectReadinessGate(context);
+  setup = createSetupUI(context);
+  setToolchainActions({ setup: () => setup.run(), installPackage: name => setup.installPackage(name) });
+  registerSetupCommands(context, setup);
 
   const previewProvider = new InkwellPreviewProvider(context);
   previewProvider.setDiagnostics(diagnostics);
-  previewProvider.ensureReady = (document, allowPrompt) => readiness.ensure(document, allowPrompt);
+  previewProvider.ensureReady = (document, allowPrompt) => ensureAuthoringReady(document, allowPrompt);
 
   // n.b. The webview steals focus from the editor, so activeTextEditor
   // is undefined when the user clicks Run in the preview panel. We
@@ -68,7 +74,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showWarningMessage("Open a markdown or LaTeX file first.");
         return;
       }
-      if (await readiness.ensure(doc)) await exportPDF(doc, diagnostics);
+      if (await ensureAuthoringReady(doc)) await exportPDF(doc, diagnostics);
     }),
 
     vscode.commands.registerCommand("inkwell.selectTemplate", async () => {
@@ -90,10 +96,6 @@ export function activate(context: vscode.ExtensionContext) {
           `Selected "${templateId}". Add template: ${templateId} to your YAML frontmatter, or create an .inkwell/ project to persist this choice.`
         );
       }
-    }),
-
-    vscode.commands.registerCommand("inkwell.setupToolchain", async () => {
-      await showToolchainStatus();
     }),
 
     vscode.commands.registerCommand("inkwell.installPackage", async (pkg?: string) => {
@@ -141,11 +143,11 @@ export function activate(context: vscode.ExtensionContext) {
     }),
 
     vscode.commands.registerCommand("inkwell.initProject", async () => {
-      await initProject();
+      await initProject(async (root, template) => ({ ready: (await setup.run(root, template))?.status === "complete" }));
     }),
 
     vscode.commands.registerCommand("inkwell.setupWorkspace", async () => {
-      await setupWorkspace();
+      await setupWorkspace(async (root, template) => ({ ready: (await setup.run(root, template))?.status === "complete" }));
     }),
 
     vscode.workspace.onDidSaveTextDocument(async (document) => {
@@ -158,6 +160,7 @@ export function activate(context: vscode.ExtensionContext) {
     }),
 
     vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration("inkwell") || e.affectsConfiguration("terminal.integrated.env")) invalidateDoctorCache();
       if (e.affectsConfiguration("inkwell.autoCompile") ||
           e.affectsConfiguration("inkwell.autoCompileIntervalSeconds")) {
         setupAutoCompileTimer();
@@ -219,7 +222,7 @@ function setupAutoCompileTimer(): void {
 const lastFailureNotified = new Map<string, string>();
 
 async function runCompile(document: vscode.TextDocument, allowPrompt = true): Promise<void> {
-  if (!await readiness.ensure(document, allowPrompt)) return;
+  if (!await ensureAuthoringReady(document, allowPrompt)) return;
   if (compileInFlight) {
     queuedCompile = document;
     return;
@@ -410,7 +413,9 @@ async function setupPythonEnv(document: vscode.TextDocument): Promise<void> {
 }
 
 async function activationCheck() {
-  const status = await checkToolchain();
+  const status = await checkToolchain({ cachedOnly: true });
+  // Cold activation performs no tool processes or prompts. A user action can request fresh health.
+  if (status.report.checks.some(check => check.id === "cached-health")) return;
   if (status.pandoc.installed && status.xelatex.installed) return;
 
   const missing: string[] = [];
@@ -426,6 +431,27 @@ async function activationCheck() {
   if (choice === "Setup now") {
     await showToolchainStatus();
   }
+}
+
+const healthPrompts = new Map<string, Promise<boolean>>();
+async function ensureAuthoringReady(document: vscode.TextDocument, allowPrompt = true): Promise<boolean> {
+  if (!await readiness.ensure(document, allowPrompt)) return false;
+  const root = getInkwellProjectRoot(document.uri.fsPath);
+  const pending = healthPrompts.get(root); if (pending) return pending;
+  const work = (async () => {
+    const report = await setup.checkLight(!allowPrompt, root);
+    if (report.checks.some(check => check.id === "cached-health")) return true;
+    const failed = report.checks.filter(check => check.required && check.status !== "ok" && check.id !== "workspace");
+    if (!failed.length) return true;
+    if (!allowPrompt) return false;
+    const output = getInkwellOutputChannel();
+    for (const check of failed) output.appendLine(`${check.id}: ${check.message}`);
+    const choice = await vscode.window.showWarningMessage("Inkwell needs a tool or packaged-file repair before continuing.", "Setup / Repair", "Show diagnostics");
+    if (choice === "Show diagnostics") output.show(true);
+    return choice === "Setup / Repair" && (await setup.run(root))?.status === "complete";
+  })();
+  healthPrompts.set(root, work);
+  try { return await work; } finally { if (healthPrompts.get(root) === work) healthPrompts.delete(root); }
 }
 
 function refreshProjectContextKey(): void {

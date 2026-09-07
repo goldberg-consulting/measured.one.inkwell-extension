@@ -46,7 +46,9 @@ async function prepareScaffold(root: string, template?: string): Promise<Project
   return result;
 }
 
-export async function initProject(): Promise<void> {
+export type ScaffoldPreparation = (root: string, template?: string) => Promise<Pick<ProjectReadiness, "ready"> & Partial<ProjectReadiness>>;
+
+export async function initProject(prepare: ScaffoldPreparation = prepareScaffold): Promise<void> {
   const root = await pickWorkspaceRoot("Select project folder");
   if (!root) return;
   const name = await vscode.window.showInputBox({
@@ -57,7 +59,7 @@ export async function initProject(): Promise<void> {
   const invalid = validateProjectName(name);
   if (invalid) { await vscode.window.showErrorMessage(invalid); return; }
   const template = await selectTemplateCommand();
-  if (!(await prepareScaffold(root, template)).ready) return;
+  if (!(await prepare(root, template)).ready) return;
   const python = await vscode.window.showQuickPick([
     { label: "Yes", detail: "Create a Python venv and install requirements.txt" },
     { label: "No", detail: "Skip Python setup" },
@@ -85,13 +87,14 @@ Write your content here. Cite sources with [@knuth1984] and use inline math like
   if (python?.label === "Yes" && !await setupScaffoldPython(root)) return;
   const document = await vscode.workspace.openTextDocument(documentPath);
   await vscode.window.showTextDocument(document);
+  await vscode.commands.executeCommand("setContext", "inkwell.projectCreated", true);
   await vscode.window.showInformationMessage(`Inkwell project "${name.trim()}" initialized.`);
 }
 
-export async function setupWorkspace(): Promise<void> {
+export async function setupWorkspace(prepare: ScaffoldPreparation = prepareScaffold): Promise<void> {
   const root = await pickWorkspaceRoot("Select workspace root");
   if (!root) return;
-  const readiness = await prepareScaffold(root);
+  const readiness = await prepare(root);
   if (!readiness.ready) return;
   const python = await vscode.window.showQuickPick([
     { label: "Yes", detail: "Create a Python venv and install requirements.txt" },

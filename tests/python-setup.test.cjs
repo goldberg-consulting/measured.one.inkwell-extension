@@ -5,7 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const Module = require('node:module');
 
-function scaffoldFixture(t, name = 'Test project') {
+function scaffoldFixture(t, name = 'Test project', pythonSuccess = false) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'inkwell-python-setup-test-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const projectDir = path.join(root, 'project');
@@ -13,7 +13,9 @@ function scaffoldFixture(t, name = 'Test project') {
   const messages = [];
   const terminalCommands = [];
   const setupCalls = [];
+  const contexts = [];
   const stub = {
+    commands: { executeCommand: async (...args) => { contexts.push(args); } },
     workspace: { workspaceFolders: [{ uri: { fsPath: projectDir } }], openTextDocument: async (file) => ({ file }) },
     window: {
       showInputBox: async () => name,
@@ -36,14 +38,14 @@ function scaffoldFixture(t, name = 'Test project') {
     if (request === './templates') return { selectTemplateCommand: async () => 'default' };
     if (request === './python-setup') return { setupPythonEnvironment: async (options) => {
       setupCalls.push(options);
-      return { success: false, status: 'failed', phase: 'install', message: 'Mock pip failure', log: 'pip failed' };
+      return { success: pythonSuccess, status: pythonSuccess ? 'ready' : 'failed', phase: 'install', message: 'Mock pip failure', log: 'pip failed' };
     } };
     if (request === './inkwell-output') return { getInkwellOutputChannel: () => ({ appendLine() {}, show() {} }) };
     return load.call(this, request, ...rest);
   };
   let scaffold;
   try { scaffold = require(modulePath); } finally { Module._load = load; }
-  return { ...scaffold, root, projectDir, messages, terminalCommands, setupCalls };
+  return { ...scaffold, root, projectDir, messages, terminalCommands, setupCalls, contexts };
 }
 
 for (const operation of ['initProject', 'setupWorkspace']) {
@@ -54,8 +56,19 @@ for (const operation of ['initProject', 'setupWorkspace']) {
     assert.equal(f.terminalCommands.length, 0, 'Python setup must not send interpolated shell commands');
     assert.equal(f.setupCalls.length, 1);
     assert.ok(f.messages.some((message) => /Mock pip failure/.test(message)));
+    assert.deepEqual(f.contexts, []);
   });
 }
+
+test('project walkthrough completes after the document is created and requested Python setup verifies', async t => {
+  const f = scaffoldFixture(t, 'Verified project', true);
+  await f.initProject(async () => ({ ready: true }));
+  assert.ok(fs.existsSync(path.join(f.projectDir, 'Verified project.md')));
+  assert.deepEqual(f.contexts, [['setContext', 'inkwell.projectCreated', true]]);
+  const cancelled = scaffoldFixture(t, undefined);
+  await cancelled.initProject(async () => ({ ready: false }));
+  assert.deepEqual(cancelled.contexts, []);
+});
 
 test('project creation rejects traversal even when input validation is bypassed', async (t) => {
   const f = scaffoldFixture(t, '../escaped');

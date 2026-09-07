@@ -160,7 +160,10 @@ export function listTemplates(
     });
   }
 
-  for (const [id, dir] of scanDir(globalTemplatesDir())) {
+  // The installation smoke process verifies packaged templates independently of
+  // any user-global overrides. Ordinary editor compilation keeps those overrides.
+  const globalEntries = process.env.INKWELL_HEADLESS === "1" ? new Map<string, string>() : scanDir(globalTemplatesDir());
+  for (const [id, dir] of globalEntries) {
     const manifest = readManifest(dir, id);
     const pandocTemplate = findPandocTemplate(dir);
     if (!pandocTemplate && result.has(id)) continue;
