@@ -4,14 +4,17 @@
 
 Inkwell lets you stay in markdown, stay in your editor, and still get publication-quality PDFs out the other end. Your analysis scripts run in place, their outputs land in the document, and the whole thing compiles to LaTeX without you ever opening a `.tex` file. Or open one. It handles those too.
 
-**Quick install (macOS):**
+**0.5 release preview:** The installer below is being validated. The 0.5 release
+artifact and matching Homebrew checksum have not been published yet; the current
+tap may still serve an earlier release. See [installation and release checks](docs/installation.md).
+
+**Quick install (macOS, once the 0.5 release is published):**
 
 ```bash
-brew tap goldberg-consulting/inkwell
-brew install --cask inkwell   # extension + Pandoc + pandoc-crossref + MacTeX
+brew install --cask goldberg-consulting/inkwell/inkwell
 ```
 
-Then reload your editor (`Cmd+Shift+P` → **Developer: Reload Window**). Upgrades are `brew upgrade --cask inkwell`. See [Installation](#installation) for the trusted-tap note, TinyTeX and manual alternatives, and Linux setup.
+Then reload your editor (`Cmd+Shift+P` → **Developer: Reload Window**). The 0.5 installer verifies the exact release in every detected editor and builds a smoke-test PDF. See [Installation](#installation) for editor selection, upgrades, existing TeX support, and Linux setup.
 
 ## How it works
 
@@ -26,155 +29,112 @@ Then reload your editor (`Cmd+Shift+P` → **Developer: Reload Window**). Upgrad
 
 ## Installation
 
-### 1. Install with Brew (macOS, recommended)
+### macOS
 
-Two commands install the extension, Pandoc, pandoc-crossref, and a full TeX distribution:
-
-```bash
-brew tap goldberg-consulting/inkwell
-brew install --cask inkwell
-```
-
-Newer Homebrew versions refuse casks from untrusted third-party taps. If you see `Refusing to load cask ... from untrusted tap`, trust the tap first:
+With Homebrew and Cursor or VS Code installed, use the fully qualified cask:
 
 ```bash
-brew trust goldberg-consulting/inkwell
-brew install --cask inkwell   # or: brew upgrade --cask inkwell
+brew install --cask goldberg-consulting/inkwell/inkwell
 ```
 
-Then add Mermaid CLI for diagram support in PDFs:
+The release VSIX is the authoritative extension artifact. The installer finds
+Cursor and VS Code in PATH, Homebrew locations, `/Applications`, and
+`~/Applications`; no editor shell-command setup is needed. It installs and
+verifies the exact release in every detected editor. Mermaid CLI comes from
+Homebrew. No global npm installation is required.
+
+A functioning existing TeX distribution is reused. With no TeX distribution,
+full MacTeX is the default. Missing packages are installed from the requirements
+inside the release artifact. User-owned TinyTeX uses its own package manager;
+system MacTeX uses administrator permission when needed. Inkwell never changes
+the ownership of a TeX tree.
+
+Installation reports complete only after editor verification, the full doctor,
+and an actual Inkwell PDF build pass. Verification PDFs, setup state, and logs
+are retained under `~/Library/Application Support/Inkwell/verification/`.
+Reload an already-running editor after an upgrade. Use **Inkwell: Setup / Repair**
+for a later repair; the same workflow resumes interrupted setup.
+
+From a checkout of the matching release, the versioned bootstrap script also
+supports editor selection and a lean profile. It downloads that release's VSIX
+and verifies its published checksum:
 
 ```bash
-npm install -g @mermaid-js/mermaid-cli
+./scripts/install-inkwell-macos.sh --editor=cursor
+./scripts/install-inkwell-macos.sh --editor=code
+./scripts/install-inkwell-macos.sh --editor=all
+./scripts/install-inkwell-macos.sh --profile=lean
 ```
 
-The cask installs:
-- **Inkwell** extension in Cursor or VS Code (auto-detected)
-- **Pandoc** and **pandoc-crossref** (formula dependencies)
-- **MacTeX** (cask dependency, skipped if already installed)
+`auto` and `all` select every detected supported editor. `cursor` and `code`
+narrow the selection. The lean profile uses BasicTeX only when no working TeX
+exists and must pass the same full doctor. It may require many additional font
+and template packages. Existing TinyTeX is supported without replacing it.
+The repository Brewfile is an optional tools-only bundle; it does not install
+an extension from a different distribution channel.
 
-Upgrading to a new release is one command — the release workflow bumps the tap automatically whenever a version ships:
+Upgrade with `brew upgrade --cask goldberg-consulting/inkwell/inkwell`. On an
+Homebrew version that requests explicit trust, follow its trust prompt for the
+fully qualified tap and repeat the command.
+
+### Install a downloaded VSIX
+
+Download the release from [Releases](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases).
+In the editor, choose **Extensions: Install from VSIX...**, select the file, and
+reload the window. **Inkwell: Setup / Repair** checks the same installed artifact
+and offers a verified repair plan. The marketplace is not an alternative 0.5
+release channel.
+
+### Linux
+
+Install Pandoc 3 or later, a matching pandoc-crossref release, a full TeX Live
+installation, and Mermaid CLI through your platform's package manager. Then
+install the release VSIX and run **Inkwell: Setup / Repair** to inspect the
+capability report and prepare the project. The health probes are read-only;
+project setup can create or migrate scaffold files. Automatic system package installation is
+currently implemented for macOS; the doctor identifies missing Linux tools.
+Do not mix a distribution-owned TeX tree with an unrelated package manager.
+
+### Prepare a workspace
+
+Use **Inkwell: New Project** for a starter document or **Inkwell: Setup / Repair**
+for an existing workspace. Both verify the tools, migrate the scaffold safely,
+and build a smoke PDF in the same flow. Edited files remain intact with
+comparison proposals; built-in templates stay in the extension. A first preview,
+compile, export, or run action also offers workspace setup. **Don't ask here**
+remembers a workspace that should remain unconfigured.
+
+Python is optional. **Inkwell: Setup Python Environment** creates a project
+virtual environment through observed processes and verifies it before reporting
+success. See the [configuration guide](docs/configuration.md) and
+[syntax guide](guide.md) for document and project choices.
+
+### Health checks and setup progress
+
+Activation reads only a cached light health result. It does not scan TeX
+packages, run installer commands, or access the network. A fresh light check
+verifies packaged assets, executable versions, editor versions, and workspace
+state. A full check also tests cross-reference conversion, TeX ownership and
+required files, and a PDF build in a temporary project.
+
+**Setup / Repair** records each stage: check, consent for system changes,
+installation, fresh verification, project migration, and smoke PDF. It reports
+completion only after the required checks pass; failures retain diagnostics and
+can be resumed. See [the installation guide](docs/installation.md) for the shared
+JSON/text doctor, retained logs, and release validation requirements.
+
+### Build from source
 
 ```bash
-brew upgrade --cask inkwell
+npm ci
+npm run verify
+npm run package:vsix
+node scripts/verify-vsix.mjs inkwell-0.5.0.vsix --tag v0.5.0
 ```
 
-**Alternative: `brew bundle`** from the repo root uses the [`Brewfile`](Brewfile) for the same result.
-
-**Alternative: full script** with LaTeX package pass and Mermaid in one shot:
-
-```bash
-./scripts/install-inkwell-macos.sh              # full MacTeX + extension + mermaid + tlmgr packages
-./scripts/install-inkwell-macos.sh --basictex   # BasicTeX variant (~300 MB instead of ~5 GB)
-```
-
-### 2. Other install methods
-
-**Extension marketplace only** (if you already have Pandoc and LaTeX):
-
-```bash
-cursor --install-extension measure-one.inkwell --force
-# or: code --install-extension measure-one.inkwell --force
-```
-
-Or search for **Inkwell** in the editor extensions pane.
-
-**Pre-built .vsix**
-
-Download the latest `.vsix` from [Releases](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases), then:
-
-```bash
-cursor --install-extension inkwell-<version>.vsix --force
-# or: code --install-extension inkwell-<version>.vsix --force
-```
-
-After installing or upgrading, reload the editor window (`Cmd+Shift+P` > **Developer: Reload Window**) — the old extension code stays loaded in memory until you do.
-
-Or in the editor: `Cmd+Shift+P` > **Extensions: Install from VSIX...** and select the file.
-
-**Option D: Build from source**
-
-```bash
-git clone https://github.com/goldberg-consulting/measured.one.inkwell-extension.git
-cd measured.one.inkwell-extension
-npm install
-npm run compile
-```
-
-Then either:
-
-- **Install from folder** (development): `Cmd+Shift+P` > **Developer: Install Extension from Location...** > select the repo folder > reload the window.
-- **Package as .vsix**: `npm run package && npx @vscode/vsce package` > install the resulting `.vsix` as above. (`vscode:prepublish` runs `package` before publish, but run it locally too before `vsce package` so `out/extension.js` includes the latest bundle.)
-
-### 3. Install the toolchain manually (if not using Brew)
-
-After the extension is active, run `Cmd+Shift+P` → **Inkwell: Check / Install Toolchain**. The guided installer detects what you have and walks you through installing the rest, including the full LaTeX package set from `requirements-latex.txt`.
-
-Or install manually:
-
-**macOS (Homebrew + MacTeX — full install):**
-
-```bash
-brew install pandoc pandoc-crossref
-brew install --cask mactex
-npm install -g @mermaid-js/mermaid-cli
-```
-
-That gives you everything: Pandoc, cross-reference filters, LaTeX (XeLaTeX + pdfLaTeX), and Mermaid diagram support.
-
-**macOS (Homebrew + TinyTeX — ~150 MB instead of ~5 GB):**
-
-```bash
-brew install pandoc pandoc-crossref
-curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh
-npm install -g @mermaid-js/mermaid-cli
-```
-
-Then install the LaTeX packages Inkwell's templates need (listed in [`requirements-latex.txt`](requirements-latex.txt)):
-
-```bash
-tlmgr update --self
-sed 's/#.*//' requirements-latex.txt | awk 'NF' | xargs tlmgr install
-texhash || mktexlsr
-```
-
-**Linux:**
-
-```bash
-sudo apt install pandoc texlive-full                 # Debian/Ubuntu
-sudo dnf install pandoc texlive-scheme-full          # Fedora
-npm install -g @mermaid-js/mermaid-cli
-```
-
-`pandoc-crossref` is required for `@fig:`, `@eq:`, and `@tbl:` cross-references. On Linux, install from [GitHub releases](https://github.com/lierdakil/pandoc-crossref/releases) or your package manager if available (`sudo apt install pandoc-crossref`).
-
-If `tlmgr` is available on your Linux TeX install, run the same full requirements pass:
-
-```bash
-sudo tlmgr update --self
-sed 's/#.*//' requirements-latex.txt | awk 'NF' | xargs sudo tlmgr install
-sudo texhash || sudo mktexlsr
-```
-
-**Python** (optional, for runnable `{python}` code blocks): set up per-project with `Cmd+Shift+P` > **Inkwell: Setup Python Environment**, or manually:
-
-```bash
-python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt
-```
-
-**Troubleshooting**
-
-- **Missing LaTeX packages:** If compilation fails with `Missing file: foo.sty`, run `tlmgr install foo`. The build log (`Cmd+Shift+U` > **Inkwell LaTeX**) shows the exact missing filename.
-- **Mermaid in PDF:** Diagram blocks need `mmdc` from `@mermaid-js/mermaid-cli` (e.g. `npm install -g @mermaid-js/mermaid-cli`). Without it, live preview may still show something useful, but **compiled PDFs** often leave mermaid as code listings and **`.inkwell/mermaid/`** stays empty.
-- **Cursor/VS Code launched from the Dock (Node managers):** GUI apps do not inherit your shell `PATH`. Inkwell augments `PATH` for subprocesses (Mermaid, Pandoc/TeX) with **`~/.npm-global/bin`**, **`nvm`** (`NVM_BIN`, **`~/.nvm/alias/default`**, and every **`~/.nvm/versions/node/<version>/bin`**), **`fnm`** (`FNM_MULTISHELL_PATH`), and **Volta** (`VOLTA_HOME` or **`~/.volta/bin`**). If `mmdc` is still missing, it runs a one-time **`SHELL -ilc`** resolution and prepends that directory for the session. Check **View → Output → Inkwell LaTeX** for a PATH diagnostic if **`mmdc --version`** fails. You can still install **`mmdc`** via **Homebrew** or symlink it into **`/opt/homebrew/bin`** if you prefer.
-
-### 4. Bootstrap your workspace
-
-For a **new project**: `Cmd+Shift+P` > **Inkwell: New Project** — scaffolds a complete project with starter document, scripts, bibliography, example files, and a syntax guide, all organized under `.inkwell/`.
-
-For an **existing repo**: `Cmd+Shift+P` > **Inkwell: Setup Workspace** — adds or updates the `.inkwell/` directory with the standard subdirectory structure, manifest, templates, examples, and guide without touching your existing files. Safe to re-run after extension updates to pick up new examples and starter files.
-
-See the **[Syntax Guide](guide.md)** for the complete reference on YAML frontmatter, code blocks, math, citations, and template-specific fields.
+Packaging bundles the extension and its headless doctor, installer, and compiler,
+then records every required runtime asset hash. The verifier checks the actual
+VSIX against that contract.
 
 ## Quick start
 
@@ -336,7 +296,7 @@ Reference the diagram with `@Fig:arch` anywhere in the document. Plain ` ```merm
 
 Rendered artifacts are cached in `.inkwell/mermaid/` by content hash. A diagram only re-renders when its source changes.
 
-**Requirements:** `npm install -g @mermaid-js/mermaid-cli` for PDF compilation. If `mmdc` is not installed, mermaid blocks pass through as code listings.
+**Requirements:** Homebrew `mermaid-cli` (installed by Setup / Repair) for PDF compilation. If `mmdc` is not installed, mermaid blocks pass through as code listings.
 
 ### Citations and bibliography
 
@@ -388,7 +348,7 @@ Document typography also passes through frontmatter: `fontsize`, `geometry`, `li
 
 ### Self-contained `.inkwell/` workspace
 
-All extension-managed resources live under a single `.inkwell/` directory at the **project root**: scripts, figures, references, examples, per-document output caches (`.inkwell/outputs/<doc-key>/`), compiled staging (`.inkwell/compiled/`), shared mermaid cache, and templates. Markdown can live in subfolders; with a **single-folder workspace** opened at the repo root, Inkwell uses that root’s `.inkwell/` (not a nested `.inkwell` next to the file). **Multi-Inkwell monorepos:** open each subproject as its own workspace folder (multi-root), or only the root that should own `.inkwell/`. The scaffold creates the full structure via **New Project** or **Setup Workspace**. Re-running Setup Workspace backfills new files from extension updates.
+All extension-managed resources live under a single `.inkwell/` directory at the **project root**: scripts, figures, references, examples, per-document output caches (`.inkwell/outputs/<doc-key>/`), compiled staging (`.inkwell/compiled/`), shared mermaid cache, and generated run history. Built-in templates stay in the extension. Markdown can live in subfolders; with a **single-folder workspace** opened at the repo root, Inkwell uses that root’s `.inkwell/` (not a nested `.inkwell` next to the file). **Multi-Inkwell monorepos:** open each subproject as its own workspace folder (multi-root), or only the root that should own `.inkwell/`. The scaffold creates the full structure via **New Project** or **Setup Workspace**. Re-running Setup Workspace backfills new files from extension updates.
 
 ## Templates
 
@@ -957,15 +917,15 @@ All commands are available from the command palette (`Cmd+Shift+P` / `Ctrl+Shift
 | **Inkwell: Setup Workspace** | | Add or update `.inkwell/` with standard subdirectories, examples, and starter files |
 | **Inkwell: Open Preview** | `Cmd+Shift+V` | Side panel with live HTML, compiled PDF, and build log tabs |
 | **Inkwell: Compile PDF** | `Cmd+Shift+R` | Compile through Pandoc + XeLaTeX/pdfLaTeX (engine selected per template) |
-| **Inkwell: Run Code Blocks** | `Cmd+Alt+R` | Execute all code blocks, cache results in `.inkwell/outputs/` |
+| **Inkwell: Run Code Blocks** | `Cmd+Alt+R` | Execute code blocks and record verified results and history in `.inkwell/runs/` |
 | **Inkwell: Cancel Running Code Blocks** | | Stop in-progress code execution |
 | **Inkwell: Clear Code Block Cache** | | Delete cached outputs so all blocks re-run on next execution |
 | **Inkwell: Export PDF to File...** | | Save the compiled PDF to a chosen location |
 | **Inkwell: Select LaTeX Template** | | Pick from built-in, global, or project-local templates |
 | **Inkwell: Setup Python Environment** | | Create a venv and install from `requirements.txt` |
-| **Inkwell: Check / Install Toolchain** | | Verify Pandoc and XeLaTeX are installed, with guided setup if missing |
+| **Inkwell: Setup / Repair** | | Check tools, review repairs, migrate the project, and verify a real PDF build |
 
-**Tip:** If you are developing from **folder** (`npm run compile` / watch), reload with `Cmd+Shift+P` > **Developer: Reload Window**. If you ship a **`.vsix`**, always **`npm run package`** (bundled `out/extension.js`) before `npx @vscode/vsce package`, then reinstall the `.vsix` and reload.
+**Tip:** If you are developing from a folder (`npm run compile` / watch), reload with `Cmd+Shift+P` > **Developer: Reload Window**. To ship a VSIX, use **`npm run package:vsix`** so all four entry points and the asset manifest are rebuilt. Verify the resulting artifact before installing it.
 
 **Contributor workflow:** Run `npm run verify` before opening a PR (typecheck, ESLint, and template regressions via `scripts/check-template-regressions.mjs`). The same `verify` job runs in GitHub Actions on pushes and PRs to `main`, and the Husky **pre-commit** hook runs `npm run verify` after `npm install`.
 

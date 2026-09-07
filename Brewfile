@@ -1,8 +1,6 @@
-# Inkwell: full toolchain + extension install.
-# Usage: brew bundle
+# Optional tools-only bundle. The release VSIX is the authoritative extension;
+# use the Inkwell installer for editor detection, TeX reuse, and full verification.
 
 brew "pandoc"
 brew "pandoc-crossref"
-cask "mactex"
-
-vscode "measure-one.inkwell"
+brew "mermaid-cli"

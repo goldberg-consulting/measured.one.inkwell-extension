@@ -1,18 +1,39 @@
 name: Release
 
+# Publishing starts here, after preflight, rather than on an already-published release.
 on:
-  release:
-    types: [published]
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Exact existing release tag (vX.Y.Z)
+        required: true
+        type: string
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: inkwell-release
+  cancel-in-progress: false
 
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    defaults:
+      run:
+        shell: bash
     steps:
-      - name: Check out repository
+      - name: Check out the exact tag
         uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -20,61 +41,132 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Verify release version and tap credentials
+        id: version
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          node scripts/release-contract.mjs preflight
+          test "$(gh api repos/goldberg-consulting/homebrew-inkwell --jq '.permissions.push == true')" = true
+
       - name: Install dependencies
         run: npm ci
 
       - name: Verify
         run: npm run verify
 
+      - name: Reuse immutable assets when resuming a public release
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VSIX: ${{ steps.version.outputs.filename }}
+        run: |
+          set -euo pipefail
+          echo "public=false" >> "$GITHUB_OUTPUT"
+          if gh release view "$RELEASE_TAG" --json isDraft > "$RUNNER_TEMP/inkwell-release.json"; then
+            if node -e 'process.exit(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).isDraft ? 1 : 0)' "$RUNNER_TEMP/inkwell-release.json"; then
+              download_dir="$RUNNER_TEMP/inkwell-public-release"
+              mkdir -p "$download_dir"
+              gh release download "$RELEASE_TAG" --pattern "$VSIX" --pattern SHA256SUMS --dir "$download_dir"
+              node scripts/release-contract.mjs verify-published "$download_dir/$VSIX" "$download_dir/SHA256SUMS" "$RELEASE_TAG"
+              cp "$download_dir/$VSIX" "$VSIX"
+              cp "$download_dir/SHA256SUMS" SHA256SUMS
+              echo "public=true" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
       - name: Build VSIX
-        run: npx @vscode/vsce package --no-dependencies
+        if: steps.existing.outputs.public != 'true'
+        run: npm run package:vsix
 
-      - name: Extract version from package.json
-        id: version
-        run: echo "version=$(node -p 'require("./package.json").version')" >> "$GITHUB_OUTPUT"
+      - name: Validate actual VSIX and prepare release checksum
+        id: artifact
+        env:
+          VSIX: ${{ steps.version.outputs.filename }}
+          PUBLIC_RELEASE: ${{ steps.existing.outputs.public }}
+        run: |
+          set -euo pipefail
+          if [ "$PUBLIC_RELEASE" = true ]; then
+            node scripts/release-contract.mjs verify-published "$VSIX" SHA256SUMS "$RELEASE_TAG"
+          else
+            node scripts/release-contract.mjs checksums "$VSIX" "$RELEASE_TAG"
+          fi
 
-      - name: Upload VSIX to release
+      - name: Check out Homebrew tap
+        uses: actions/checkout@v4
+        with:
+          repository: goldberg-consulting/homebrew-inkwell
+          ref: main
+          path: tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          persist-credentials: false
+
+      - name: Prepare matching tap commit before publishing
+        id: tap
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          node scripts/release-contract.mjs tap tap/Casks/inkwell.rb "$VERSION" SHA256SUMS
+          node scripts/release-contract.mjs verify-tap tap
+          git -C tap config user.name "github-actions[bot]"
+          git -C tap config user.email "github-actions[bot]@users.noreply.github.com"
+          git -C tap add Casks/inkwell.rb
+          if git -C tap diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git -C tap commit -m "bump inkwell to $VERSION"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload verified assets to a draft release
+        if: steps.existing.outputs.public != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VSIX: ${{ steps.artifact.outputs.filename }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --json isDraft > "$RUNNER_TEMP/inkwell-release.json"; then
+            node -e 'if (!JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).isDraft) throw new Error("The release is already public; its artifacts are immutable.")' "$RUNNER_TEMP/inkwell-release.json"
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --draft --title "Inkwell $RELEASE_TAG" --generate-notes
+          fi
+          gh release upload "$RELEASE_TAG" "$VSIX" SHA256SUMS --clobber
+
+      - name: Publish verified release with Homebrew visibly pending
+        id: public
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VSIX="inkwell-${{ steps.version.outputs.version }}.vsix"
-          if [ -f "$VSIX" ]; then
-            gh release upload "${{ github.event.release.tag_name }}" "$VSIX" --clobber
-          else
-            echo "VSIX not found: $VSIX"
-            exit 1
-          fi
+          set -euo pipefail
+          gh release view "$RELEASE_TAG" --json body > "$RUNNER_TEMP/inkwell-release-notes.json"
+          node scripts/release-contract.mjs notes pending "$RUNNER_TEMP/inkwell-release-notes.json" "$RELEASE_TAG" "$RUNNER_TEMP/inkwell-pending-notes.md"
+          gh release edit "$RELEASE_TAG" --draft=false --title "Inkwell $RELEASE_TAG — Homebrew pending" --notes-file "$RUNNER_TEMP/inkwell-pending-notes.md"
 
-      - name: Compute SHA256
-        id: sha
-        run: |
-          VSIX="inkwell-${{ steps.version.outputs.version }}.vsix"
-          SHA=$(shasum -a 256 "$VSIX" | awk '{print $1}')
-          echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
-
-      - name: Update Homebrew tap
+      - name: Publish matching Homebrew tap commit
+        if: steps.tap.outputs.changed == 'true'
         env:
-          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
-          if [ -z "$TAP_TOKEN" ]; then
-            echo "HOMEBREW_TAP_TOKEN secret not set; skipping tap update."
-            exit 0
-          fi
+          set -euo pipefail
+          git -C tap -c credential.helper= -c 'credential.helper=!gh auth git-credential' push origin HEAD:main
 
-          VERSION="${{ steps.version.outputs.version }}"
-          SHA="${{ steps.sha.outputs.sha256 }}"
+      - name: Mark release complete after the tap update
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view "$RELEASE_TAG" --json body > "$RUNNER_TEMP/inkwell-release-notes.json"
+          node scripts/release-contract.mjs notes complete "$RUNNER_TEMP/inkwell-release-notes.json" "$RELEASE_TAG" "$RUNNER_TEMP/inkwell-complete-notes.md"
+          gh release edit "$RELEASE_TAG" --title "Inkwell $RELEASE_TAG" --notes-file "$RUNNER_TEMP/inkwell-complete-notes.md"
 
-          git clone "https://x-access-token:${TAP_TOKEN}@github.com/goldberg-consulting/homebrew-inkwell.git" /tmp/tap
-          cd /tmp/tap
+      - name: Explain incomplete Homebrew publication
+        if: failure() && steps.public.outcome == 'success'
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'TEXT'
+          The verified release is public, but Homebrew publication is incomplete. Its title and notes remain marked **Homebrew pending**.
 
-          CASK="Casks/inkwell.rb"
-
-          sed -i "s/version \".*\"/version \"${VERSION}\"/" "$CASK"
-          sed -i "s/sha256 \".*\"/sha256 \"${SHA}\"/" "$CASK"
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add "$CASK"
-          git diff --cached --quiet && echo "No changes to commit" && exit 0
-          git commit -m "bump inkwell to ${VERSION}"
-          git push origin main
+          Rerun this failed Release workflow, or dispatch the same exact tag. The workflow downloads and validates the existing public VSIX and SHA256SUMS without rebuilding or overwriting them, then verifies and retries the tap update. Resolve conflicting tap changes in the tap repository before retrying; never force-push or replace the release assets.
+          TEXT

@@ -1,0 +1,10 @@
+{
+  "name": "inkwell-ci-mermaid",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Isolated, reproducible Mermaid rendering tools for the Linux demo workflow.",
+  "dependencies": {
+    "@mermaid-js/mermaid-cli": "11.17.0",
+    "puppeteer": "24.31.0"
+  }
+}

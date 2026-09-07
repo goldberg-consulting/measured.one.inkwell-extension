@@ -2,6 +2,27 @@
 
 Complete reference for writing Inkwell documents. Covers YAML frontmatter, code blocks, inline data binding, math, citations, cross-references, tables, and template-specific fields.
 
+## Setup and health checks
+
+Use **Inkwell: Setup / Repair** to inspect the installed tools, review any system
+changes, prepare the workspace, and verify a real PDF. The first-run walkthrough
+and New Project use the same observed setup flow. Interrupted setup can be resumed
+by running the command again; a failed process never counts as a completed stage.
+
+Health checks do not install software or change a TeX tree. Activation uses only
+a cached light result. A fresh light check verifies assets, executable versions,
+editor versions, and workspace state. A full check adds a cross-reference fixture,
+the installed artifact's exact TeX requirements, ownership classification, and a
+temporary PDF build. Setup applies changes only through its separate installation
+and workspace stages. Its diagnostics distinguish passed, warning, failed, and
+skipped checks.
+
+On macOS, setup reuses a functioning TeX installation. Full MacTeX is the default
+when TeX is missing; an explicitly selected lean profile uses BasicTeX and must
+pass the same checks. Existing user-owned TinyTeX does not need sudo, and normal
+system MacTeX ownership is preserved. Mermaid CLI comes from Homebrew's
+`mermaid-cli` formula.
+
 ## YAML Frontmatter
 
 Every Inkwell document starts with a `---` fenced YAML block that controls metadata, template selection, and styling.
@@ -220,11 +241,7 @@ Rendered diagrams are cached in `.inkwell/mermaid/` by content hash (both SVG fo
 
 ### Prerequisites
 
-Install mermaid-cli globally:
-
-```bash
-npm install -g @mermaid-js/mermaid-cli
-```
+Run **Inkwell: Setup / Repair**. On macOS, Mermaid CLI is installed through the Homebrew `mermaid-cli` formula and verified before setup completes.
 
 If `mmdc` is not installed, mermaid blocks pass through as code listings in the compiled PDF but still render in the live preview (client-side via mermaid.js).
 
@@ -893,53 +910,63 @@ Do not convert these; Inkwell passes raw LaTeX through to the PDF engine:
 
 ## Troubleshooting
 
-Run **Inkwell: Check / Install Toolchain** from the command palette first — it diagnoses all of the conditions below and surfaces one-click remediations for most of them. The list here is a reference for what those messages mean.
+For tool or installation failures, start with **Inkwell: Setup / Repair** from
+the command palette and open its diagnostics. Document syntax, labels, and
+template overrides may still need changes in the source; the entries below
+distinguish those cases from toolchain failures.
 
 ### Compile fails with "You haven't defined the language 'spanish' yet"
 
-Affects the **rho** and **rmxaa** templates on TinyTeX / BasicTeX installs. Fixed in Inkwell 0.3.0+ by loading Spanish alongside English in the template wrappers. If you see this on an older version, upgrade the extension (`brew upgrade --cask inkwell`) or add `babel-spanish` and `hyphen-spanish` to your local `requirements-latex.txt` and run **Inkwell: Check / Install Toolchain**.
+Affects the **rho** and **rmxaa** templates when their Spanish language support
+is unavailable. Current template wrappers load Spanish alongside English, and
+the packaged requirements include `babel-spanish` and `hyphen-spanish`. Upgrade
+an older extension, then run **Inkwell: Setup / Repair**. Repairs read the
+requirements inside the installed extension; editing a same-named file in your
+working directory does not change that package plan.
 
-### Compile fails with "File 'xstring.sty' not found" (or fixtounicode, fix2col, ...)
+### Compile fails with "File 'xstring.sty' not found" (or another required package)
 
-Your TeX distribution is missing a package that a shipped template depends on. On a clean TinyTeX install these are not present by default; the full package list ships in `requirements-latex.txt`. Run **Inkwell: Check / Install Toolchain** → *Install packages with tlmgr*, or run the command directly:
-
-```bash
-sed 's/#.*//' <path-to-requirements-latex.txt> | awk 'NF' | xargs tlmgr install
-texhash || mktexlsr
-```
+Run **Inkwell: Setup / Repair** to compare the installed TeX files with the
+requirements inside your extension artifact. Review the missing-package plan;
+setup observes installation, probes the files again, and builds a smoke PDF.
+The requirements file in your current working directory is not used for repairs.
 
 ### Compiled PDF shows "??" where cross-references should be
 
-Affects any document that uses `@fig:`, `@tbl:`, `@eq:`, `@sec:`, `\ref{…}`, `\pageref{LastPage}`, or `\tableofcontents`. Fixed in Inkwell 0.3.0+: the compile pipeline now runs the engine twice so LaTeX can resolve cross-references via `.aux`. If you still see `??` on an older version, compile twice in a row (the second run will resolve) or upgrade.
+Inkwell runs the required TeX passes within each build. Check that every reference
+has a matching label and inspect the build log for unresolved labels. The full
+doctor also tests Pandoc and pandoc-crossref together, so a present but incompatible
+filter is reported as a failure. A second independent compile is not a substitute
+for correcting an unresolved label or incompatible filter.
 
-### tlmgr install succeeds but compile still reports "file not found"
+### Package installation or TeX ownership needs attention
 
-Symptom of a root-owned TeX tree. Common after:
-
-- Bootstrapping TinyTeX with `curl … | sudo sh`
-- Copying a `~/Library/TinyTeX/` tree from another machine
-- Running an aborted `brew install --cask basictex` as root
-
-When the TEXMFROOT directory is owned by a user other than the one running Inkwell, `tlmgr install` as your user fails to update the `ls-R` file index — the packages are on disk but `kpsewhook` can't find them. The extension detects this in **Inkwell: Check / Install Toolchain** and offers a one-click fix. Manually:
-
-```bash
-sudo chown -R "$USER" "$(kpsewhich -var-value TEXMFROOT)"
-texhash
-```
-
-Re-run the toolchain check afterward to confirm.
+Run **Inkwell: Setup / Repair** and open its diagnostics. A health check is
+read-only: it never runs texhash, installs packages, or changes ownership.
+Root ownership is normal for system MacTeX; its package installation may request
+administrator permission. User-owned TinyTeX uses no sudo. An incorrectly owned
+or unwritable TinyTeX tree is reported for distribution-specific repair, and its
+existing files and ownership are preserved.
 
 ### Preview shows raw LaTeX syntax instead of rendered output
 
 Reload the editor window: `Cmd+Shift+P` → **Developer: Reload Window**. After a `brew upgrade --cask inkwell`, VS Code / Cursor keeps the old extension code loaded in memory until the window reloads.
 
-### `brew install --cask inkwell` refuses to load the cask
+### Homebrew refuses to load the cask
 
-Newer Homebrew versions require third-party taps with casks to be explicitly trusted. Run `brew trust goldberg-consulting/inkwell`, then repeat the install or upgrade.
+Use the fully qualified name: `brew install --cask goldberg-consulting/inkwell/inkwell`.
+If your Homebrew version asks you to trust the tap, follow that prompt before
+repeating the command. A download or checksum failure is a release problem;
+do not bypass checksum verification.
 
 ### A template or example added in a new release doesn't show up
 
-Three common causes. First, the installed extension may be stale — check `Cmd+Shift+P` → **Extensions: Show Installed Extensions** for the Inkwell version, upgrade (`brew upgrade --cask inkwell` or reinstall the `.vsix`), and reload the window. Second, **Setup Workspace** copies examples into `.inkwell/examples/` only when the file is *missing* — it never overwrites. Delete the stale copy under `.inkwell/examples/` and re-run **Inkwell: Setup Workspace**. Third, if you previously seeded templates into `.inkwell/templates/`, those copies permanently shadow the extension's built-ins — a template bug fixed in a newer release stays broken until you delete the stale folder under `.inkwell/templates/` (or `~/.inkwell/templates/`).
+Check the installed Inkwell version, then run **Inkwell: Setup / Repair**.
+Managed examples upgrade only when their hashes match the installed seed.
+Edited files remain intact; Compare files opens their `.new` proposals and
+Keep my files records user ownership. Existing local templates intentionally
+shadow built-ins. Preserve or rename your local override if you choose to use
+the updated built-in template; setup does not delete it.
 
 ### I want to see the exact pandoc / xelatex invocation
 
@@ -947,7 +974,7 @@ Open the **Inkwell** output channel (*View* > *Output* > *Inkwell* in the dropdo
 
 ### Mermaid diagrams show as code in the PDF
 
-Install the Mermaid CLI globally: `npm install -g @mermaid-js/mermaid-cli`. Inkwell shells out to `mmdc` to rasterize each diagram; without it, the fenced code survives to the PDF unrendered. **Inkwell: Check / Install Toolchain** flags this when it's missing.
+Run **Inkwell: Setup / Repair** to install and verify the Homebrew `mermaid-cli` formula on macOS. Inkwell shells out to `mmdc` to rasterize each diagram; without it, the fenced code survives to the PDF unrendered. **Inkwell: Setup / Repair** flags this when it's missing.
 
 ### Preview and PDF agree but differ from what I expect
 

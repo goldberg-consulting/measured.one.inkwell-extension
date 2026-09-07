@@ -54,9 +54,36 @@
   now stop compilation with a located diagnostic instead of quietly dropping
   sources.
 
-This is work toward 0.5, not a released version. Installation, styling,
-bibliography UX, offline preview, and release gates follow
-the implementation brief in phase order.
+### Installation and first-run reliability (Phase 3)
+
+- The extension and headless JSON/text doctor share one structured health report.
+  Light checks verify assets and executable/editor versions; full checks add
+  cross-reference conversion, exact TeX files, safe ownership classification,
+  and an actual Inkwell PDF build. Health checks never install software, refresh
+  TeX indexes, access the network, or change TeX ownership. Activation requests
+  only cached light health.
+- Setup / Repair, the walkthrough, and explicit project setup use observed,
+  resumable stages with consent for system changes, fresh verification, scaffold
+  migration, and a smoke PDF. Failed processes and skipped required checks cannot
+  become successful completion.
+- The versioned release VSIX is the authoritative extension artifact. The macOS
+  bootstrap supports `auto`, `all`, `cursor`, and `code` editor selection,
+  including app-bundle CLIs. It verifies the exact version in each selected editor
+  and uses Homebrew Mermaid CLI instead of requiring a global npm installation.
+- Setup reuses functioning TeX installations. Full MacTeX is the missing-TeX
+  default; an explicit lean profile must pass the same full checks. User TinyTeX
+  uses no sudo, normal system MacTeX ownership is preserved, and requirements come
+  from the installed artifact. Obsolete `fix2col` was removed: its fixes have been
+  in the LaTeX kernel since 2015 and no bundled template imports it.
+- Packaging now includes independent extension, doctor, installer, and smoke
+  compiler bundles with an asset hash manifest. Artifact verification checks the
+  actual VSIX contents and exact release tag. The separate Homebrew tap draft
+  uses supported installer/uninstaller scripts and mocked lifecycle tests.
+
+This is unreleased work toward 0.5. The final release artifact, tap checksum,
+architecture-specific installation checks, clean-machine install, and activation
+benchmark remain release gates. Mocked tests and artifact audits do not establish
+that a clean Mac installation has passed. See [installation and health checks](docs/installation.md).
 
 ## 0.4.0 (2026-09-04)
 
