@@ -31,8 +31,31 @@
   run the actual extension runner/compiler, reject unresolved references, and
   verify expected text in the PDF. Machine-readable baseline reports are included.
 
-This is work toward 0.5, not a released version. Configuration, migrations,
-installation, styling, bibliography UX, offline preview, and release gates follow
+### Configuration and project upgrades
+
+- Preview, PDF compilation, citations, template selection, and runs now share a
+  typed YAML resolver. Scalar, flow-list, block-list, quoted, and CRLF forms follow
+  the same precedence. Diagnostics identify invalid values and template locks.
+  `inkwell.defaultCodeDisplay` now supplies the documented authoring default.
+- Manifest schema 4 stores project choices in `defaults.typography`, `tables`,
+  `references`, and `runs`, with hashes and ownership in `managedFiles`. Legacy
+  `settings` and `documentSettings` remain readable and migrate without losing
+  unknown fields. Rendering never rewrites document frontmatter or the manifest.
+- Migration preserves edited files, creates comparison proposals beside them,
+  and offers Compare files or Keep my files. Malformed manifests receive a backup
+  and stop setup. Interrupted migrations resume; successful repeated setup does
+  no additional writes. Built-in templates stay in the installed extension.
+- Inkwell actions share project readiness. Plain workspaces receive one setup
+  action and a persistent Don't ask here choice; background Markdown changes do
+  not opt in a workspace. New Project and Setup Workspace use the same migration.
+- Declared bibliographies come before sorted discovered files in both preview
+  and PDF; an explicit empty list disables discovery. Document-relative paths
+  and project/defaults-relative paths share one resolution rule. Missing files
+  now stop compilation with a located diagnostic instead of quietly dropping
+  sources.
+
+This is work toward 0.5, not a released version. Installation, styling,
+bibliography UX, offline preview, and release gates follow
 the implementation brief in phase order.
 
 ## 0.4.0 (2026-09-04)

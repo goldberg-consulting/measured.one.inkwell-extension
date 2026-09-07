@@ -16,19 +16,23 @@ import * as path from "path";
 import * as fs from "fs";
 import { setupPythonEnvironment } from "./python-setup";
 import { getInkwellOutputChannel } from "./inkwell-output";
+import { ProjectReadinessGate } from "./project-readiness-ui";
 
 let diagnostics: InkwellDiagnostics;
 let autoCompileTimer: ReturnType<typeof setInterval> | undefined;
 let activeRunCancel: RunCancellation | undefined;
 let compileInFlight = false;
 let queuedCompile: vscode.TextDocument | undefined;
+let readiness: ProjectReadinessGate;
 
 export function activate(context: vscode.ExtensionContext) {
   setExtensionPath(context.extensionPath);
   diagnostics = new InkwellDiagnostics();
+  readiness = new ProjectReadinessGate(context);
 
   const previewProvider = new InkwellPreviewProvider(context);
   previewProvider.setDiagnostics(diagnostics);
+  previewProvider.ensureReady = (document, allowPrompt) => readiness.ensure(document, allowPrompt);
 
   // n.b. The webview steals focus from the editor, so activeTextEditor
   // is undefined when the user clicks Run in the preview panel. We
@@ -64,13 +68,14 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showWarningMessage("Open a markdown or LaTeX file first.");
         return;
       }
-      await exportPDF(doc, diagnostics);
+      if (await readiness.ensure(doc)) await exportPDF(doc, diagnostics);
     }),
 
     vscode.commands.registerCommand("inkwell.selectTemplate", async () => {
       const doc =
         vscode.window.activeTextEditor?.document ?? previewProvider.getDocument();
       const uri = doc?.uri;
+      if (doc && !await readiness.ensure(doc)) return;
       const templateId = await selectTemplateCommand(uri);
       if (!templateId) return;
 
@@ -143,12 +148,12 @@ export function activate(context: vscode.ExtensionContext) {
       await setupWorkspace();
     }),
 
-    vscode.workspace.onDidSaveTextDocument((document) => {
+    vscode.workspace.onDidSaveTextDocument(async (document) => {
       const mode = vscode.workspace
         .getConfiguration("inkwell")
         .get<string>("autoCompile");
       if (mode === "onSave" && isCompilable(document)) {
-        runCompile(document);
+        await runCompile(document, false);
       }
     }),
 
@@ -202,7 +207,7 @@ function setupAutoCompileTimer(): void {
   autoCompileTimer = setInterval(() => {
     const editor = vscode.window.activeTextEditor;
     if (editor && isCompilable(editor.document)) {
-      runCompile(editor.document);
+      void runCompile(editor.document, false).catch(err => console.error("Inkwell auto-compile failed:", err));
     }
   }, seconds * 1000);
 }
@@ -213,7 +218,8 @@ function setupAutoCompileTimer(): void {
 // resets it.
 const lastFailureNotified = new Map<string, string>();
 
-async function runCompile(document: vscode.TextDocument): Promise<void> {
+async function runCompile(document: vscode.TextDocument, allowPrompt = true): Promise<void> {
+  if (!await readiness.ensure(document, allowPrompt)) return;
   if (compileInFlight) {
     queuedCompile = document;
     return;
@@ -263,6 +269,7 @@ async function runCodeBlocksWithProgress(
   document: vscode.TextDocument,
   previewProvider: InkwellPreviewProvider
 ): Promise<void> {
+  if (!await readiness.ensure(document)) return;
   if (activeRunCancel) {
     activeRunCancel.cancel();
     activeRunCancel = undefined;
@@ -328,6 +335,7 @@ async function runCodeBlocksWithProgress(
 }
 
 async function setupPythonEnv(document: vscode.TextDocument): Promise<void> {
+  if (!await readiness.ensure(document)) return;
   const docDir = path.dirname(document.uri.fsPath);
   const projectRoot = getInkwellProjectRoot(document.uri.fsPath);
 
@@ -416,7 +424,7 @@ async function activationCheck() {
   );
 
   if (choice === "Setup now") {
-    showToolchainStatus();
+    await showToolchainStatus();
   }
 }
 

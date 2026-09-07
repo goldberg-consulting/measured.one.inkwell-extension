@@ -79,16 +79,16 @@ async function main() {
   const { checkWarnings } = await import('./demo-policy.mjs');
   const policy = JSON.parse(fs.readFileSync(path.join(repo, 'tests/fixtures/warning-allowlist.json'), 'utf8'));
   fs.mkdirSync(path.join(project, '.inkwell/references'), { recursive: true });
-  const scaffold = fs.readFileSync(path.join(repo, 'src/scaffold.ts'), 'utf8');
-  // Seed from the shipped scaffold, never from the author's project bibliography.
-  const seed = scaffold.match(/const STARTER_BIB = `([\s\S]*?)`;/)[1].replaceAll('\\\\', '\\');
+  const seeds = require(path.join(repo, 'out/scaffold-assets.js'));
+  const seed = seeds.STARTER_BIB;
   const bib = baseline ? seed.replace(/(?:^|\n)@book\{fourier1822,[\s\S]*?\n\}\n/, '\n') : seed;
   fs.writeFileSync(path.join(project, '.inkwell/references/refs.bib'), bib);
   fs.writeFileSync(path.join(project, '.inkwell/manifest.json'), '{"template":"default"}\n');
-  fs.mkdirSync(path.join(project, '.inkwell/scripts'), { recursive: true });
-  for (const [constant, name] of [['SINE_PLOT_PY', 'sine_plot.py'], ['SCATTER_PY', 'scatter.py'], ['CONVERGENCE_TABLE_PY', 'convergence_table.py']]) {
-    const script = scaffold.match(new RegExp(`const ${constant} = \u0060([\\s\\S]*?)\u0060;`))[1].replaceAll('\\\\', '\\');
-    fs.writeFileSync(path.join(project, '.inkwell/scripts', name), script);
+  for (const [relative, content] of Object.entries(seeds.SCAFFOLD_SEED_FILES)) {
+    if (!relative.startsWith('.inkwell/scripts/')) continue;
+    const destination = path.join(project, relative);
+    fs.mkdirSync(path.dirname(destination), { recursive: true });
+    fs.writeFileSync(destination, content);
   }
   const examples = fs.readdirSync(path.join(repo, 'examples')).filter(f => /^demo-.*\.md$/.test(f)).sort();
   for (const name of examples) {
