@@ -1,5 +1,40 @@
 # Changelog
 
+## Unreleased — 0.5 reliability work
+
+### Output safety
+
+- Failed Pandoc, TeX, bibliography, Python setup, and code-run processes no longer
+  report completion because an output file happens to exist. A failed PDF build
+  preserves the previous PDF; a successful build publishes through an atomic rename.
+- Preview updates carry document and source revisions. Switching documents clears
+  old content, and retained PDFs display their last successful revision and time
+  when provenance is available.
+- Executable blocks now store successful provenance in
+  `.inkwell/runs/<document-id>/<block-id>/history/<run-id>/run.json`, selected by an
+  atomic `current.json`. Source, interpreter, installed-package metadata, inputs,
+  lockfiles, upstream outputs, and artifact hashes determine whether output is current.
+- Existing ordinal `.inkwell/outputs/*/block_*` artifacts require one rerun and are
+  never treated as verified results. Scripts remain user-owned. Moving blocks to
+  different execution indices conservatively invalidates output because legacy
+  scripts can read `INKWELL_BLOCK_INDEX`; stable storage identities are preserved.
+- Clearing generated output invalidates active runs as well as stored results.
+  Failed attempts remain inspectable but cannot become current.
+- Python environment setup uses observed processes and fresh verification, and
+  unsafe project names are rejected before creating files.
+- The starter bibliography includes Fourier's 1822 book. Generated code-font
+  styling loads the LaTeX dependency required by line-wrapping options.
+
+### Verification
+
+- Behavioral tests use temporary projects and run in Linux/macOS CI. Demo checks
+  run the actual extension runner/compiler, reject unresolved references, and
+  verify expected text in the PDF. Machine-readable baseline reports are included.
+
+This is work toward 0.5, not a released version. Configuration, migrations,
+installation, styling, bibliography UX, offline preview, and release gates follow
+the implementation brief in phase order.
+
 ## 0.4.0 (2026-09-04)
 
 Ports the template and pipeline fixes proven in a downstream report-writing project (catalog items P01–P10, G05, G09, G10 of its improvement handoff): the ETH XeLaTeX/typography overlay, the header-includes preamble collision, document-declared bibliographies, binding validation, and preview figure-label parsing.

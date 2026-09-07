@@ -14,6 +14,8 @@ import { clearCache } from "./cache";
 import { setupWorkspace, initProject } from "./scaffold";
 import * as path from "path";
 import * as fs from "fs";
+import { setupPythonEnvironment } from "./python-setup";
+import { getInkwellOutputChannel } from "./inkwell-output";
 
 let diagnostics: InkwellDiagnostics;
 let autoCompileTimer: ReturnType<typeof setInterval> | undefined;
@@ -41,8 +43,8 @@ export function activate(context: vscode.ExtensionContext) {
   };
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("inkwell.preview", () => {
-      previewProvider.show();
+    vscode.commands.registerCommand("inkwell.preview", async () => {
+      await previewProvider.show();
     }),
 
     vscode.commands.registerCommand("inkwell.compile", async () => {
@@ -85,8 +87,8 @@ export function activate(context: vscode.ExtensionContext) {
       }
     }),
 
-    vscode.commands.registerCommand("inkwell.setupToolchain", () => {
-      showToolchainStatus();
+    vscode.commands.registerCommand("inkwell.setupToolchain", async () => {
+      await showToolchainStatus();
     }),
 
     vscode.commands.registerCommand("inkwell.installPackage", async (pkg?: string) => {
@@ -122,7 +124,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.activeTextEditor?.document ?? previewProvider.getDocument();
       if (!doc) return;
       const cacheDir = getInkwellOutputsDir(doc.uri.fsPath);
-      clearCache(cacheDir);
+      clearCache(cacheDir, doc.uri.fsPath);
       vscode.window.showInformationMessage("Inkwell: Code block cache cleared.");
     }),
 
@@ -133,12 +135,12 @@ export function activate(context: vscode.ExtensionContext) {
       await setupPythonEnv(doc);
     }),
 
-    vscode.commands.registerCommand("inkwell.initProject", () => {
-      initProject();
+    vscode.commands.registerCommand("inkwell.initProject", async () => {
+      await initProject();
     }),
 
-    vscode.commands.registerCommand("inkwell.setupWorkspace", () => {
-      setupWorkspace();
+    vscode.commands.registerCommand("inkwell.setupWorkspace", async () => {
+      await setupWorkspace();
     }),
 
     vscode.workspace.onDidSaveTextDocument((document) => {
@@ -278,25 +280,25 @@ async function runCodeBlocksWithProgress(
   const cancel = new RunCancellation();
   activeRunCancel = cancel;
 
-  previewProvider.sendRunStarted(blocks.length);
+  const previewRequest = previewProvider.sendRunStarted(blocks.length, document);
 
   let results: Awaited<ReturnType<typeof runAllBlocks>> = [];
   let threw = false;
   try {
     results = await runAllBlocks(text, sourceFile, cancel, (p) => {
-      previewProvider.sendBlockProgress(p);
+      previewProvider.sendBlockProgress(p, previewRequest);
       if (p.warning) {
-        previewProvider.sendLogEntry("error", p.warning);
+        previewProvider.sendLogEntry("error", p.warning, undefined, previewRequest);
       }
       if (p.interpreter && p.status === "running") {
-        previewProvider.sendLogEntry("info", `Block ${p.index + 1}: using ${p.interpreter}`);
+        previewProvider.sendLogEntry("info", `Block ${p.index + 1}: using ${p.interpreter}`, undefined, previewRequest);
       }
     });
   } catch (err) {
     threw = true;
-    previewProvider.sendLogEntry("error", "Run failed unexpectedly", String(err));
+    previewProvider.sendLogEntry("error", "Run failed unexpectedly", String(err), previewRequest);
   } finally {
-    activeRunCancel = undefined;
+    if (activeRunCancel === cancel) activeRunCancel = undefined;
     const failed = results.filter((r) => r.exitCode !== 0 && r.exitCode !== 130);
     const cancelled = results.filter((r) => r.exitCode === 130);
     const cached = results.filter((r) => r.cached);
@@ -307,20 +309,21 @@ async function runCodeBlocksWithProgress(
         "error",
         `Block ${r.block.index + 1} (${r.block.lang}) failed`,
         r.stderr,
+        previewRequest,
       );
     }
 
     if (threw) {
-      previewProvider.sendRunComplete("failed", ran, cached.length, cancelled.length, failed.length || 1);
+      previewProvider.sendRunComplete("failed", ran, cached.length, cancelled.length, failed.length || 1, previewRequest);
     } else if (cancel.cancelled) {
-      previewProvider.sendRunComplete("cancelled", ran, cached.length, cancelled.length);
+      previewProvider.sendRunComplete("cancelled", ran, cached.length, cancelled.length, 0, previewRequest);
     } else if (failed.length) {
-      previewProvider.sendRunComplete("failed", ran, cached.length, 0, failed.length);
+      previewProvider.sendRunComplete("failed", ran, cached.length, 0, failed.length, previewRequest);
     } else {
-      previewProvider.sendRunComplete("done", ran, cached.length);
+      previewProvider.sendRunComplete("done", ran, cached.length, 0, 0, previewRequest);
     }
 
-    previewProvider.notifyBlocksRan();
+    await previewProvider.notifyBlocksRan(document, previewRequest);
   }
 }
 
@@ -366,38 +369,36 @@ async function setupPythonEnv(document: vscode.TextDocument): Promise<void> {
   const reqFile = [path.join(docDir, "requirements.txt"), path.join(projectRoot, "requirements.txt")].find((p) =>
     fs.existsSync(p)
   );
-  const hasReqs = Boolean(reqFile);
-
-  const terminal = vscode.window.createTerminal("Inkwell Python Env");
-  terminal.show();
-
-  const commands: string[] = [];
-
-  if (fs.existsSync(resolved)) {
-    commands.push(`echo "Venv already exists at ${resolved}"`);
-  } else {
-    commands.push(`python3 -m venv "${resolved}"`);
-  }
-
-  commands.push(`source "${resolved}/bin/activate"`);
-
-  if (hasReqs && reqFile) {
-    commands.push(`pip install -r "${reqFile}"`);
-  } else {
-    const installPick = await vscode.window.showInputBox({
+  let packages: string[] = [];
+  if (!reqFile) {
+    const input = await vscode.window.showInputBox({
       prompt: "Packages to install (space-separated, or leave empty)",
       placeHolder: "numpy matplotlib pandas polars scikit-learn seaborn",
     });
-    if (installPick?.trim()) {
-      commands.push(`pip install ${installPick.trim()}`);
-    }
+    packages = input?.trim().split(/\s+/).filter(Boolean) || [];
   }
-
-  commands.push(`python3 --version`);
-  commands.push(`echo "Venv ready at ${envPath}"`);
-  commands.push(`echo "Add to your frontmatter:  python-env: ${envPath}"`);
-
-  terminal.sendText(commands.join(" && "));
+  const cancellation = new RunCancellation();
+  const result = await vscode.window.withProgress({
+    location: vscode.ProgressLocation.Notification,
+    title: "Inkwell: Setting up Python environment",
+    cancellable: true,
+  }, async (_progress, token) => {
+    const subscription = token.onCancellationRequested(() => cancellation.cancel());
+    try {
+      return await setupPythonEnvironment({
+        projectDir: projectRoot, environmentDir: resolved,
+        requirementsFile: reqFile, packages, cancel: cancellation,
+      });
+    } finally { subscription.dispose(); }
+  });
+  const output = getInkwellOutputChannel();
+  output.appendLine(result.log);
+  if (result.success) {
+    await vscode.window.showInformationMessage(`Inkwell: Python ${result.pythonVersion} environment verified at ${resolved}.`);
+  } else {
+    output.show(true);
+    await vscode.window.showErrorMessage(`Inkwell: ${result.message} See the Inkwell output log for details.`);
+  }
 }
 
 async function activationCheck() {

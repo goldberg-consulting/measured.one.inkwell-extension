@@ -6,6 +6,8 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 import { selectTemplateCommand } from "./templates";
+import { setupPythonEnvironment } from "./python-setup";
+import { getInkwellOutputChannel } from "./inkwell-output";
 
 const SCAFFOLD_VERSION = 3;
 
@@ -40,6 +42,9 @@ const DEFAULT_REQUIREMENTS =
   "numpy\nmatplotlib\npandas\npolars\nscikit-learn\numap-learn\nseaborn\n";
 
 const GITIGNORE = `.inkwell/outputs/
+.inkwell/runs/
+.inkwell/.cache/
+.inkwell/venv/
 .inkwell/compiled/
 .inkwell/mermaid/
 *.aux
@@ -54,7 +59,15 @@ venv/
 .venv/
 `;
 
-const STARTER_BIB = `@article{knuth1984,
+const STARTER_BIB = `@book{fourier1822,
+  author    = {Fourier, Joseph},
+  title     = {Théorie analytique de la chaleur},
+  publisher = {Firmin Didot, père et fils},
+  address   = {Paris},
+  year      = {1822}
+}
+
+@article{knuth1984,
   author  = {Knuth, Donald E.},
   title   = {Literate Programming},
   journal = {The Computer Journal},
@@ -450,9 +463,14 @@ export async function initProject(): Promise<void> {
   const name = await vscode.window.showInputBox({
     prompt: "Project name (used for the main document filename)",
     value: path.basename(baseDir),
-    validateInput: (v) => (v.trim() ? null : "Name is required"),
+    validateInput: validateProjectName,
   });
   if (!name) return;
+  const invalidName = validateProjectName(name);
+  if (invalidName) {
+    vscode.window.showErrorMessage(invalidName);
+    return;
+  }
 
   const templateId = await selectTemplateCommand();
 
@@ -474,13 +492,7 @@ export async function initProject(): Promise<void> {
   createStructure(options);
 
   if (options.pythonEnv) {
-    const terminal = vscode.window.createTerminal("Inkwell Setup");
-    terminal.show();
-    const venvPath = path.join(options.dir, "venv");
-    const reqPath = path.join(options.dir, "requirements.txt");
-    terminal.sendText(
-      `python3 -m venv "${venvPath}" && source "${venvPath}/bin/activate" && pip install -r "${reqPath}" && python3 --version`
-    );
+    if (!await setupScaffoldPython(options.dir)) return;
   }
 
   const docPath = path.join(options.dir, `${options.name}.md`);
@@ -566,13 +578,8 @@ export async function setupWorkspace(): Promise<void> {
       fs.writeFileSync(reqPath, DEFAULT_REQUIREMENTS);
       report.push("created requirements.txt");
     }
-    const terminal = vscode.window.createTerminal("Inkwell Setup");
-    terminal.show();
-    const venvPath = path.join(baseDir, "venv");
-    terminal.sendText(
-      `python3 -m venv "${venvPath}" && source "${venvPath}/bin/activate" && pip install -r "${reqPath}" && python3 --version`
-    );
-    report.push("creating venv (installing in terminal)");
+    if (!await setupScaffoldPython(baseDir)) return;
+    report.push("Python environment verified");
   }
 
   if (report.length) {
@@ -586,7 +593,37 @@ export async function setupWorkspace(): Promise<void> {
   }
 }
 
+async function setupScaffoldPython(projectDir: string): Promise<boolean> {
+  const result = await vscode.window.withProgress({
+    location: vscode.ProgressLocation.Notification,
+    title: "Setting up the Python environment",
+  }, () => setupPythonEnvironment({
+    projectDir,
+    environmentDir: path.join(projectDir, "venv"),
+    requirementsFile: path.join(projectDir, "requirements.txt"),
+  }));
+  const output = getInkwellOutputChannel();
+  output.appendLine(result.log);
+  if (!result.success) {
+    output.show(true);
+    vscode.window.showErrorMessage(`Project files are available, but Python setup did not complete: ${result.message}`);
+  }
+  return result.success;
+}
+
+export function validateProjectName(value: string): string | null {
+  const name = value.trim();
+  if (!name) return "Name is required";
+  if (!/^[\p{L}\p{N}][\p{L}\p{N} ._'-]*$/u.test(name) || name.endsWith(".") ||
+      /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name) || Buffer.byteLength(name, "utf8") > 240) {
+    return "Use a single document name with letters, numbers, spaces, dots, apostrophes, hyphens, or underscores; paths and shell syntax are not allowed.";
+  }
+  return null;
+}
+
 function createStructure(opts: ScaffoldOptions): void {
+  const invalidName = validateProjectName(opts.name);
+  if (invalidName) throw new Error(invalidName);
   const dirs = [
     ".inkwell",
     ".inkwell/outputs",
@@ -609,7 +646,7 @@ function createStructure(opts: ScaffoldOptions): void {
   if (!fs.existsSync(docPath)) {
     let frontmatter = DEFAULT_FRONTMATTER.replace(
       '"Untitled"',
-      `"${opts.name}"`
+      JSON.stringify(opts.name)
     );
     const templateStub = opts.template && TEMPLATE_FRONTMATTER[opts.template];
     if (templateStub) {
