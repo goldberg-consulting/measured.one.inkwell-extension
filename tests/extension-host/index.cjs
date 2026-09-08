@@ -329,9 +329,10 @@ exports.run = async function () {
     const extension = vscode.extensions.getExtension('measure-one.inkwell');
     assert.ok(extension, 'The verified packaged extension is loaded as a development extension.');
     assert.equal(fs.realpathSync(extension.extensionPath), fs.realpathSync(config.extensionPath));
-    // Cursor force-enables several builtin agent extensions even when explicitly
-    // disabled. Let editor startup settle without importing or activating Inkwell.
-    await delay(1000);
+    // Current Code versions can force-enable bundled extensions after launch
+    // despite explicit disablement. Let that startup settle without importing
+    // or activating Inkwell before measuring only Inkwell activation.
+    await delay(config.hostSettleMs);
     assert.equal(extension.isActive, false, 'Activation must not occur before instrumentation; launch an empty workspace.');
     assert.equal(require.cache[path.join(config.extensionPath, 'out/extension.js')], undefined, 'Packaged entrypoint must remain unloaded before measurement.');
     webviews = observeWebviews(config.extensionPath);
