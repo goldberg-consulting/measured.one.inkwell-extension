@@ -97,7 +97,8 @@ xstring
 # bundles (provide multiple .sty files each)
 # amsfonts -> amssymb.sty, amsfonts.sty
 # amscls -> amsthm.sty
-# tools -> array.sty, calc.sty, longtable.sty, multicol.sty
+# caption -> caption.sty, subcaption.sty
+# tools -> array.sty, calc.sty, longtable.sty, multicol.sty, tabularx.sty
 # preprint -> authblk.sty, balance.sty
 # sttools -> stfloats.sty, flushend.sty
 # graphics -> rotating.sty, graphicx.sty
@@ -139,8 +140,9 @@ ltabptch
 accsupp
 floatrow
 textcase
-subcaption
-tabularx
+# `subcaption.sty` and `tabularx.sty` are supplied by the `caption` and
+# `tools` packages above.  They are style filenames rather than valid tlmgr
+# package names, so do not add them as separate manifest entries.
 
 # EPS support. The kth-letter template embeds an .eps logo; under
 # pdflatex this requires epstopdf.sty (epstopdf-pkg) plus the epstopdf
