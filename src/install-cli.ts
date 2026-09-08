@@ -12,12 +12,13 @@ import { executeRunProcess, RunCancellation } from "./run-process";
 import { runSmokeBuild } from "./smoke-build";
 import { buildTexInvocationPath } from "./shell-env";
 
-export interface InstallerArguments { extensionRoot: string; vsix: string; selection: EditorSelection; profile: "full" | "lean"; yes: boolean; outputRoot?: string; expectedVersion?: string; uninstall?: boolean }
+export interface InstallerArguments { extensionRoot: string; vsix: string; selection: EditorSelection; profile: "full"; yes: boolean; allowDowngrade?: boolean; outputRoot?: string; expectedVersion?: string; uninstall?: boolean }
 export function parseInstallerArguments(args: string[]): InstallerArguments {
   const result: InstallerArguments = { extensionRoot: path.join(__dirname, ".."), vsix: "", selection: "auto", profile: "full", yes: false };
   for (const arg of args) {
     if (arg === "--yes") { result.yes = true; continue; }
     if (arg === "--uninstall") { result.uninstall = true; continue; }
+    if (arg === "--allow-downgrade") { result.allowDowngrade = true; continue; }
     const split = arg.indexOf("="); if (split < 0) throw new Error(`Unknown installer argument: ${arg}`);
     const key = arg.slice(0, split), value = arg.slice(split + 1);
     if (key === "--artifact-root") result.extensionRoot = path.resolve(value);
@@ -25,10 +26,11 @@ export function parseInstallerArguments(args: string[]): InstallerArguments {
     else if (key === "--output-root") result.outputRoot = path.resolve(value);
     else if (key === "--version") result.expectedVersion = value;
     else if (key === "--editor" && ["auto", "all", "cursor", "code"].includes(value)) result.selection = value as EditorSelection;
-    else if (key === "--profile" && ["full", "lean"].includes(value)) result.profile = value as "full" | "lean";
+    else if (key === "--profile" && value === "full") result.profile = "full";
     else throw new Error(`Unknown installer argument: ${arg}`);
   }
   if (!result.vsix) throw new Error("An authoritative release VSIX path is required (--vsix=...).");
+  if (result.allowDowngrade && (!result.yes || result.uninstall)) throw new Error("Downgrading requires both --allow-downgrade and explicit --yes consent during standalone installation.");
   return result;
 }
 
@@ -71,7 +73,7 @@ async function runInstallerSteps(args: InstallerArguments, controller: AbortCont
   if (assetErrors.length) throw new Error(assetErrors.map(check => check.message).join("\n"));
   if (controller.signal.aborted) return 130;
   process.stdout.write(`Installing Inkwell ${pkg.version} into ${selected.map(editor => editor.label).join(" and ")}.\n`);
-  const installed = await installEditorArtifact(args.vsix, pkg.version, selected, { env, execute });
+  const installed = await installEditorArtifact(args.vsix, pkg.version, selected, { env, execute, allowDowngrade: args.allowDowngrade, downgradeConsent: args.yes });
   process.stdout.write(installed.log + "\n");
   if (!installed.success) throw new Error("Extension installation is partial or unverified. Repeat the installer after resolving the editor errors.");
   if (controller.signal.aborted) return 130;
@@ -83,8 +85,7 @@ async function runInstallerSteps(args: InstallerArguments, controller: AbortCont
   const setup = createSetupOrchestrator({
     store: createFileSetupStore(path.join(base, "setup-state.json")),
     doctor: options => doctor.run({ extensionRoot: args.extensionRoot, mode: "full", workspaceRoot: options.workspaceRoot,
-      expectedVersion: pkg.version, expectedEditors: selected.map(editor => editor.id), env, forceRefresh: true,
-      requiredTools: args.profile === "lean" ? ["ghostscript"] : [] }),
+      expectedVersion: pkg.version, expectedEditors: selected.map(editor => editor.id), env, forceRefresh: true }),
     plan: report => asSetupPlan(doctorToInstallationPlan(report, { extensionRoot: args.extensionRoot, cwd: projectRoot, env, profile: args.profile })),
     consent: async plan => {
       process.stdout.write(plan.steps.map(step => `• ${step.label}`).join("\n") + "\n");
@@ -106,7 +107,7 @@ async function runInstallerSteps(args: InstallerArguments, controller: AbortCont
   fs.writeFileSync(path.join(base, "setup.log"), state.logs.map(entry => `${entry.time} [${entry.stage}] ${entry.message}`).join("\n") + "\n");
   if (state.status !== "complete") { process.stderr.write(`Inkwell setup ${state.status}. Details: ${path.join(base, "setup.log")}\n`); return 1; }
   const finalReport = await doctor.run({ extensionRoot: args.extensionRoot, mode: "full", workspaceRoot: projectRoot, expectedVersion: pkg.version,
-    expectedEditors: selected.map(editor => editor.id), env, forceRefresh: true, requiredTools: args.profile === "lean" ? ["ghostscript"] : [] });
+    expectedEditors: selected.map(editor => editor.id), env, forceRefresh: true });
   fs.writeFileSync(path.join(base, "doctor.json"), JSON.stringify(finalReport, null, 2) + "\n");
   if (!finalReport.ready || controller.signal.aborted) { process.stderr.write(`Inkwell setup failed final verification. Details: ${path.join(base, "doctor.json")}\n`); return 1; }
   process.stdout.write(`Inkwell ${pkg.version} installation complete. Every selected editor, the full doctor, and a real PDF build passed.\nVerification PDFs and logs: ${base}\n`);

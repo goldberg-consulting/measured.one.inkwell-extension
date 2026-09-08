@@ -10,25 +10,30 @@ INKWELL_VSIX=""
 INKWELL_EXPECTED_SHA=""
 INKWELL_OUTPUT=""
 INKWELL_UNINSTALL=0
+INKWELL_ALLOW_DOWNGRADE=0
+INKWELL_EXPLICIT_CONSENT=0
 
 usage() {
-  echo "Usage: $0 [--editor=auto|all|cursor|code] [--profile=full|lean] [--version=X.Y.Z] [--vsix=/path/to/release.vsix] [--sha256=HASH] [--output-root=/path]"
+  echo "Usage: $0 [--editor=auto|all|cursor|code] [--version=X.Y.Z] [--vsix=/path/to/release.vsix] [--sha256=HASH] [--output-root=/path] [--allow-downgrade --yes]"
 }
 for arg in "$@"; do
   case "$arg" in
     --editor=auto|--editor=all|--editor=cursor|--editor=code) INKWELL_EDITOR="${arg#*=}" ;;
-    --profile=full|--profile=lean) INKWELL_PROFILE="${arg#*=}" ;;
-    --basictex) INKWELL_PROFILE="lean" ;;
+    --profile=full) INKWELL_PROFILE="full" ;;
     --version=*) INKWELL_RELEASE_VERSION="${arg#*=}" ;;
     --vsix=*) INKWELL_VSIX="${arg#*=}" ;;
     --sha256=*) INKWELL_EXPECTED_SHA="${arg#*=}" ;;
     --output-root=*) INKWELL_OUTPUT="${arg#*=}" ;;
     --uninstall) INKWELL_UNINSTALL=1 ;;
-    --yes) ;; # Running this installer explicitly authorizes its displayed plan.
+    --allow-downgrade) INKWELL_ALLOW_DOWNGRADE=1 ;;
+    --yes) INKWELL_EXPLICIT_CONSENT=1 ;;
     --help|-h) usage; exit 0 ;;
     *) echo "Unknown argument: $arg" >&2; usage >&2; exit 2 ;;
   esac
 done
+if [[ "$INKWELL_ALLOW_DOWNGRADE" == 1 && ( "$INKWELL_EXPLICIT_CONSENT" != 1 || "$INKWELL_UNINSTALL" == 1 ) ]]; then
+  echo "Downgrading requires both --allow-downgrade and explicit --yes consent during standalone installation." >&2; exit 2
+fi
 if [[ ! "$INKWELL_RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]; then
   echo "Invalid release version." >&2; exit 2
 fi
@@ -79,4 +84,5 @@ fi
 INKWELL_ARGS=("--artifact-root=$INKWELL_ARTIFACT" "--vsix=$INKWELL_VSIX" "--version=$INKWELL_RELEASE_VERSION" "--editor=$INKWELL_EDITOR" "--profile=$INKWELL_PROFILE" "--yes")
 if [[ -n "$INKWELL_OUTPUT" ]]; then INKWELL_ARGS+=("--output-root=$INKWELL_OUTPUT"); fi
 if [[ "$INKWELL_UNINSTALL" == 1 ]]; then INKWELL_ARGS+=("--uninstall"); fi
+if [[ "$INKWELL_ALLOW_DOWNGRADE" == 1 ]]; then INKWELL_ARGS+=("--allow-downgrade"); fi
 "$INKWELL_NODE" "$INKWELL_ARTIFACT/out/install-cli.js" "${INKWELL_ARGS[@]}"

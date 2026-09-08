@@ -68,14 +68,14 @@ export async function detectEditors(options: EditorOptions = {}): Promise<Editor
 export function selectEditors(editors: EditorProbe[], selection: EditorSelection): EditorProbe[] {
   if (!["auto", "all", "cursor", "code"].includes(selection)) throw new Error(`Unsupported editor selection: ${selection}`);
   const selected = selection === "all" || selection === "auto" ? editors : editors.filter(editor => editor.id === selection);
-  if (!selected.length) throw new Error(`No ${selection === "auto" || selection === "all" ? "supported" : selection} editor was detected. Install Cursor or VS Code, then repeat setup.`);
+  if (!selected.length) throw new Error(`No ${selection === "auto" || selection === "all" ? "supported" : selection} editor was detected. Install ${selection === "code" ? "VS Code" : "Cursor"}, then repeat setup.`);
   const broken = selected.filter(editor => editor.status !== "ok");
   if (broken.length) throw new Error(`Editor checks failed: ${broken.map(editor => `${editor.label}: ${editor.message}`).join("; ")}`);
   return selected;
 }
 
 export async function installEditorArtifact(
-  vsix: string, expectedVersion: string, editors: EditorProbe[], options: EditorOptions & { cancel?: RunCancellation } = {},
+  vsix: string, expectedVersion: string, editors: EditorProbe[], options: EditorOptions & { cancel?: RunCancellation; allowDowngrade?: boolean; downgradeConsent?: boolean } = {},
 ): Promise<{ success: boolean; editors: EditorProbe[]; log: string }> {
   if (!/^\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?$/.test(expectedVersion)) throw new Error("Invalid expected extension version.");
   if (!path.isAbsolute(vsix) || !fs.statSync(vsix).isFile()) throw new Error("Select an existing absolute VSIX artifact path.");
@@ -83,6 +83,24 @@ export async function installEditorArtifact(
   const processOptions = { cwd: options.cwd || path.dirname(vsix), env: options.env || process.env, timeoutMs: 300000 };
   const results: EditorProbe[] = [], logs: string[] = [];
   for (const editor of editors) {
+    // Re-read immediately before a potential write: discovery may have preceded
+    // a concurrent editor update, and its version cannot authorize a downgrade.
+    const before = await execute(editor.path, ["--list-extensions", "--show-versions"], processOptions, options.cancel);
+    logs.push(`${editor.label}: check installed release\n${before.stdout}\n${before.stderr}`);
+    if (!clean(before)) { results.push({ ...editor, status: "broken", message: "Installed extension version could not be verified; no extension was changed." }); continue; }
+    const installed = before.stdout.split(/\r?\n/).map(line => line.trim()).find(line => line.toLowerCase().startsWith(EXTENSION_ID + "@"));
+    const currentVersion = installed?.slice(EXTENSION_ID.length + 1);
+    if (currentVersion === expectedVersion) {
+      const message = `Verified ${EXTENSION_ID}@${expectedVersion}; no installation needed.`;
+      logs.push(`${editor.label}: ${message}`);
+      results.push({ ...editor, extensionVersion: currentVersion, status: "ok", message }); continue;
+    }
+    const comparison = currentVersion === undefined ? -1 : compareReleaseVersions(currentVersion, expectedVersion);
+    if (comparison === undefined || comparison > 0 && !(options.allowDowngrade && options.downgradeConsent)) {
+      const message = `Preserved Inkwell ${currentVersion}; ${comparison === undefined ? "its version could not be compared" : `it is newer than the requested ${expectedVersion}`}. Installation is partial because the exact release is not installed.`;
+      logs.push(`${editor.label}: ${message}`);
+      results.push({ ...editor, extensionVersion: currentVersion, status: "broken", message }); continue;
+    }
     const install = await execute(editor.path, ["--install-extension", vsix, "--force"], processOptions, options.cancel);
     logs.push(`${editor.label}: install ${EXTENSION_ID}@${expectedVersion}\n${install.stdout}\n${install.stderr}`);
     if (!clean(install)) { results.push({ ...editor, status: "broken", message: "Extension installation did not exit successfully." }); continue; }
@@ -95,16 +113,42 @@ export async function installEditorArtifact(
   return { success: results.length > 0 && results.every(editor => editor.status === "ok" && editor.extensionVersion === expectedVersion), editors: results, log: logs.join("\n") };
 }
 
+/** SemVer ordering keeps pre-releases older than their corresponding release. */
+function compareReleaseVersions(left: string, right: string): number | undefined {
+  const parse = (value: string) => /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(value);
+  const a = parse(left), b = parse(right);
+  if (!a || !b) return undefined;
+  for (let i = 1; i <= 3; i++) {
+    const x = BigInt(a[i]), y = BigInt(b[i]);
+    if (x !== y) return x > y ? 1 : -1;
+  }
+  if (!a[4] || !b[4]) return a[4] === b[4] ? 0 : a[4] ? -1 : 1;
+  const x = a[4].split("."), y = b[4].split(".");
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    if (x[i] === undefined || y[i] === undefined) return x[i] === undefined ? -1 : 1;
+    if (x[i] === y[i]) continue;
+    const xn = /^\d+$/.test(x[i]), yn = /^\d+$/.test(y[i]);
+    if (xn && yn) return BigInt(x[i]) > BigInt(y[i]) ? 1 : -1;
+    if (xn !== yn) return xn ? -1 : 1;
+    return x[i] > y[i] ? 1 : -1;
+  }
+  return 0;
+}
+
 /** Cask removal leaves a separately upgraded extension version in place. */
 export async function uninstallEditorArtifact(expectedVersion: string, editors: EditorProbe[], options: EditorOptions = {}): Promise<{ success: boolean; log: string }> {
   const execute = options.execute || executeRunProcess;
   const logs: string[] = [];
   let success = true;
   for (const editor of editors) {
-    if (editor.extensionVersion !== expectedVersion) {
-      logs.push(`${editor.label}: ${editor.extensionVersion ? `preserved separately installed Inkwell ${editor.extensionVersion}` : "Inkwell is not installed"}.`); continue;
-    }
     const processOptions = { cwd: options.cwd || os.homedir(), env: options.env || process.env, timeoutMs: 120000 };
+    const installed = await execute(editor.path, ["--list-extensions", "--show-versions"], processOptions);
+    logs.push(installed.stdout, installed.stderr);
+    if (!clean(installed)) { success = false; continue; }
+    const current = installed.stdout.split(/\r?\n/).map(line => line.trim()).find(line => line.toLowerCase().startsWith(`${EXTENSION_ID}@`))?.slice(EXTENSION_ID.length + 1);
+    if (current !== expectedVersion) {
+      logs.push(`${editor.label}: ${current ? `preserved separately installed Inkwell ${current}` : "Inkwell is not installed"}.`); continue;
+    }
     const removed = await execute(editor.path, ["--uninstall-extension", EXTENSION_ID], processOptions);
     logs.push(removed.stdout, removed.stderr);
     if (!clean(removed)) { success = false; continue; }

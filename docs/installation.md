@@ -20,11 +20,12 @@ The cask retains the downloaded VSIX in its versioned Caskroom directory and run
 the installer bundled inside that artifact. It detects supported editors on PATH,
 in Homebrew locations, and inside their application bundles in `/Applications`
 or `~/Applications`. It verifies the exact `measure-one.inkwell` release in every
-selected editor. No editor shell-command setup is needed.
+detected editor. The cask has no editor-selection option. No editor shell-command
+setup is needed.
 
-Homebrew manages Pandoc, pandoc-crossref, Mermaid CLI, and Node. A working existing
-TeX distribution is reused. If TeX is absent, the default profile installs full
-MacTeX. The installer uses the requirements file inside the VSIX payload and
+Homebrew manages Pandoc, pandoc-crossref, Mermaid CLI, Node, and full MacTeX as
+direct cask dependencies. MacTeX is an unconditional part of this cask's full
+profile. The installer uses the requirements file inside the VSIX payload and
 installs only missing packages. It does not use a same-named file in the caller's
 working directory.
 
@@ -52,6 +53,14 @@ selection:
 `auto` is the default; both `auto` and `all` select every detected supported
 editor. `cursor` and `code` narrow selection. No matching editor, a failed editor
 process, or a mismatched installed extension version makes setup unsuccessful.
+An exact installed release is verified without reinstalling. An older release is
+upgraded. A newer release is preserved, and the installation reports a partial
+result instead of completion. Only the standalone installer permits an explicit
+downgrade with both `--allow-downgrade` and `--yes`:
+
+```bash
+./scripts/install-inkwell-macos.sh --editor=cursor --allow-downgrade --yes
+```
 
 The bootstrap downloads the versioned release VSIX and its published checksum.
 To use an existing artifact, supply its absolute path and expected version:
@@ -73,18 +82,13 @@ release file, reload, and run **Inkwell: Setup / Repair**. The 0.5 release artif
 is the authoritative distribution; the Brewfile does not install a potentially
 different marketplace version.
 
-## TeX profiles and ownership
+## TeX installation and ownership
 
-The full profile supplies MacTeX when no functioning distribution exists. The
-explicit lean profile selects BasicTeX in that situation:
-
-```bash
-./scripts/install-inkwell-macos.sh --profile=lean
-```
-
-Lean setup can require many additional fonts and template packages and must pass
-the same exact-file and PDF checks as the full profile. A working user TinyTeX
-installation is also reused; it is not replaced by BasicTeX or MacTeX.
+The cask always includes full MacTeX. The standalone installer and Setup / Repair
+reuse a functioning existing TeX distribution, including a user TinyTeX
+installation. They install full MacTeX only when no distribution exists. A lean
+cask or installer profile is deferred beyond 0.5. Reused distributions must pass
+the same required-file and PDF checks.
 
 User-owned TinyTeX uses its own package manager without sudo. Root ownership is
 normal for a system MacTeX installation, whose package manager may require

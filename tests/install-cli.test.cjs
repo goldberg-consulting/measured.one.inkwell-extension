@@ -83,7 +83,7 @@ test('SIGTERM during editor installation stops its process group before the inst
   const f = fixture(t), ready = path.join(f.root, 'editor-pid'), product = path.join(f.root, 'late-editor-write');
   fs.writeFileSync(f.args.vsix, 'temporary artifact fixture');
   const fakeEditor = path.join(f.root, 'editor.cjs');
-  fs.writeFileSync(fakeEditor, `const fs=require('node:fs');fs.writeFileSync(${JSON.stringify(ready)},String(process.pid));setTimeout(()=>fs.writeFileSync(${JSON.stringify(product)},'continued'),700);setInterval(()=>{},1000);`);
+  fs.writeFileSync(fakeEditor, `if(process.argv.includes('--list-extensions'))process.exit(0);const fs=require('node:fs');fs.writeFileSync(${JSON.stringify(ready)},String(process.pid));setTimeout(()=>fs.writeFileSync(${JSON.stringify(product)},'continued'),700);setInterval(()=>{},1000);`);
   const driver = path.join(f.root, 'installer-driver.cjs');
   fs.writeFileSync(driver, `
 const Module=require('node:module');const load=Module._load;
@@ -113,4 +113,14 @@ require(${JSON.stringify(require.resolve('../out/install-cli'))}).runInstaller($
   await new Promise(resolve => setTimeout(resolve, 800));
   assert.equal(fs.existsSync(product), false, 'the editor cannot continue installing after cancellation');
   assert.doesNotMatch(log, /installation complete/);
+});
+
+test('standalone downgrade arguments require an explicit flag and consent, and defer lean setup', t => {
+  const f = fixture(t), base = [`--vsix=${f.args.vsix}`];
+  assert.equal(f.api.parseInstallerArguments(base).allowDowngrade, undefined);
+  assert.throws(() => f.api.parseInstallerArguments([...base, '--allow-downgrade']), /explicit --yes/);
+  assert.throws(() => f.api.parseInstallerArguments([...base, '--allow-downgrade', '--yes', '--uninstall']), /standalone installation/);
+  assert.throws(() => f.api.parseInstallerArguments([...base, '--profile=lean']), /Unknown installer argument/);
+  const args = f.api.parseInstallerArguments([...base, '--allow-downgrade', '--yes']);
+  assert.equal(args.allowDowngrade, true); assert.equal(args.yes, true);
 });

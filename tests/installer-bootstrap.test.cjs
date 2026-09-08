@@ -68,8 +68,19 @@ test('checksum mismatch and missing installer payload both fail before executing
   const g=fixture(t,{INKWELL_NO_INSTALLER:'1'});const missing=g.run([`--vsix=${g.artifact}`]);
   assert.notEqual(missing.status,0);assert.match(missing.stderr,/does not contain/);
 });
-test('remote bootstrap validates checksum and forwards lean profile to the same artifact installer', t => {
-  const f=fixture(t);const result=f.run(['--profile=lean']);
+test('remote bootstrap validates checksum and uses the full profile', t => {
+  const f=fixture(t);const result=f.run([]);
   assert.equal(result.status,0,result.stderr);
-  assert.ok(f.calls().some(call=>call.name==='node'&&call.args.includes('--profile=lean')));
+  assert.ok(f.calls().some(call=>call.name==='node'&&call.args.includes('--profile=full')));
+});
+test('standalone downgrade requires explicit consent before downloads or installation', t => {
+  const f=fixture(t);const refused=f.run(['--allow-downgrade']);
+  assert.equal(refused.status,2);assert.match(refused.stderr,/explicit --yes/);assert.deepEqual(f.calls(),[]);
+  const allowed=f.run([`--vsix=${f.artifact}`,'--allow-downgrade','--yes']);
+  assert.equal(allowed.status,0,allowed.stderr);
+  assert.ok(f.calls().some(call=>call.name==='node'&&call.args.includes('--allow-downgrade')&&call.args.includes('--yes')));
+});
+for (const option of ['--profile=lean','--basictex']) test(`0.5 defers unsupported ${option} without installing anything`, t => {
+  const f=fixture(t);const result=f.run([option]);
+  assert.equal(result.status,2);assert.deepEqual(f.calls(),[]);
 });
