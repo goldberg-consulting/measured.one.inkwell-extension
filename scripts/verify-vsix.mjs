@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import { inflateRawSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { ASSET_MANIFEST_PATH, CORE_ASSETS, RUNTIME_BUNDLES, RUNTIME_TREES,
-  isPrivatePath, isSafeRelativePath, isReleaseVersion, readBundledAssetPaths } from './build-asset-manifest.mjs';
+  isPrivatePath, isSafeRelativePath, isReleaseVersion, readBundledAssetPaths, verifyPreviewAssets, verifyRuntimeResourceUrls } from './build-asset-manifest.mjs';
 
 const MAX_ARCHIVE = 512 * 1024 * 1024;
 const MAX_FILE = 256 * 1024 * 1024;
@@ -118,7 +118,8 @@ export function verifyVsix(file, { tag, requiredPaths = readBundledAssetPaths() 
   const manifest = jsonEntry(entries, `extension/${ASSET_MANIFEST_PATH}`);
   requireCondition(manifest.schemaVersion === 1 && manifest.extensionVersion === packageJson.version && manifest.publisher === packageJson.publisher
     && manifest.name === packageJson.name && manifest.files && typeof manifest.files === 'object' && !Array.isArray(manifest.files), 'Asset manifest identity/schema mismatch.');
-  for (const relative of [...CORE_ASSETS, ...requiredPaths]) requireCondition(Object.hasOwn(manifest.files, relative), `Required asset is absent from contract: ${relative}`);
+  const previewPaths = verifyPreviewAssets(relative => entries.get(`extension/${relative}`));
+  for (const relative of [...CORE_ASSETS, ...requiredPaths, ...previewPaths]) requireCondition(Object.hasOwn(manifest.files, relative), `Required asset is absent from contract: ${relative}`);
   const allowedOut = new Set([...RUNTIME_BUNDLES, ASSET_MANIFEST_PATH]);
   for (const [relative, expected] of Object.entries(manifest.files)) {
     requireCondition(isSafeRelativePath(relative) && !isPrivatePath(relative) && relative !== ASSET_MANIFEST_PATH, `Unsafe asset contract path: ${relative}`);
@@ -126,11 +127,13 @@ export function verifyVsix(file, { tag, requiredPaths = readBundledAssetPaths() 
     const bytes = entries.get(`extension/${relative}`);
     requireCondition(bytes, `Missing packaged asset: ${relative}`);
     requireCondition(bytes.length === expected.size && crypto.createHash('sha256').update(bytes).digest('hex') === expected.sha256, `Asset hash/size mismatch: ${relative}`);
+    verifyRuntimeResourceUrls(relative, bytes);
   }
   for (const name of entries.keys()) {
     if (['extension.vsixmanifest', '[Content_Types].xml'].includes(name)) continue;
     requireCondition(name.startsWith('extension/'), `Unexpected archive root entry: ${name}`);
     const relative = name.slice('extension/'.length);
+    requireCondition(!relative.startsWith('media/vendor/') || previewPaths.includes(relative), `Unlisted preview vendor asset: ${relative}`);
     requireCondition(!isPrivatePath(relative), `Private/source file must not ship: ${relative}`);
     requireCondition(!relative.startsWith('out/') || allowedOut.has(relative), `Unexpected executable/build output: ${relative}`);
     const needsContract = RUNTIME_TREES.some(tree => relative.startsWith(`${tree}/`)) || relative.startsWith('out/')

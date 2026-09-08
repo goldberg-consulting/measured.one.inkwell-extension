@@ -142,6 +142,9 @@ plt.close(fig)
 
 r = np.corrcoef(x, y)[0, 1]
 print(f"n = {len(x)}, r = {r:.3f}, slope = {m:.3f}")
+print(f"::inkwell sample_n={len(x)}")
+print(f"::inkwell corr_r={r:.3f}")
+print(f"::inkwell slope={m}")
 `;
 
 export const CONVERGENCE_TABLE_PY = `import os

@@ -11,6 +11,7 @@ import * as os from "os";
 import * as crypto from "crypto";
 import { execFile } from "child_process";
 import { promisify } from "util";
+import { performance } from "perf_hooks";
 import { findDefaultsYaml, getDocumentConfig, getResolvedReferences, getInkwellProjectRoot } from "./config";
 import { DocumentConfig, Metadata, parseDocumentFrontmatter, stripResolvedConfigFields } from "./document-config";
 import { stringify as stringifyYaml } from "yaml";
@@ -26,6 +27,9 @@ import { publishPdf, validatePdf } from "./pdf-publication";
 import { hasTypographyOverride } from "./style-model";
 import { tablePdfOptions } from "./table-model";
 import { bibliographyMetadata, bibliographyService } from "./bibliography-service";
+import { texConvergenceCache, TexConvergenceRun } from "./tex-convergence";
+import { templateAssetCache } from "./template-assets";
+import { createDocumentSnapshot } from "./document-snapshot";
 
 const exec = promisify(execFile);
 
@@ -46,7 +50,7 @@ const PANDOC_EXTENSIONS = [
   "smart",
 ].join("+");
 
-const TEX_ENV = {
+const TEX_ENV: NodeJS.ProcessEnv = {
   ...process.env,
   PATH: buildTexInvocationPath(),
 };
@@ -78,6 +82,11 @@ interface CompileDetails {
 }
 
 export type CompilePhase = "preflight" | "pandoc" | "tex" | "bibliography" | "validation" | "publication" | "complete";
+export type CompilePhaseTimings = Record<Exclude<CompilePhase, "complete"> | "total", number>;
+
+function emptyPhaseTimings(): CompilePhaseTimings {
+  return { preflight: 0, pandoc: 0, tex: 0, bibliography: 0, validation: 0, publication: 0, total: 0 };
+}
 
 export interface LastSuccessfulOutput {
   pdfPath: string;
@@ -96,6 +105,10 @@ export interface CompileResult extends CompileDetails {
   message: string;
   logPath?: string;
   lastSuccessfulOutput?: LastSuccessfulOutput;
+  phaseTimingsMs: CompilePhaseTimings;
+  cacheHits: { texAuxiliary: boolean; templateAssets: boolean };
+  texPasses: number;
+  passReasons: string[];
 }
 
 interface CompileAttempt {
@@ -111,6 +124,11 @@ interface CompileAttempt {
   failure?: string;
   processLog: string[];
   lastSuccessfulOutput?: LastSuccessfulOutput;
+  phaseTimingsMs: CompilePhaseTimings;
+  cacheHits: { texAuxiliary: boolean; templateAssets: boolean };
+  texPasses: number;
+  passReasons: string[];
+  releaseTemplateAssets?: () => void;
 }
 
 export type CompileMode = "pandoc" | "xelatex";
@@ -135,6 +153,8 @@ function getCacheDir(sourceFile: string): string {
 }
 
 export function purgeAllCacheDirs(): void {
+  texConvergenceCache.clear();
+  templateAssetCache.clear();
   const root = path.join(os.tmpdir(), "inkwell-vscode");
   try {
     fs.rmSync(root, { recursive: true, force: true });
@@ -167,6 +187,8 @@ async function runCompileProcess(
   options: { cwd: string; timeout: number; env: NodeJS.ProcessEnv }
 ): Promise<{ stdout: string; stderr: string } | undefined> {
   attempt.phase = phase;
+  const started = performance.now();
+  if (phase === "tex") attempt.texPasses++;
   attempt.processLog.push(`[inkwell] ${phase}: ${command} ${args.join(" ")}`);
   try {
     const result = await executeRunProcess(command, args, { cwd: options.cwd, env: options.env, timeoutMs: options.timeout });
@@ -185,12 +207,15 @@ async function runCompileProcess(
     attempt.failure = `${phase} failed${attempt.signal ? ` (${attempt.signal})` : attempt.exitCode !== null ? ` (exit ${attempt.exitCode})` : ""}: ${err.message || String(err)}`;
     attempt.processLog.push(String(err.stdout || ""), String(err.stderr || ""), attempt.failure);
     return undefined;
+  } finally {
+    attempt.phaseTimingsMs[phase] += performance.now() - started;
   }
 }
 
 function publishCompileOutput(attempt: CompileAttempt, stagedPdf: string): boolean {
   if (attempt.failure) return false;
   attempt.phase = "validation";
+  let phaseStarted = performance.now();
   let metadata: LastSuccessfulOutput;
   try {
     validatePdf(stagedPdf);
@@ -201,9 +226,12 @@ function publishCompileOutput(attempt: CompileAttempt, stagedPdf: string): boole
       publishedAt: new Date().toISOString(),
       pdfHash: crypto.createHash("sha256").update(fs.readFileSync(stagedPdf)).digest("hex"),
     };
+    attempt.phaseTimingsMs.validation += performance.now() - phaseStarted;
     attempt.phase = "publication";
+    phaseStarted = performance.now();
     publishPdf(stagedPdf, attempt.pdfOutput);
   } catch (err: any) {
+    attempt.phaseTimingsMs[attempt.phase as "validation" | "publication"] += performance.now() - phaseStarted;
     attempt.failure = `${attempt.phase} failed: ${err.message || String(err)}`;
     attempt.processLog.push(attempt.failure);
     return false;
@@ -222,6 +250,7 @@ function publishCompileOutput(attempt: CompileAttempt, stagedPdf: string): boole
   } finally {
     if (temporary) { try { fs.unlinkSync(temporary); } catch {} }
   }
+  attempt.phaseTimingsMs.publication += performance.now() - phaseStarted;
   attempt.phase = "complete";
   return true;
 }
@@ -282,18 +311,13 @@ export function compile(
   if (existing?.signature === signature) return existing.promise;
   // All consumers in this attempt see the same document revision, including
   // template resolution after asynchronous binary discovery.
-  const snapshot = new Proxy(document, {
-    get(target, property) {
-      if (property === "getText") return () => sourceText;
-      if (property === "version") return sourceVersion;
-      return Reflect.get(target, property);
-    },
-  });
+  const snapshot = createDocumentSnapshot(document, sourceText, sourceVersion);
   const run = (async (): Promise<CompileResult> => {
     // Different revisions targeting one public file serialize, retaining their
     // captured source. Unrelated documents can compile independently.
     if (existing) await existing.promise.catch(() => undefined);
     const start = Date.now();
+    const measuredStart = performance.now();
     const sourceHash = crypto.createHash("sha256").update(sourceText).digest("hex");
     let attempt: CompileAttempt | undefined;
     let details: CompileDetails;
@@ -302,6 +326,7 @@ export function compile(
         sourceFile, sourceText, sourceVersion, sourceHash, pdfOutput,
         cacheDir: fs.mkdtempSync(path.join(getCacheDir(sourceFile), "attempt-")),
         phase: "preflight", exitCode: null, processLog: [],
+        phaseTimingsMs: emptyPhaseTimings(), cacheHits: { texAuxiliary: false, templateAssets: false }, texPasses: 0, passReasons: [],
         lastSuccessfulOutput: readLastSuccessfulOutput(sourceFile, pdfOutput),
       };
       details = detectMode(snapshot) === "xelatex"
@@ -311,6 +336,8 @@ export function compile(
       const message = `${attempt?.phase || "preflight"} failed: ${err.message || String(err)}`;
       if (attempt) attempt.failure = message;
       details = { success: false, pdfPath: undefined, errors: [{ line: undefined, message, severity: "error" }], log: message, duration: (Date.now() - start) / 1000 };
+    } finally {
+      attempt?.releaseTemplateAssets?.();
     }
     const message = details.success ? "PDF compiled successfully." : attempt?.failure || details.errors.find((error) => error.severity === "error")?.message || "Compilation failed.";
     if (!details.success && !details.errors.some((error) => error.severity === "error")) {
@@ -326,8 +353,16 @@ export function compile(
       } catch { logPath = undefined; }
       details.log = fullLog + (logPath ? `\n[inkwell] full compile log: ${logPath}` : "");
     }
+    const phaseTimingsMs = attempt?.phaseTimingsMs || emptyPhaseTimings();
+    phaseTimingsMs.total = performance.now() - measuredStart;
+    // Planning includes configuration, staging, dependency hashing, and logs.
+    // Process and publication clocks are measured directly and never overlap.
+    phaseTimingsMs.preflight = Math.max(0, phaseTimingsMs.total - phaseTimingsMs.pandoc - phaseTimingsMs.tex -
+      phaseTimingsMs.bibliography - phaseTimingsMs.validation - phaseTimingsMs.publication);
     return {
       ...details, sourceVersion, sourceHash, message, logPath,
+      phaseTimingsMs, cacheHits: attempt?.cacheHits || { texAuxiliary: false, templateAssets: false },
+      texPasses: attempt?.texPasses || 0, passReasons: attempt?.passReasons || [],
       phase: attempt?.phase || "preflight", exitCode: attempt?.exitCode ?? null,
       signal: attempt?.signal, lastSuccessfulOutput: attempt?.lastSuccessfulOutput,
     };
@@ -368,7 +403,10 @@ async function compileTeX(
   const projectRoot = getInkwellProjectRoot(sourceFile);
   copySiblingFiles(sourceDir, projectRoot, cacheDir);
   const template = getTemplateForDocument(document);
-  copySupportingFiles(template, cacheDir);
+  const support = copySupportingFiles(template, cacheDir, [sourceDir, projectRoot, path.join(sourceDir, ".inkwell"), path.join(projectRoot, ".inkwell")]);
+  const supportDir = support?.directory || cacheDir;
+  attempt.releaseTemplateAssets = support?.release;
+  attempt.cacheHits.templateAssets = support?.cacheHit || false;
   // A sibling PDF may be a resource, but cannot masquerade as this attempt's
   // output if the process exits without generating a new document.
   fs.rmSync(path.join(cacheDir, `${baseName}.pdf`), { force: true });
@@ -376,21 +414,34 @@ async function compileTeX(
   const args = [
     "-interaction=nonstopmode",
     "-halt-on-error",
+    "-recorder",
     `-output-directory=${cacheDir}`,
     tmpSource,
   ];
 
   const texEnv = {
     ...TEX_ENV,
-    TEXINPUTS: [cacheDir, template.dir, sourceDir, ""].join(":"),
+    TEXINPUTS: [cacheDir, supportDir, template.dir, sourceDir, ""].join(":"),
+    BIBINPUTS: [cacheDir, supportDir, template.dir, sourceDir, TEX_ENV.BIBINPUTS || "", ""].join(":"),
+    BSTINPUTS: [cacheDir, supportDir, template.dir, sourceDir, TEX_ENV.BSTINPUTS || "", ""].join(":"),
   };
 
   let stderr = "";
   let stdout = "";
+  const hasBib = /\\(?:bibliography|addbibresource)\s*\{/.test(document.getText());
+  const convergence = hasBib ? undefined : await texConvergenceCache.prepare({
+    directory: cacheDir, sourceDirectory: sourceDir, sourceFile,
+    sourceHash: attempt.sourceHash, texFile: tmpSource, jobName: baseName,
+    engine: xelatex, engineArgs: args, environment: texEnv,
+    templateIdentity: JSON.stringify([template.id, template.dir, template.manifest]),
+  });
+  attempt.cacheHits.texAuxiliary = convergence?.restored || false;
+  attempt.passReasons.push(hasBib ? "raw-bibliography-required" : convergence?.restored ? "verify-restored-auxiliaries" : "cold-or-invalidated-auxiliaries");
 
-  // Two passes required: the first resolves cross-references and TOC
-  // entries; the second incorporates them into the final PDF.
+  // Cold attempts use two passes. Verified auxiliary state may converge after
+  // one fresh pass; that decision never reuses a previously generated PDF.
   for (let pass = 0; pass < 2; pass++) {
+    if (pass === 1) attempt.passReasons.push("second-standard-pass-required");
     const result = await runCompileProcess(attempt, "tex", xelatex, args, {
         cwd: sourceDir,
         timeout: 120_000,
@@ -399,11 +450,16 @@ async function compileTeX(
     if (!result) break;
     stdout += result.stdout;
     stderr += result.stderr;
+    if (pass === 0 && convergence && await convergence.canFinishAfterFirstPass(
+      result.stdout + "\n" + result.stderr + "\n" + safeReadFile(path.join(cacheDir, `${baseName}.log`))
+    )) {
+      attempt.processLog.push("[inkwell] TeX auxiliary state converged after one fresh pass.");
+      attempt.passReasons.push("verified-auxiliary-convergence");
+      break;
+    }
   }
 
   // Bibliography requires an extra pass: xelatex -> biber/bibtex -> xelatex.
-  const hasBib = document.getText().includes("\\bibliography{") ||
-    document.getText().includes("\\addbibresource{");
   if (hasBib && !attempt.failure) {
     const biber = await findBinary("biber");
     const bibtex = await findBinary("bibtex");
@@ -417,6 +473,7 @@ async function compileTeX(
       // Two passes after the bib tool: the first pulls in the .bbl, the
       // second resolves the now-defined \cite labels and page references.
       for (let pass = 0; pass < 2 && !attempt.failure; pass++) {
+        attempt.passReasons.push("post-bibliography-pass-required");
         const result = await runCompileProcess(attempt, "tex", xelatex, args, {
           cwd: sourceDir,
           timeout: 120_000,
@@ -437,6 +494,7 @@ async function compileTeX(
   try {
     logContent = fs.readFileSync(logFile, "utf-8");
   } catch {}
+  if (published) await convergence?.rememberPublished(logContent);
 
   const combined = stderr + "\n" + stdout + "\n" + logContent;
   const errors = parseErrors(attempt.processLog.join("\n") + "\n" + logContent, stdout);
@@ -586,6 +644,7 @@ async function compilePandoc(
   const sourceFile = document.uri.fsPath;
   const sourceDir = path.dirname(sourceFile);
   const baseName = path.basename(sourceFile, path.extname(sourceFile));
+  const projectRoot = getInkwellProjectRoot(sourceFile);
 
   const pandoc = await findBinary("pandoc");
   if (!pandoc) {
@@ -606,7 +665,10 @@ async function compilePandoc(
   const templateName = path.basename(template.pandocTemplate);
   const templateDst = path.join(cacheDir, templateName);
   fs.copyFileSync(template.pandocTemplate, templateDst);
-  copySupportingFiles(template, cacheDir);
+  const support = copySupportingFiles(template, cacheDir, [sourceDir, projectRoot, path.join(sourceDir, ".inkwell"), path.join(projectRoot, ".inkwell")]);
+  const supportDir = support?.directory || cacheDir;
+  attempt.releaseTemplateAssets = support?.release;
+  attempt.cacheHits.templateAssets = support?.cacheHit || false;
 
   // The manifest engine is a hard requirement, never a preference.
   // pdflatex-only templates (tufte, rho, rmxaa, tmsce, kth-letter,
@@ -698,8 +760,7 @@ async function compilePandoc(
   else if (ext === ".org") fromFormat = "org";
   else if (ext === ".txt") fromFormat = `markdown+${PANDOC_EXTENSIONS}`;
 
-  const projectRoot = getInkwellProjectRoot(sourceFile);
-  const resourcePath = [cacheDir, template.dir, sourceDir, projectRoot].join(":");
+  const resourcePath = [cacheDir, supportDir, template.dir, sourceDir, projectRoot].join(":");
 
   const pandocArgs = [
     tmpSource,
@@ -829,10 +890,12 @@ async function compilePandoc(
   // files that live in the cache dir, the template's own directory (for
   // subdirectory-structured classes like rmaa-rho-class/), or beside
   // the source document. The trailing colon preserves default TeX paths.
-  const texInputs = [cacheDir, template.dir, sourceDir, projectRoot, ""].join(":");
+  const texInputs = [cacheDir, supportDir, template.dir, sourceDir, projectRoot, ""].join(":");
   const texEnv = {
     ...TEX_ENV,
     TEXINPUTS: texInputs,
+    BIBINPUTS: [cacheDir, supportDir, template.dir, sourceDir, projectRoot, TEX_ENV.BIBINPUTS || "", ""].join(":"),
+    BSTINPUTS: [cacheDir, supportDir, template.dir, sourceDir, projectRoot, TEX_ENV.BSTINPUTS || "", ""].join(":"),
   };
 
   const clsExpected = path.join(template.dir, "rmaa-rho-class", "rmaa-rho.cls");
@@ -869,6 +932,7 @@ async function compilePandoc(
 
   const texExists = fs.existsSync(tmpTex);
   let logContent = "";
+  let convergence: TexConvergenceRun | undefined;
 
   // Stage 2: engine -> .pdf, run twice to resolve cross-references.
   // A failed Pandoc callback is authoritative even if it left a TeX file.
@@ -876,11 +940,22 @@ async function compilePandoc(
     const engineArgs = [
       "-interaction=nonstopmode",
       "-halt-on-error",
+      "-recorder",
       `-output-directory=${cacheDir}`,
       tmpTex,
     ];
+    const hasBib = /\\(?:bibliography|addbibresource)\s*\{/.test(fs.readFileSync(tmpTex, "utf8"));
+    if (!hasBib) convergence = await texConvergenceCache.prepare({
+      directory: cacheDir, sourceDirectory: sourceDir, sourceFile,
+      sourceHash: attempt.sourceHash, texFile: tmpTex, jobName: baseName,
+      engine, engineArgs, environment: texEnv,
+      templateIdentity: JSON.stringify([template.id, template.dir, template.manifest]),
+    });
+    attempt.cacheHits.texAuxiliary = convergence?.restored || false;
+    attempt.passReasons.push(hasBib ? "raw-bibliography-required" : convergence?.restored ? "verify-restored-auxiliaries" : "cold-or-invalidated-auxiliaries");
 
     for (let pass = 0; pass < 2; pass++) {
+      if (pass === 1) attempt.passReasons.push("second-standard-pass-required");
       stdout += `\n[inkwell] ${engine} pass ${pass + 1}: ${engine} ${engineArgs.join(" ")}\n`;
       const result = await runCompileProcess(attempt, "tex", engine, engineArgs, {
           cwd: sourceDir,
@@ -890,6 +965,13 @@ async function compilePandoc(
       if (!result) break;
       stdout += result.stdout;
       stderr += result.stderr;
+      if (pass === 0 && convergence && await convergence.canFinishAfterFirstPass(
+        result.stdout + "\n" + result.stderr + "\n" + safeReadFile(path.join(cacheDir, `${baseName}.log`))
+      )) {
+        attempt.processLog.push("[inkwell] TeX auxiliary state converged after one fresh pass.");
+        attempt.passReasons.push("verified-auxiliary-convergence");
+        break;
+      }
     }
 
     // Bibliography handling for the raw-\cite path. Pandoc's
@@ -900,8 +982,6 @@ async function compilePandoc(
     // macro in the generated .tex and run biber/bibtex + one more
     // engine pass in that case.
     if (!attempt.failure) {
-      const texContent = fs.readFileSync(tmpTex, "utf-8");
-      const hasBib = /\\(bibliography|addbibresource)\{/.test(texContent);
       if (hasBib) {
         const biber = await findBinary("biber");
         const bibtex = await findBinary("bibtex");
@@ -915,6 +995,7 @@ async function compilePandoc(
           // Two passes after the bib tool so the .bbl is pulled in and the
           // resulting \cite / page references resolve in the same compile.
           for (let pass = 0; pass < 2 && !attempt.failure; pass++) {
+            attempt.passReasons.push("post-bibliography-pass-required");
             const r = await runCompileProcess(attempt, "tex", engine, engineArgs, {
               cwd: sourceDir,
               timeout: 90_000,
@@ -935,6 +1016,7 @@ async function compilePandoc(
   }
 
   const published = publishCompileOutput(attempt, tmpOutput);
+  if (published) await convergence?.rememberPublished(logContent);
 
   const errors = [
     ...featureCheck.warnings,

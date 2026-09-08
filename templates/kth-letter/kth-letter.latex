@@ -59,8 +59,8 @@
 \providecommand{\listfigurename}{List of Figures}
 \providecommand{\listtablename}{List of Tables}
 \makeatletter
-\newcommand{\section}[1]{\par\vspace{0.9\baselineskip}\noindent\textbf{\large #1}\par\vspace{0.45\baselineskip}}
-\newcommand{\subsection}[1]{\par\vspace{0.6\baselineskip}\noindent\textbf{#1}\par\vspace{0.3\baselineskip}}
+\NewDocumentCommand{\section}{s m}{\par\vspace{0.9\baselineskip}\noindent\textbf{\large #2}\par\vspace{0.45\baselineskip}}
+\NewDocumentCommand{\subsection}{s m}{\par\vspace{0.6\baselineskip}\noindent\textbf{#2}\par\vspace{0.3\baselineskip}}
 \makeatother
 
 $if(name)$\name{$name$}$endif$

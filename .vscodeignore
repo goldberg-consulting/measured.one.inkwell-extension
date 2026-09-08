@@ -23,7 +23,7 @@ out/**
 !out/doctor-cli.js
 !out/install-cli.js
 !out/smoke-cli.js
-!out/asset-manifest.json
+!out/assets-manifest.json
 .cursor/**
 # Keep the agent guide that ships with the extension (consumed by the
 # Setup Workspace command when .cursor/agents/ exists in the user's

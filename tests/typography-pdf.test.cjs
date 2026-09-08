@@ -5,6 +5,7 @@ const path = require('node:path');
 const os = require('node:os');
 const cp = require('node:child_process');
 const Module = require('node:module');
+const { selectPackagedCompiler, checkPdfGolden } = require('./helpers/pdf-goldens.cjs');
 const { resolveDocumentConfig } = require('../out/document-config');
 const { resolveTypography, TEX_POINT_TO_CSS_POINT } = require('../out/style-model');
 
@@ -20,6 +21,7 @@ test('actual Default and ETH PDFs agree with shared point sizes and preserve lay
   Module._load = function (name, ...rest) { return name === 'vscode' ? headless : originalLoad.call(this, name, ...rest); };
   let compile;
   try { ({ compile } = require('../out/compiler')); } finally { Module._load = originalLoad; }
+  compile = selectPackagedCompiler(root, compile);
   fs.mkdirSync(path.join(root, '.inkwell'));
   fs.writeFileSync(path.join(root, '.inkwell/manifest.json'), '{"schemaVersion":4,"defaults":{},"managedFiles":{}}');
   const evidence = [];
@@ -30,6 +32,7 @@ test('actual Default and ETH PDFs agree with shared point sizes and preserve lay
     const result = await compile({ uri: headless.Uri.file(file), languageId: 'markdown', version: 1, isUntitled: false, getText: () => text });
     fs.writeFileSync(path.join(root, `${template}-${classSize}.result.json`), JSON.stringify(result, null, 2));
     assert.equal(result.success, true, `${result.message}; ${result.logPath}`);
+    checkPdfGolden({ id: `typography-${template}-${classSize}`, template, sourcePath: file, pdfPath: result.pdfPath, logPath: result.logPath });
     const probe = cp.spawnSync(process.env.INKWELL_PDF_PYTHON || 'python3', ['-c', `import fitz,json,sys\ndoc=fitz.open(sys.argv[1])\nprint(json.dumps([dict(s,page=i+1) for i,p in enumerate(doc) for b in p.get_text('dict')['blocks'] if 'lines' in b for l in b['lines'] for s in l['spans']]))`, result.pdfPath], { encoding: 'utf8' });
     assert.equal(probe.status, 0, probe.stderr);
     const spans = JSON.parse(probe.stdout);

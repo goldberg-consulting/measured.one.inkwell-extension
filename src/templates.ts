@@ -8,6 +8,8 @@ import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
 import { findInkwellRoot, getDocumentConfig } from "./config";
+import { TemplateAssetLease, templateAssetCache } from "./template-assets";
+import { ResolutionSnapshot, freezeResolution, resolutionCache } from "./resolution-cache";
 
 export type PdfEngine = "xelatex" | "pdflatex" | "lualatex";
 
@@ -66,135 +68,88 @@ function builtinTemplatesDir(): string {
   return path.join(__dirname, "..", "templates");
 }
 
-function projectTemplatesDir(
-  documentUri: vscode.Uri
-): string | undefined {
-  const root = findInkwellRoot(documentUri);
-  if (!root) return undefined;
-  const dir = path.join(root, ".inkwell", "templates");
-  return fs.existsSync(dir) ? dir : undefined;
-}
-
-function readManifest(templateDir: string, fallbackId: string): TemplateManifest {
+function readManifest(templateDir: string, fallbackId: string, snapshot: ResolutionSnapshot): TemplateManifest {
   const manifestPath = path.join(templateDir, "template.json");
+  if (!snapshot.file(manifestPath, templateDir)) return { name: fallbackId };
   try {
-    const raw = fs.readFileSync(manifestPath, "utf-8");
-    const parsed = JSON.parse(raw);
-    return { name: parsed.name || fallbackId, ...parsed };
-  } catch {
+    const descriptor = fs.openSync(manifestPath, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
+    try {
+      const parsed = JSON.parse(fs.readFileSync(descriptor, "utf-8"));
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? { ...parsed, name: parsed.name || fallbackId } : { name: fallbackId };
+    } finally { fs.closeSync(descriptor); }
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) snapshot.cacheable = false;
     return { name: fallbackId };
   }
 }
 
-function findPandocTemplate(templateDir: string): string | undefined {
-  const entries = fs.readdirSync(templateDir);
-  const latex = entries.find((f) => f.endsWith(".latex"));
-  if (latex) return path.join(templateDir, latex);
-  const tex = entries.find(
-    (f) => f.endsWith(".tex") && f.startsWith("template")
-  );
-  if (tex) return path.join(templateDir, tex);
-  return undefined;
-}
-
-function findSupportingFiles(templateDir: string): string[] {
-  const files: string[] = [];
-  const walk = (dir: string) => {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        walk(full);
-      } else if (
-        SUPPORTING_EXTENSIONS.has(path.extname(entry.name).toLowerCase()) &&
-        !entry.name.endsWith(".latex")
-      ) {
-        files.push(full);
+function scanTemplate(templateDir: string, id: string, snapshot: ResolutionSnapshot): { manifest: TemplateManifest; pandocTemplate?: string; supportingFiles: string[] } {
+  const supportingFiles: string[] = [], candidates: string[] = [];
+  const walk = (directory: string) => {
+    if (!snapshot.directory(directory, templateDir)) return;
+    try {
+      for (const entry of fs.readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+        const full = path.join(directory, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (snapshot.file(full, templateDir)) {
+          if (directory === templateDir && (entry.name.endsWith(".latex") || (entry.name.startsWith("template") && entry.name.endsWith(".tex")))) candidates.push(full);
+          if (SUPPORTING_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) supportingFiles.push(full);
+        }
       }
-    }
+    } catch { snapshot.cacheable = false; }
   };
   walk(templateDir);
-  return files;
+  return { manifest: readManifest(templateDir, id, snapshot), pandocTemplate: candidates.find(file => file.endsWith(".latex")) || candidates[0], supportingFiles };
 }
 
-function scanDir(dir: string): Map<string, string> {
+function scanDir(directory: string, boundary: string, snapshot: ResolutionSnapshot): Map<string, string> {
   const templates = new Map<string, string>();
-  if (!fs.existsSync(dir)) return templates;
-
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (entry.isDirectory() && !entry.name.startsWith(".")) {
-      templates.set(entry.name, path.join(dir, entry.name));
+  // A selected project/home boundary may be an intentional root alias. Keep
+  // its identity observed, then validate ordinary child directories against
+  // the physical boundary; selected templates and support dirs stay strict.
+  const physicalBoundary = snapshot.inspect(boundary, false).realPath;
+  if (!physicalBoundary || !snapshot.directory(directory, physicalBoundary)) return templates;
+  try {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const full = path.join(directory, entry.name);
+      if (entry.isDirectory() && !entry.name.startsWith(".") && snapshot.directory(full, directory)) templates.set(entry.name, full);
     }
-  }
+  } catch { snapshot.cacheable = false; }
   return templates;
 }
 
-export function listTemplates(
-  documentUri?: vscode.Uri
-): Map<string, ResolvedTemplate> {
-  const result = new Map<string, ResolvedTemplate>();
-
-  const builtinDir = builtinTemplatesDir();
-  const defaultTemplate = path.join(builtinDir, "inkwell.latex");
-  if (fs.existsSync(defaultTemplate)) {
-    const defaultEntry: ResolvedTemplate = {
-      id: "inkwell",
-      manifest: { name: "Inkwell Default", description: "Clean single-column article with theorem environments, code highlighting, and title page", engine: "xelatex" },
-      dir: builtinDir,
-      pandocTemplate: defaultTemplate,
-      supportingFiles: [],
-    };
-    result.set("inkwell", defaultEntry);
-    result.set("default", { ...defaultEntry, id: "default" });
-  }
-
-  for (const [id, dir] of scanDir(builtinDir)) {
-    if (result.has(id)) continue;
-    const manifest = readManifest(dir, id);
-    const pandocTemplate = findPandocTemplate(dir);
-    result.set(id, {
-      id,
-      manifest,
-      dir,
-      pandocTemplate: pandocTemplate || defaultTemplate,
-      supportingFiles: findSupportingFiles(dir),
-    });
-  }
-
-  // The installation smoke process verifies packaged templates independently of
-  // any user-global overrides. Ordinary editor compilation keeps those overrides.
-  const globalEntries = process.env.INKWELL_HEADLESS === "1" ? new Map<string, string>() : scanDir(globalTemplatesDir());
-  for (const [id, dir] of globalEntries) {
-    const manifest = readManifest(dir, id);
-    const pandocTemplate = findPandocTemplate(dir);
-    if (!pandocTemplate && result.has(id)) continue;
-    result.set(id, {
-      id,
-      manifest,
-      dir,
-      pandocTemplate: pandocTemplate || defaultTemplate,
-      supportingFiles: findSupportingFiles(dir),
-    });
-  }
-
-  if (documentUri) {
-    const projDir = projectTemplatesDir(documentUri);
-    if (projDir) {
-      for (const [id, dir] of scanDir(projDir)) {
-        const manifest = readManifest(dir, id);
-        const pandocTemplate = findPandocTemplate(dir);
-        if (!pandocTemplate && result.has(id)) continue;
-        result.set(id, {
-          id,
-          manifest,
-          dir,
-          pandocTemplate: pandocTemplate || defaultTemplate,
-          supportingFiles: findSupportingFiles(dir),
-        });
+export function listTemplates(documentUri?: vscode.Uri): Map<string, ResolvedTemplate> {
+  resolutionCache.start();
+  const builtinDir = builtinTemplatesDir(), globalDir = globalTemplatesDir();
+  // Nearest-root template policy intentionally differs from artifact workspace
+  // preference. Root resolution also observes missing nested .inkwell markers.
+  const projectRoot = documentUri ? findInkwellRoot(documentUri) : undefined;
+  const headless = process.env.INKWELL_HEADLESS === "1";
+  const entries = resolutionCache.get(`templates:${JSON.stringify([builtinDir, globalDir, projectRoot, headless])}`, snapshot => {
+    const result = new Map<string, ResolvedTemplate>();
+    const defaultTemplate = path.join(builtinDir, "inkwell.latex");
+    if (snapshot.directory(builtinDir) && snapshot.file(defaultTemplate, builtinDir)) {
+      const defaultEntry: ResolvedTemplate = {
+        id: "inkwell", manifest: { name: "Inkwell Default", description: "Clean single-column article with theorem environments, code highlighting, and title page", engine: "xelatex" },
+        dir: builtinDir, pandocTemplate: defaultTemplate, supportingFiles: [],
+      };
+      result.set("inkwell", defaultEntry); result.set("default", { ...defaultEntry, id: "default" });
+    }
+    const sources: [string, string, boolean][] = [[builtinDir, builtinDir, true]];
+    if (!headless) sources.push([globalDir, os.homedir(), false]);
+    if (projectRoot) sources.push([path.join(projectRoot, ".inkwell", "templates"), projectRoot, false]);
+    for (const [directory, boundary, builtin] of sources) {
+      for (const [id, dir] of scanDir(directory, boundary, snapshot)) {
+        if (builtin && result.has(id)) continue;
+        const scanned = scanTemplate(dir, id, snapshot);
+        if (!builtin && !scanned.pandocTemplate && result.has(id)) continue;
+        result.set(id, { id, dir, ...scanned, pandocTemplate: scanned.pandocTemplate || defaultTemplate });
       }
     }
-  }
-
-  return result;
+    return freezeResolution([...result.entries()]);
+  });
+  // Freezing a Map does not protect its entries: callers get a fresh container.
+  return new Map(entries);
 }
 
 export function resolveTemplate(
@@ -234,14 +189,27 @@ export function getTemplateForDocument(
 
 export function copySupportingFiles(
   template: ResolvedTemplate,
-  targetDir: string
-): void {
+  targetDir: string,
+  resourceRoots: readonly string[] = []
+): TemplateAssetLease {
+  const builtins = builtinTemplatesDir();
+  const relative = path.relative(builtins, template.dir);
+  const isBuiltin = relative === "" || (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+  // If a project supplies a colliding resource, retain the exact existing
+  // per-attempt copy/override behavior instead of changing search precedence.
+  const hasCollision = template.supportingFiles.some(file => resourceRoots.some(root =>
+    fs.existsSync(path.join(root, path.relative(template.dir, file)))));
+  if (isBuiltin && !hasCollision) {
+    const lease = templateAssetCache.acquire(template.dir, template.supportingFiles);
+    if (lease) return lease;
+  }
   for (const file of template.supportingFiles) {
     const relative = path.relative(template.dir, file);
     const dest = path.join(targetDir, relative);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.copyFileSync(file, dest);
   }
+  return { directory: targetDir, cacheHit: false, release() {} };
 }
 
 export function collectAllFeatures(

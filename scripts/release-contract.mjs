@@ -92,6 +92,16 @@ export function updateTapCask(source, version, sha256) {
   return replace(replace(source, 'version', version), 'sha256', sha256);
 }
 
+/** The audited candidate tree may change only its release metadata for promotion. */
+export function promoteTapCandidate(source, version, sha256, releaseCommit) {
+  if (!/^[a-f0-9]{40}$/.test(releaseCommit)) throw new Error('The audited candidate needs an exact release commit.');
+  const canonical = 'https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/download/v#{version}/inkwell-#{version}.vsix';
+  const candidate = `https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/download/inkwell-rc-${releaseCommit}/inkwell-${version}.vsix`;
+  const urls = [...source.matchAll(/^(\s*url\s+)(["'])([^"'\r\n]+)\2([^\r\n]*)$/gm)];
+  if (urls.length !== 1 || ![candidate, canonical].includes(urls[0][3])) throw new Error('The audited tap URL does not match this immutable RC or its canonical final URL.');
+  return updateTapCask(source.replace(urls[0][0], `${urls[0][1]}"${canonical}"${urls[0][4]}`), version, sha256);
+}
+
 export function validateTapContract(root) {
   root = path.resolve(root);
   const caskPath = path.join(root, 'Casks/inkwell.rb');
@@ -154,16 +164,17 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     } else if (command === 'verify-tap' && args.length === 1) {
       verifyTapLifecycle(path.resolve(args[0]));
       console.log('The Homebrew cask syntax and mocked shared-installer lifecycle tests passed.');
-    } else if (command === 'tap' && args.length === 3) {
-      const [file, version, checksumFile] = args;
+    } else if (command === 'tap' && args.length === 3 || command === 'promote-tap' && args.length === 4) {
+      const [file, version, checksumFile, releaseCommit] = args;
       if (!validVersion(version)) throw new Error('The tap release version is invalid.');
       const entries = fs.readFileSync(checksumFile, 'utf8').trim().split(/\r?\n/).map(line => line.split(/\s+/)).filter(([, name]) => name === `inkwell-${version}.vsix`);
       if (entries.length !== 1) throw new Error('SHA256SUMS must identify exactly one matching release artifact.');
-      const updated = updateTapCask(fs.readFileSync(file, 'utf8'), version, entries[0][0]);
+      const source = fs.readFileSync(file, 'utf8');
+      const updated = command === 'promote-tap' ? promoteTapCandidate(source, version, entries[0][0], releaseCommit) : updateTapCask(source, version, entries[0][0]);
       const temporary = `${file}.${crypto.randomUUID()}.tmp`;
       try { fs.writeFileSync(temporary, updated, { flag: 'wx' }); fs.renameSync(temporary, file); }
       finally { fs.rmSync(temporary, { force: true }); }
       console.log('Prepared the matching Homebrew cask update.');
-    } else throw new Error('Usage: release-contract.mjs preflight | checksums FILE.vsix vVERSION | verify-published FILE.vsix SHA256SUMS vVERSION | notes pending|complete RELEASE_JSON vVERSION OUTPUT | verify-tap TAP_ROOT | tap CASK VERSION SHA256SUMS');
+    } else throw new Error('Usage: release-contract.mjs preflight | checksums FILE.vsix vVERSION | verify-published FILE.vsix SHA256SUMS vVERSION | notes pending|complete RELEASE_JSON vVERSION OUTPUT | verify-tap TAP_ROOT | tap CASK VERSION SHA256SUMS | promote-tap CASK VERSION SHA256SUMS RELEASE_COMMIT');
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

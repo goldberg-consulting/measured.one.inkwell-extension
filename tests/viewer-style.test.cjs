@@ -1,3 +1,4 @@
+const { clientProgram } = require('./preview-client-helper.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -76,7 +77,7 @@ function host(t, settings = {}, workspaceValues = new Map()) {
 }
 
 /** Runs the shipped client program without loading external scripts or project files. */
-function client(shell, savedState) {
+function client(shell, savedState, options = {}) {
   const elements = new Map(), messages = [], states = [], windowListeners = new Map();
   class Element {
     constructor(tag = 'div') {
@@ -128,7 +129,7 @@ function client(shell, savedState) {
     setTimeout() {}, clearTimeout() {}, requestAnimationFrame() {}, getComputedStyle: element => element.style,
     atob: value => Buffer.from(value, 'base64').toString('binary'), Uint8Array,
   };
-  const program = [...shell.matchAll(/<script nonce="[^"]+">([\s\S]*?)<\/script>/g)].at(-1)[1];
+  const program = clientProgram(shell, options);
   vm.runInNewContext(program, context);
   return { element: getElement, document, messages, states, state, tabs,
     send: data => windowListeners.get('message')({ data }), click: id => getElement(id).click() };
@@ -151,16 +152,11 @@ test('viewer state normalizes accessibility scale independently of PDF zoom and 
   assert.equal(readViewerState(undefined, 130, 'pdf').selectedTab, 'pdf');
 });
 
-test('the minified release viewer runtime remains self-contained inside the webview', t => {
-  const esbuild = require('esbuild');
-  const bundle = esbuild.buildSync({ entryPoints: [path.join(extensionRoot, 'src', 'viewer-state.ts')],
-    bundle: true, minify: true, write: false, format: 'cjs', platform: 'node', target: 'node18' });
-  const module = { exports: {} };
-  vm.runInNewContext(bundle.outputFiles[0].text, { module, exports: module.exports });
-  const runtime = module.exports.viewerStateRuntime.toString();
+test('the minified release client includes and executes the shared viewer-state module', t => {
   const h = host(t), shell = h.shell();
-  assert.ok(shell.includes(viewerStateRuntime.toString()), 'shell must embed the self-contained shared runtime');
-  const c = client(shell.replace(viewerStateRuntime.toString(), runtime));
+  assert.match(shell, /src="[^"]*preview-client\.js"/, 'shell must use the local bundled client');
+  assert.ok(!shell.includes(viewerStateRuntime.toString()), 'runtime belongs in the tested client module');
+  const c = client(shell, undefined, { minify: true });
   c.click('font-increase'); assert.equal(c.state.value.fontScale, 110);
   assert.equal(c.element('article-content').style.zoom, '1.1');
   c.click('font-reset'); assert.equal(c.state.value.fontScale, 100);
@@ -271,7 +267,7 @@ test('browser PDF fit follows pane resizing and custom zoom keeps both page edge
   const h = host(t), shell = h.shell();
   const css = [...shell.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(match => match[1]).join('\n');
   const body = shell.match(/<body[^>]*>([\s\S]*?)<\/body>/)[1].replace(/<script\b[\s\S]*?<\/script>/g, '');
-  const program = [...shell.matchAll(/<script nonce="[^"]+">([\s\S]*?)<\/script>/g)].at(-1)[1];
+  const program = clientProgram(shell);
   const fixture = path.join(h.root, 'viewer.html');
   const stub = `
     window.viewerMeasurements = { renders: [] };

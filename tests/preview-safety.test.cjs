@@ -1,3 +1,4 @@
+const { clientProgram } = require('./preview-client-helper.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -85,6 +86,7 @@ function client(provider, webview, globals = {}) {
       };
     }
     appendChild(child) { child.parentNode = this; this.children.push(child); if (child.id) elements.set(child.id, child); return child; }
+    insertBefore(child, before) { child.parentNode = this; const index = this.children.indexOf(before); this.children.splice(index < 0 ? this.children.length : index, 0, child); if (child.id) elements.set(child.id, child); return child; }
     remove() { if (this.parentNode) this.parentNode.children = this.parentNode.children.filter((c) => c !== this); }
     querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
     querySelectorAll(selector) { return this.children.filter((c) => selector.startsWith('.') && c.classList.contains(selector.slice(1))); }
@@ -103,7 +105,7 @@ function client(provider, webview, globals = {}) {
     atob: (data) => Buffer.from(data, 'base64').toString('binary'), Uint8Array, ...globals,
   };
   const shell = provider.buildShell(webview, true);
-  const program = [...shell.matchAll(/<script nonce="[^"]+">([\s\S]*?)<\/script>/g)].at(-1)[1];
+  const program = clientProgram(shell);
   vm.runInNewContext(program, context);
   let identity = { revision: 1, documentUri: 'file:///test.md', sourceVersion: 1 };
   return { element: document.getElementById, send: (data) => {
@@ -140,7 +142,7 @@ test('blocked readiness clears a switched preview without rendering or compiling
   assert.equal(renders, 0);
   assert.equal(compiles, 0);
   const update = h.messages.find(message => message.type === 'updateContent');
-  assert.equal(update.pdfData, null);
+  assert.equal(update.pdfUri, null);
   assert.doesNotMatch(update.html, /private unconfigured/);
 });
 
@@ -243,6 +245,38 @@ test('a delayed compile from A cannot send PDF or errors to document B', async (
   assert.equal(h.messages.length, 0);
 });
 
+test('an obsolete compile cannot publish diagnostics after its document changes', async t => {
+  const slow = deferred(); const h = host(t, undefined, () => slow.promise); const diagnostics = [];
+  h.provider.setDiagnostics({ report: (...arguments_) => diagnostics.push(arguments_) });
+  const document = h.document('changing.md', 'old', 1);
+  h.provider.currentDocument = document; await h.provider.sendContentUpdate(document);
+  const compiling = h.provider.handleCompile();
+  document.version = 2; document.getText = () => 'new';
+  slow.resolve({ success: false, errors: [{ severity: 'error', message: 'obsolete' }], duration: 1, log: 'old' });
+  await compiling;
+  assert.deepEqual(diagnostics, []);
+});
+
+test('preview routes every captured document through its compile coordinator adapter', async t => {
+  const slow = deferred(), calls = [];
+  const h = host(t, undefined, async () => { throw new Error('Shared adapter was bypassed'); });
+  h.provider.onCompile = async document => {
+    calls.push(path.basename(document.uri.fsPath));
+    if (calls.length === 1) await slow.promise;
+    return { success: false, errors: [], duration: 0, log: '' };
+  };
+  const promises = [];
+  for (const name of ['a.md', 'b.md', 'c.md']) {
+    const document = h.document(name, name);
+    h.provider.currentDocument = document;
+    await h.provider.sendContentUpdate(document);
+    promises.push(h.provider.handleCompile());
+  }
+  slow.resolve(); await Promise.all(promises);
+  assert.deepEqual(calls, ['a.md', 'b.md', 'c.md']);
+  assert.ok(h.messages.filter(message => message.type === 'compileDone').every(message => message.documentUri.endsWith('/c.md')));
+});
+
 test('run events retain their source identity across document switches and newer runs', async (t) => {
   const h = host(t);
   const a = h.document('a.md', 'A');
@@ -271,6 +305,8 @@ test('a null PDF invalidates an in-flight PDF.js load', async (t) => {
   let destroyed = 0;
   const c = client(h.provider, h.webview, { pdfjsLib: { GlobalWorkerOptions: {}, getDocument: () => ({ promise: load.promise }) } });
   c.send({ type: 'updateContent', html: 'A', pdfData: 'b2xk' });
+  await Promise.resolve();
+  await Promise.resolve();
   c.send({ type: 'updateContent', html: 'B', pdfData: null });
   load.resolve({ destroy() { destroyed++; }, numPages: 1, getPage() { throw new Error('stale PDF page must not load'); } });
   await new Promise((resolve) => setImmediate(resolve));
@@ -323,7 +359,8 @@ test('a failed same-document compile retains and labels its last successful PDF'
   for (const message of h.messages) c.send(message);
   const done = h.messages.find((m) => m.type === 'compileDone');
   assert.equal(done.success, false);
-  assert.equal(Buffer.from(done.pdfData, 'base64').toString(), 'last good PDF');
+  assert.match(done.pdfUri, /a\.pdf\?inkwellPdf=/);
+  assert.equal(done.pdfData, undefined);
   assert.match(c.element('pdf-output-status').textContent, /Last successful output.*source version 1/);
   assert.match(c.element('pdf-output-status').textContent, /2026/);
 });
@@ -350,6 +387,167 @@ test('a failed compile preserves an existing PDF when its provenance metadata is
   await h.provider.handleCompile();
   for (const message of h.messages) c.send(message);
   const done = h.messages.find(m => m.type === 'compileDone');
-  assert.equal(Buffer.from(done.pdfData, 'base64').toString(), 'existing PDF');
+  assert.match(done.pdfUri, /a\.pdf\?inkwellPdf=/);
+  assert.equal(done.pdfData, undefined);
   assert.match(c.element('pdf-output-status').textContent, /Existing PDF.*unavailable/);
+});
+
+test('PDF updates use stable asynchronous local resources without reading or sending PDF bytes', async t => {
+  const h = host(t);
+  const document = h.document('resource.md', 'Draft text');
+  const pdfPath = path.join(h.root, 'resource.pdf');
+  fs.writeFileSync(pdfPath, 'last good PDF');
+  const originalRead = fs.readFileSync;
+  fs.readFileSync = function(file, ...args) {
+    if (String(file) === pdfPath) throw new Error('Preview must never synchronously read PDF bytes');
+    return originalRead.call(this, file, ...args);
+  };
+  try {
+    h.provider.currentDocument = document;
+    await h.provider.sendContentUpdate(document);
+    await h.provider.sendContentUpdate(document);
+    const updates = h.messages.filter(message => message.type === 'updateContent');
+    assert.match(updates[0].pdfUri, /resource\.pdf\?inkwellPdf=/);
+    assert.equal(updates[0].pdfUri, updates[1].pdfUri);
+    assert.equal(Object.hasOwn(updates[0], 'pdfData'), false);
+    fs.writeFileSync(pdfPath, 'replacement PDF with changed size');
+    await h.provider.sendContentUpdate(document);
+    assert.notEqual(h.messages.filter(message => message.type === 'updateContent').at(-1).pdfUri, updates[0].pdfUri);
+  } finally { fs.readFileSync = originalRead; }
+});
+
+test('a PDF symlink outside the document directory is never exposed as a webview resource', async t => {
+  const h = host(t);
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'inkwell-outside-pdf-'));
+  t.after(() => fs.rmSync(outside, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(outside, 'private.pdf'), 'private');
+  fs.symlinkSync(path.join(outside, 'private.pdf'), path.join(h.root, 'escape.pdf'));
+  const document = h.document('escape.md', 'Safe document');
+  h.provider.currentDocument = document;
+  await h.provider.sendContentUpdate(document);
+  assert.equal(h.messages.find(message => message.type === 'updateContent').pdfUri, null);
+});
+
+test('rapid edit bursts perform one final render and publish only the newest revision', async t => {
+  let renders = 0;
+  const h = host(t, async body => { renders++; return emptyCitations(body); });
+  const document = h.document('typing.md', 'draft');
+  let text = '';
+  document.getText = () => text;
+  h.provider.currentDocument = document;
+  for (let version = 1; version <= 30; version++) {
+    document.version = version; text = `Latest draft ${version}`;
+    h.provider.scheduleUpdate(document);
+  }
+  t.after(() => clearTimeout(h.provider.throttle));
+  await new Promise(resolve => setTimeout(resolve, 220));
+  const updates = h.messages.filter(message => message.type === 'updateContent');
+  assert.equal(renders, 1); assert.equal(updates.length, 1);
+  assert.equal(updates[0].sourceVersion, 30);
+  assert.match(updates[0].html, /Latest draft 30/);
+});
+
+test('ordinary draft text appears before optional citations finish and cannot outlive its source', async t => {
+  const pending = deferred();
+  const h = host(t, () => pending.promise);
+  const document = h.document('cited.md', 'Immediate prose with @smith2024.');
+  h.provider.currentDocument = document;
+  const rendering = h.provider.sendContentUpdate(document);
+  await Promise.resolve();
+  const draft = h.messages.find(message => message.type === 'draftContent');
+  assert.match(draft.html, /Immediate prose/);
+  assert.match(draft.featureStatus, /Resolving references/);
+  assert.equal(h.messages.some(message => message.type === 'updateContent'), false);
+  pending.resolve(emptyCitations('Immediate prose with resolved citation.'));
+  await rendering;
+  assert.match(h.messages.find(message => message.type === 'updateContent').html, /resolved citation/);
+});
+
+test('the actual sanitized preview pipeline restores math and retains the approximate citation notice', async t => {
+  const h = host(t, async body => ({ ...emptyCitations(body), approximate: true }));
+  const document = h.document('safe-math.md', '$a < b$\n\n$$c^2 = a^2 + b^2$$\n\nSee @smith2024.\n\n<script>privateScript()</script>\n');
+  h.provider.currentDocument = document;
+  await h.provider.sendContentUpdate(document);
+  const final = h.messages.find(message => message.type === 'updateContent').html;
+  assert.match(final, /<span data-inkwell-math="0">\$\$c\^2 = a\^2 \+ b\^2\$\$<\/span>|<div class="math-display" data-inkwell-math="0">\$\$c\^2 = a\^2 \+ b\^2\$\$<\/div>/);
+  assert.match(final, /<span data-inkwell-math="1">\$a &lt; b\$<\/span>/);
+  assert.match(final, /<aside class="citation-preview-notice">Approximate citation preview:/);
+  assert.doesNotMatch(final, /INKWELLMATHPLACEHOLDER|privateScript|<script/);
+  const early = h.messages.find(message => message.type === 'draftContent').html;
+  assert.doesNotMatch(early, /INKWELLMATHPLACEHOLDER|privateScript|<script/);
+});
+
+test('a stopped watcher cannot publish its delayed refresh, while a later manual render remains current', async t => {
+  const pending = deferred();
+  let first = true;
+  const h = host(t, async body => { if (first) { first = false; return pending.promise; } return emptyCitations(body); });
+  const document = h.document('watched.md', 'Current author text');
+  h.provider.currentDocument = document;
+  let watcherActive = true;
+  const refreshing = h.provider.refresh(document, () => watcherActive);
+  watcherActive = false;
+  pending.resolve(emptyCitations('Obsolete watcher result'));
+  await refreshing;
+  assert.equal(h.messages.some(message => message.type === 'updateContent'), false);
+  await h.provider.sendContentUpdate(document);
+  const updates = h.messages.filter(message => message.type === 'updateContent');
+  assert.equal(updates.length, 1);
+  assert.match(updates[0].html, /Current author text/);
+  assert.doesNotMatch(updates[0].html, /Obsolete/);
+});
+
+
+test('selected run progress uses real block indices and adds only executed dependency rows', async t => {
+  const h = host(t), document = h.document('selected.md', 'Selection');
+  h.provider.currentDocument = document;
+  await h.provider.sendContentUpdate(document);
+  const request = h.provider.sendRunStarted(1, document, [2]);
+  const started = h.messages.find(message => message.type === 'runStarted');
+  assert.deepEqual(started.blockIndices, [2]);
+  const c = client(h.provider, h.webview);
+  for (const message of h.messages) c.send(message);
+  assert.deepEqual(c.element('run-block-list').children.map(row => row.id), ['run-block-2']);
+  c.send({ ...request, type: 'blockProgress', index: 0, status: 'done', total: 3, label: 'Dependency' });
+  assert.deepEqual(c.element('run-block-list').children.map(row => row.id), ['run-block-0', 'run-block-2']);
+  assert.equal(c.element('run-summary').textContent, '1/2 blocks');
+  c.send({ ...request, type: 'blockProgress', index: 2, status: 'done', total: 3, label: 'Selected' });
+  assert.equal(c.element('run-summary').textContent, '2/2 blocks');
+  c.send({ ...request, type: 'runComplete', outcome: 'done', ran: 2, cached: 0 });
+  assert.equal(c.element('run-block-list').children.some(row => row.id === 'run-block-1'), false);
+  assert.equal(c.element('run-block-list').children.some(row => row.classList.contains('status-pending')), false);
+});
+
+test('dependency refresh checks its source guard again before asynchronous publication', async t => {
+  const work = deferred(), h = host(t, () => work.promise);
+  const document = h.document('guarded.md', 'Cite [@key].'); h.provider.currentDocument = document;
+  let current = true; const pending = h.provider.refresh(document, () => current);
+  await new Promise(resolve => setImmediate(resolve)); current = false;
+  work.resolve(emptyCitations('Old dependency result')); await pending;
+  assert.equal(h.messages.some(message => message.type === 'updateContent'), false);
+});
+
+
+test('same-source dependency refresh releases obsolete run controls and rejects old completion', async t => {
+  const h = host(t), document = h.document('active-run.md', 'Current source', 1);
+  h.provider.currentDocument = document;
+  await h.provider.sendContentUpdate(document);
+  const run = h.provider.sendRunStarted(1, document);
+  h.provider.sendBlockProgress({ index: 0, status: 'running' }, run);
+  const c = client(h.provider, h.webview);
+  for (const message of h.messages) c.send(message);
+  assert.equal(c.element('run-btn').disabled, true);
+  assert.equal(c.element('run-block-list').children[0].classList.contains('status-running'), true);
+  h.messages.length = 0;
+  await h.provider.refresh(document);
+  assert.equal(h.messages.find(message => message.type === 'renderStarted').sourceVersion, run.sourceVersion);
+  for (const message of h.messages) c.send(message);
+  assert.equal(c.element('run-btn').disabled, false);
+  assert.equal(c.element('run-cancel-btn').style.display, 'none');
+  assert.equal(c.element('run-block-list').children.length, 0);
+  h.messages.length = 0;
+  h.provider.sendRunComplete('failed', 0, 0, 0, 1, run);
+  assert.equal(h.messages.length, 0);
+  c.send({ ...run, type: 'runComplete', outcome: 'failed', failed: 1 });
+  assert.equal(c.element('run-btn').disabled, false);
+  assert.equal(c.element('run-block-list').children.length, 0);
 });

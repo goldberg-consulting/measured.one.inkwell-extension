@@ -80,6 +80,15 @@
   actual VSIX contents and exact release tag. The separate Homebrew tap draft
   uses supported installer/uninstaller scripts and mocked lifecycle tests.
 
+### Editable run scripts and verified current output (Phase 7)
+
+- Add editor commands and CodeLens actions to extract and open external run scripts, run a selected block or changed blocks, and inspect the current result. The existing Run Code Blocks command is preserved. Automatic stable IDs are saved in the fence before persistent execution; invalid or duplicate identities block execution with diagnostics.
+- Keep user-owned source in `.inkwell/scripts/` and generated attempts in `.inkwell/runs/<document-id>/<block-id>/history/`. Atomic `current.json` publication requires a complete, verified successful attempt. Failed, stale, superseded, or modified-during-publication output cannot become current; the previous success is preserved.
+- Fingerprint declared input files, lockfiles, interpreter identity, allowlisted environment settings, and upstream results. Refresh visible stale state when source scripts or dependencies change. Runs remain sequential with configurable time, input, artifact, log, and retention limits.
+- Treat canonical `.inkwell/scripts/` references as project-root paths while preserving document-first lookup for other existing relative scripts. Input globs consistently resolve from the project root. Explicit environment paths must stay inside the project; normal system discovery and project virtual environments remain supported. These containment and provenance corrections have regression coverage.
+- Preserve unverified legacy output on upgrade until the user clears it, but require a new successful run before injection. Deleted or malformed identity maps cannot revive older histories. Clearing generated output preserves user-owned scripts.
+- Sanitize raw HTML in preview while preserving safe generated math, table, and reference markup. Existing standalone HTML artifact presentation remains literal source.
+
 ### Bibliography and canonical configuration (Phase 6)
 
 - Pandoc's citation AST now renders narrative, grouped, suppressed-author, locator,
@@ -133,9 +142,32 @@
 - Quoted fence attributes can contain braces, so caption/label variable bindings
   survive parsing and resolve from successful run values without interpreting cells.
 
+### Offline preview and measured compilation (Phase 8)
+
+- Preview packages pinned math, diagram, highlighting, and PDF assets, loads
+  optional features on demand, and rejects obsolete results. PDF rendering keeps
+  at most six canvases and reuses file transfers across zoom and scroll changes.
+- Compile requests coalesce per document across the toolbar and editor commands.
+  Unchanged timed builds reuse a verified successful output. Fresh PDF builds
+  reuse verified TeX auxiliaries and immutable built-in template support files.
+- Compiler results report phase timings, cache hits, pass counts, and convergence
+  reasons. Frozen native editor documents use independent source snapshots.
+- The canonical `out/assets-manifest.json` requires every local vendor asset and
+  hash; `schemas/doctor.schema.json` defines versioned health reports. Doctor keeps
+  compatibility with the former singular manifest filename.
+
+### Release evidence (Phase 9)
+
+- CI shares one immutable candidate across package, behavioral, editor-host,
+  offline-browser, and demo checks. Actual packaged compiler and runner bytes
+  produce the demo reports. Repeated benchmarks require a valid baseline and a
+  confirming run before judging an individual regression.
+- Publication consumes the tested artifact and matching release-commit evidence.
+  Missing clean-install, upgrade, parity, or performance evidence blocks release.
+
 This is unreleased work toward 0.5. The final release artifact, tap checksum,
-architecture-specific installation checks, clean-machine install, and activation
-benchmark remain release gates. Mocked tests and artifact audits do not establish
+architecture-specific installation checks, clean-machine install, and final
+performance evidence remain release gates. Mocked tests and artifact audits do not establish
 that a clean Mac installation has passed. See [installation and health checks](docs/installation.md).
 
 ## 0.4.0 (2026-09-04)

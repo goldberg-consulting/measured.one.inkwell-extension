@@ -996,3 +996,11 @@ Run **Inkwell: Setup / Repair** to install and verify the Homebrew `mermaid-cli`
 ### Preview and PDF agree but differ from what I expect
 
 Preview is an HTML simulation of what LaTeX will produce. For structural correctness (refs, bibliography, numbering) preview and PDF should match post-compile. Visual differences (font, spacing, column breaks) are inherent to the two rendering engines — the PDF is authoritative for layout; the preview is authoritative for write-time feedback.
+
+## Editable scripts and current output
+
+Use **Extract Code Block to Script** to move a runnable fence into `.inkwell/scripts/`.
+Run commands save stable IDs in the Markdown before executing; generated results
+are verified under `.inkwell/runs/`. **Run Changed Blocks** and **Show Current Run
+Details** help identify stale results. See the [run-file guide](docs/run-files.md)
+for path rules, limits, dependency declarations, and safe cache clearing.

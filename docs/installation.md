@@ -174,10 +174,13 @@ for a system-managed TeX installation.
 
 The VSIX verifier checks required bundled entry points, templates and assets,
 requirements, filters, CSL, guides, and examples against the packaged hash
-manifest. The release tag must equal `v${package.json.version}`. A missing tap
+`out/assets-manifest.json`. It also checks every promised local preview vendor
+asset and rejects remote runtime script/style dependencies. The Doctor JSON
+contract is bundled at `schemas/doctor.schema.json`.
+The release tag must equal `v${package.json.version}`. A missing tap
 credential or unmatched cask checksum leaves release publication incomplete.
 
-The Phase 3 release record must also include:
+The release record must also include:
 
 - Warm activation p95 at or below 200 ms on the named benchmark machine, with
   no `kpsewhich`, texhash, Homebrew, or network calls. A pure doctor fixture
@@ -196,3 +199,16 @@ Mocked editor and tap lifecycle matrices, local read-only tool probes, and
 artifact audits cover parts of this contract. They must be identified as such;
 they are not substitutes for the clean-machine or architecture-specific release
 tests. The tap's final checksum remains pending until the final VSIX is built.
+
+The Verify workflow builds one candidate and records its release commit and
+SHA-256. Other jobs consume those same bytes. Release publication takes an
+existing candidate and a complete matching evidence bundle; it does not rebuild
+the extension. Missing real-install, upgrade, visual-parity, or performance
+evidence blocks publication. A release retry verifies the already published
+artifact and never replaces it with newly built bytes.
+
+The maintained workflows retain actual editor activation and run-to-PDF reports,
+offline browser counters, all-demo PDF checks, and repeated benchmark results.
+The real macOS installation workflow additionally retains the machine identity,
+Doctor output, installer log, scaffold, and smoke PDF. Headless validation alone
+does not establish the New Project and Preview journey in a clean editor.

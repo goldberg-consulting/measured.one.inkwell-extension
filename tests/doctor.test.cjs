@@ -9,6 +9,9 @@ const { createDoctor, classifyTexOwnership, formatDoctorText, DOCTOR_REQUIRED_AS
 const { runDoctorCli } = require('../out/doctor-cli');
 const { loadTexRequirements, TEX_PACKAGE_FILES } = require('../out/tex-requirements');
 const { planMigration, applyMigration } = require('../out/scaffold-migrations');
+const Ajv = require('ajv');
+const schema = JSON.parse(fs.readFileSync(path.join(__dirname, '../schemas/doctor.schema.json'), 'utf8'));
+const validateReport = new Ajv({ allErrors: true }).compile(schema);
 
 const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const ok = (stdout = 'fixture version 1.0\n', overrides = {}) => ({ stdout, stderr: '', exitCode: 0, rawExitCode: 0, signal: null, timedOut: false, cancelled: false, maxBufferExceeded: false, ...overrides });
@@ -25,7 +28,7 @@ function fixture(t, config = {}) {
   write(path.join(extensionRoot, 'requirements-latex.txt'), config.requirements ?? '# installed authoritative manifest\ngeometry\namscls\n');
   const manifest = () => {
     const files = Object.fromEntries(DOCTOR_REQUIRED_ASSETS.map(relative => { const bytes = fs.readFileSync(path.join(extensionRoot, relative)); return [relative, { sha256: sha(bytes), size: bytes.length }]; }));
-    write(path.join(extensionRoot, 'out/asset-manifest.json'), JSON.stringify({ schemaVersion: 1, extensionVersion: '0.5.0', files }));
+    write(path.join(extensionRoot, 'out/assets-manifest.json'), JSON.stringify({ schemaVersion: 1, extensionVersion: '0.5.0', files }));
   };
   manifest();
   const bin = path.join(root, 'bin');
@@ -147,14 +150,62 @@ test('packaged hash mismatch and omitted mandatory asset block readiness', async
   write(path.join(f.extensionRoot, 'templates/inkwell.latex'), 'tampered');
   const corrupt = await f.doctor.run(f.options);
   assert.equal(corrupt.cacheHit, false); assert.equal(check(corrupt, 'assets').status, 'error');
-  const manifest = JSON.parse(fs.readFileSync(path.join(f.extensionRoot, 'out/asset-manifest.json')));
+  const manifest = JSON.parse(fs.readFileSync(path.join(f.extensionRoot, 'out/assets-manifest.json')));
   delete manifest.files['templates/inkwell.latex'];
   const missing = await f.doctor.run({ ...f.options, assetsManifest: manifest });
   assert.equal(check(missing, 'assets').status, 'error'); assert.match(check(missing, 'assets').message, /omits required/);
 });
 
+test('doctor reads legacy manifest names but never masks a corrupt canonical contract', async t => {
+  const f = fixture(t), canonical = path.join(f.extensionRoot, 'out/assets-manifest.json');
+  const legacy = path.join(f.extensionRoot, 'out/asset-manifest.json');
+  fs.renameSync(canonical, legacy);
+  assert.equal((await f.doctor.run(f.options)).ready, true);
+  write(canonical, '{broken JSON');
+  const damaged = await f.doctor.run(f.options);
+  assert.equal(damaged.ready, false); assert.equal(damaged.cacheHit, false);
+  assert.equal(check(damaged, 'assets').status, 'error');
+  f.manifest(); write(legacy, '{broken legacy JSON');
+  assert.equal((await f.doctor.run(f.options)).ready, true);
+});
+
+test('doctor requires the bundled output schema and rejects an escaping manifest link', async t => {
+  const f = fixture(t), canonical = path.join(f.extensionRoot, 'out/assets-manifest.json');
+  const manifest = JSON.parse(fs.readFileSync(canonical, 'utf8'));
+  delete manifest.files['schemas/doctor.schema.json'];
+  const missing = await f.doctor.run({ ...f.options, assetsManifest: manifest });
+  assert.equal(missing.ready, false); assert.match(check(missing, 'assets').message, /omits required file schemas\/doctor.schema.json/);
+  const outside = path.join(f.root, 'outside-manifest.json'); fs.renameSync(canonical, outside); fs.symlinkSync(outside, canonical);
+  const linked = await f.doctor.run(f.options);
+  assert.equal(linked.ready, false); assert.match(check(linked, 'assets').message, /escapes the project root/);
+});
+
+test('published schema accepts actual healthy, failed, full, cached and CLI error JSON', async t => {
+  const f = fixture(t), broken = fixture(t, { missing: ['pandoc'] });
+  const reports = [
+    await f.doctor.run({ ...f.options, cachedOnly: true }),
+    await f.doctor.run(f.options),
+    await f.doctor.run(f.options),
+    await f.doctor.run({ ...f.options, mode: 'full' }),
+    await broken.doctor.run(broken.options),
+  ];
+  const output = [];
+  assert.equal(await runDoctorCli(['--json', '--unknown'], f.dependencies, { stdout: value => output.push(value), stderr: () => {} }), 2);
+  reports.push(JSON.parse(output[0]));
+  for (const report of reports) {
+    const json = JSON.parse(JSON.stringify(report));
+    assert.equal(validateReport(json), true, JSON.stringify(validateReport.errors));
+  }
+  const report = JSON.parse(JSON.stringify(reports[1]));
+  for (const mutate of [r => { delete r.processCount; }, r => { r.schemaVersion = 2; }, r => { r.checks[0].status = 'success'; },
+    r => { r.tools.pandoc.state = 'installed'; }, r => { r.durationMs = -1; }, r => { r.generatedAt = 'yesterday'; }]) {
+    const invalid = structuredClone(report); mutate(invalid);
+    assert.equal(validateReport(invalid), false, `Schema accepted ${JSON.stringify(invalid)}`);
+  }
+});
+
 test('packaged asset traversal and outward symlinks are rejected read-only', async t => {
-  const f = fixture(t), manifest = JSON.parse(fs.readFileSync(path.join(f.extensionRoot, 'out/asset-manifest.json')));
+  const f = fixture(t), manifest = JSON.parse(fs.readFileSync(path.join(f.extensionRoot, 'out/assets-manifest.json')));
   manifest.files['../outside'] = { sha256: sha('outside') };
   const traversal = await f.doctor.run({ ...f.options, assetsManifest: manifest });
   assert.equal(check(traversal, 'assets').status, 'error');

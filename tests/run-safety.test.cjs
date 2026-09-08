@@ -9,10 +9,11 @@ const cp = require('node:child_process');
 
 // Only the editor boundary is mocked. Every fixture lives outside the repository.
 const originalLoad = Module._load;
+const mockWorkspace = { getWorkspaceFolder: () => undefined, isTrusted: true };
 Module._load = function (request, ...args) {
   if (request === 'vscode') return {
     Uri: { file: fsPath => ({ fsPath }) },
-    workspace: { getWorkspaceFolder: () => undefined },
+    workspace: mockWorkspace,
     window: { createOutputChannel: () => ({ appendLine() {} }) },
   };
   return originalLoad.call(this, request, ...args);
@@ -30,7 +31,7 @@ function fixture(t) {
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   return { root, source };
 }
-const fence = (body, attrs = '') => '```{shell ' + attrs + '}\n' + body + '\n```';
+const fence = (body, attrs = '') => '```{shell ' + (/\b(?:id|label)=/.test(attrs) ? '' : 'id=\"test-' + require('node:crypto').createHash('sha256').update(body + attrs).digest('hex').slice(0, 12) + '\" ') + attrs + '}\n' + body + '\n```';
 
 test('stale source cannot inject stdout from the last successful run', async t => {
   const { source } = fixture(t);
@@ -126,9 +127,9 @@ test('current provenance covers external scripts, declared inputs, lockfiles, an
   fs.writeFileSync(lock, 'some-package==1.0\n');
   assert.equal(gatherCachedResults(markdown, source)[0].cacheStatus, 'miss');
   await runner.runAllBlocks(markdown, source);
-  process.env.INKWELL_TEST_RUNTIME = 'one';
-  t.after(() => { delete process.env.INKWELL_TEST_RUNTIME; });
-  // Relevant user environment must not be exempted just because its name starts with INKWELL.
+  process.env.PYTHONHASHSEED = 'one';
+  t.after(() => { delete process.env.PYTHONHASHSEED; });
+  // Allowlisted runtime settings invalidate the environment fingerprint.
   assert.equal(gatherCachedResults(markdown, source)[0].cacheStatus, 'miss');
 });
 
@@ -214,7 +215,8 @@ test('timeout kills children in the same process group', { skip: process.platfor
 test('nested document globs include new inputs and support zero or more globstar directories', async t => {
   const { root } = fixture(t);
   const docDir = path.join(root, 'chapter');
-  const dataDir = path.join(docDir, 'data');
+  const dataDir = path.join(root, 'data');
+  fs.mkdirSync(docDir, { recursive: true });
   fs.mkdirSync(dataDir, { recursive: true });
   fs.writeFileSync(path.join(dataDir, 'first.csv'), 'a,b\n1,2');
   const source = path.join(docDir, 'notes.md');
@@ -348,14 +350,14 @@ test('inline expression cache invalidates when the selected interpreter environm
   const { root, source } = fixture(t);
   const binary = path.join(root, 'venv', 'bin', 'python3');
   fs.mkdirSync(path.dirname(binary), { recursive: true });
-  fs.writeFileSync(binary, '#!/bin/sh\ncase "$1" in --version) echo FakePython;; -c) echo "[]";; *) echo "::result_0=$INLINE_RUNTIME_TEST";; esac\n', { mode: 0o755 });
+  fs.writeFileSync(binary, '#!/bin/sh\ncase "$1" in --version) echo FakePython;; -c) echo "[]";; *) echo "::result_0=$PYTHONHASHSEED";; esac\n', { mode: 0o755 });
   const { evaluateInlineExpressions } = require('../out/inject');
   const evaluate = () => evaluateInlineExpressions('`{python} 1`', new Map(), { pythonEnv: 'venv' }, root, root, getInkwellOutputsDir(source));
-  const previous = process.env.INLINE_RUNTIME_TEST;
-  t.after(() => { if (previous === undefined) delete process.env.INLINE_RUNTIME_TEST; else process.env.INLINE_RUNTIME_TEST = previous; });
-  process.env.INLINE_RUNTIME_TEST = 'before';
+  const previous = process.env.PYTHONHASHSEED;
+  t.after(() => { if (previous === undefined) delete process.env.PYTHONHASHSEED; else process.env.PYTHONHASHSEED = previous; });
+  process.env.PYTHONHASHSEED = 'before';
   assert.equal(evaluate(), 'before');
-  process.env.INLINE_RUNTIME_TEST = 'after';
+  process.env.PYTHONHASHSEED = 'after';
   assert.equal(evaluate(), 'after');
 });
 

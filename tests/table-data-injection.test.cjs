@@ -110,7 +110,9 @@ test('quoted fence attributes can contain braces without altering block identity
   assert.equal(blocks[1].caption, 'Literal } and {{value}}');
   assert.equal(blocks[0].source, 'echo "body }"');
   assert.equal(blocks[0].startLine, 3);
-  assert.equal(runner.parseCodeBlocks('```{shell caption="unclosed}\necho no\n```').length, 0);
+  const malformed = runner.parseCodeBlocks('```{shell caption="unclosed}\necho no\n```');
+  assert.equal(malformed.length, 1);
+  assert.match(malformed[0].parsingError, /Unclosed quote/);
 });
 
 test('failed and cache-missing runs cannot inject otherwise well-formed table artifacts', t => {

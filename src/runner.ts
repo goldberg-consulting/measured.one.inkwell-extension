@@ -4,10 +4,16 @@
 
 import * as path from "path";
 import * as fs from "fs";
+import { randomUUID } from "crypto";
+import * as vscode from "vscode";
 import { getDocumentConfig, getInkwellProjectRoot } from "./config";
 import { applyBlockOverrides, ConfigDiagnostic, DocumentConfig, resolveDocumentConfig } from "./document-config";
 import { executeRunProcess, RunCancellation, ProcessOutcome } from "./run-process";
-import { fingerprintBlock, resolveRunSource, RunStore } from "./run-store";
+import { fingerprintBlock, resolveRunSource, RunStore, RunFingerprint } from "./run-store";
+import { parseQuotedAttrs, parseRunList } from "./run-attributes";
+import { containedRunPath, relativeRunPath } from "./run-paths";
+import { RunLimits, runLimits } from "./run-limits";
+export { parseQuotedAttrs } from "./run-attributes";
 export { RunCancellation } from "./run-process";
 
 export type BlockStatus = "pending" | "running" | "cached" | "done" | "failed" | "cancelled";
@@ -34,6 +40,7 @@ export interface CodeBlock {
   dependsOn?: string[];
   attributes?: Record<string, string>;
   configDiagnostics?: ConfigDiagnostic[];
+  parsingError?: string;
   timeoutMs?: number;
   lang: string;
   source: string;
@@ -49,7 +56,7 @@ export interface CodeBlock {
   raw: string;
 }
 
-export interface RunConfig {
+export interface RunConfig extends Partial<RunLimits> {
   pythonEnv?: string;
   rEnv?: string;
   nodeEnv?: string;
@@ -92,11 +99,12 @@ const LANG_COMMANDS: Record<string, string[]> = {
 };
 
 // Quarto/Pandoc-style fenced code blocks: ```{python file="..." output="plot"}
-const BLOCK_PATTERN = /^```\{(\w+)((?:"[^"\r\n]*"|'[^'\r\n]*'|[^}"'\r\n])*)\}\s*\n([\s\S]*?)^```/gm;
+const BLOCK_PATTERN = /^```\{(\w+)([^\r\n]*)\}\s*\r?\n([\s\S]*?)^```[ \t]*(?=\r?$)/gm;
 
 export function parseRunConfig(markdown: string, sourceFile?: string): RunConfig {
   const config = sourceFile ? getDocumentConfig(markdown, sourceFile) : resolveDocumentConfig({ text: markdown });
   return {
+    ...runLimits(config.runs as Partial<RunLimits>),
     pythonEnv: config.runs.pythonEnv, rEnv: config.runs.rEnv, nodeEnv: config.runs.nodeEnv,
     defaultDisplay: config.runs.display, cache: config.runs.cache,
     timeoutMs: config.runs.timeoutSeconds === undefined ? undefined : config.runs.timeoutSeconds * 1000,
@@ -142,7 +150,9 @@ export function parseCodeBlocks(markdown: string): CodeBlock[] {
     const startLine = markdown.substring(0, charOffset).split("\n").length;
     const endLine = startLine + raw.split("\n").length - 1;
 
-    const attrs = parseQuotedAttrs(attrsStr);
+    let attrs: Record<string, string> = {};
+    let parsingError: string | undefined;
+    try { attrs = parseQuotedAttrs(attrsStr); } catch (error) { parsingError = String(error); }
 
     const display = (attrs.display as DisplayMode) || undefined;
     const noCache = attrs.cache === undefined ? undefined : attrs.cache === "false" || attrs.cache === "no";
@@ -151,8 +161,9 @@ export function parseCodeBlocks(markdown: string): CodeBlock[] {
       index: index++,
       id: attrs.id,
       attributes: attrs,
-      inputs: attrs.inputs?.split(/[,;]+/).map(value => value.trim()).filter(Boolean),
-      dependsOn: attrs["depends-on"]?.split(/[,;\s]+/).filter(Boolean),
+      parsingError,
+      inputs: attrs.inputs === undefined ? undefined : parseRunList(attrs.inputs),
+      dependsOn: attrs["depends-on"] === undefined ? undefined : parseRunList(attrs["depends-on"]),
       lang,
       source: source.trimEnd(),
       file: attrs.file,
@@ -171,17 +182,6 @@ export function parseCodeBlocks(markdown: string): CodeBlock[] {
   return blocks;
 }
 
-/** Parse `key="value"` attribute pairs from a fenced-block info string. */
-export function parseQuotedAttrs(str: string): Record<string, string> {
-  const attrs: Record<string, string> = {};
-  const pattern = /([\w-]+)=(?:"([^"]*)"|'([^']*)'|([^\s]+))/g;
-  let m: RegExpExecArray | null;
-  while ((m = pattern.exec(str)) !== null) {
-    attrs[m[1]] = m[2] ?? m[3] ?? m[4];
-  }
-  return attrs;
-}
-
 /** The python binary inside a venv directory, preferring python3. */
 export function venvPythonBin(venvDir: string): string | undefined {
   const p3 = path.join(venvDir, "bin", "python3");
@@ -195,10 +195,11 @@ export function resolveVenvPython(
   projectRoot: string,
   docDir: string,
 ): string | undefined {
-  const home = process.env.HOME || "~";
-  const spec = envSpec.replace(/^~/, home);
+  relativeRunPath(envSpec);
+  const spec = envSpec;
   for (const base of [projectRoot, docDir]) {
-    const bin = venvPythonBin(path.resolve(base, spec));
+    const directory = containedRunPath(projectRoot, path.resolve(base, spec), true);
+    const bin = venvPythonBin(directory);
     if (bin) return bin;
   }
   return undefined;
@@ -236,11 +237,13 @@ export function resolveInterpreter(
     return { cmd: defaultCmd, args: defaultArgs, envVars: {}, label: defaultCmd };
   }
 
-  const home = process.env.HOME || "~";
-  const spec = envSpec.replace(/^~/, home);
+  // Project-selected environments are project paths. Installed system tools
+  // remain available through the language's default executable on PATH.
+  relativeRunPath(envSpec);
+  const spec = envSpec;
   let resolved: string | undefined;
   for (const base of [projectRoot, docDir]) {
-    const r = path.resolve(base, spec);
+    const r = containedRunPath(projectRoot, path.resolve(base, spec), true);
     if (fs.existsSync(r)) {
       resolved = r;
       break;
@@ -313,11 +316,19 @@ function failedResult(block: CodeBlock, message: string, exitCode = 1): BlockRes
 export async function runBlock(
   block: CodeBlock, projectRoot: string, docDir: string, outputDir: string,
   cancel?: RunCancellation, runConfig: RunConfig = {},
+  plan?: { interpreter: ResolvedInterpreter; fingerprint: RunFingerprint },
 ): Promise<BlockResult> {
+  if (vscode.workspace.isTrusted === false) return failedResult(block, "Trust this workspace before running document code.");
+  containedRunPath(projectRoot, outputDir, true, true);
   fs.mkdirSync(outputDir, { recursive: true });
   if (cancel?.cancelled) return failedResult(block, "Cancelled", 130);
   const langKey = block.lang.toLowerCase();
   if (!LANG_COMMANDS[langKey]) return failedResult(block, `Unsupported language: ${block.lang}`);
+  const selected = resolveInterpreter(langKey, block.env, runConfig, projectRoot, docDir);
+  const current = fingerprintBlock(block, docDir, projectRoot, selected, plan?.fingerprint.upstream, runLimits(runConfig));
+  if (plan && current.hash !== plan.fingerprint.hash) return failedResult(block, "Source, inputs, or interpreter selection changed before execution; run again.");
+  const interpreter = plan?.interpreter || selected;
+  const fingerprint = plan?.fingerprint || current;
   let scriptPath: string;
   if (block.file) {
     scriptPath = resolveRunSource(block.file, docDir, projectRoot);
@@ -326,13 +337,14 @@ export async function runBlock(
     const ext = langKey.startsWith("python") ? ".py" : langKey === "r" ? ".R"
       : ["node", "javascript"].includes(langKey) ? ".js" : ".sh";
     // Source stays outside the published artifacts directory.
-    scriptPath = path.join(path.dirname(outputDir), `source${ext}`);
-    fs.writeFileSync(scriptPath, block.source, "utf8");
+    scriptPath = path.join(path.dirname(outputDir), `source${plan ? "" : `-${randomUUID()}`}${ext}`);
+    containedRunPath(projectRoot, scriptPath, true, true);
+    fs.writeFileSync(scriptPath, block.source, { encoding: "utf8", flag: "wx" });
   }
-  const interpreter = resolveInterpreter(langKey, block.env, runConfig, projectRoot, docDir);
-  const executable = fingerprintBlock(block, docDir, projectRoot, interpreter).interpreter.path;
+  const executable = fingerprint.interpreter.path;
   const outcome = await executeRunProcess(executable, [...interpreter.args, scriptPath], {
     cwd: projectRoot, timeoutMs: block.timeoutMs ?? runConfig.timeoutMs, maxBuffer: runConfig.maxBuffer,
+    maxStdoutBytes: runConfig.maxStdoutBytes, maxStderrBytes: runConfig.maxStderrBytes,
     env: { ...process.env, ...interpreter.envVars, INKWELL_OUTPUT_DIR: outputDir, INKWELL_BLOCK_INDEX: String(block.index) },
   }, cancel);
   return { block, ...outcome, process: outcome,
@@ -356,11 +368,12 @@ export function blockLabel(block: CodeBlock): string {
 
 /** Read-only validation used by both compilation and preview. */
 export function readCurrentRunResults(markdown: string, sourceFile: string): BlockResult[] {
+  if (vscode.workspace.isTrusted === false) return parseCodeBlocks(markdown).map(block => failedResult(block, "Trust this workspace before verifying document code results."));
   const runConfig = parseRunConfig(markdown, sourceFile);
   const blocks = applyRunDefaults(parseCodeBlocks(markdown), runConfig);
   const projectRoot = getInkwellProjectRoot(sourceFile);
   const docDir = path.dirname(sourceFile);
-  const store = new RunStore(projectRoot, sourceFile);
+  const store = new RunStore(projectRoot, sourceFile, runLimits(runConfig));
   const invalid = runConfig.diagnostics?.filter(diagnostic => diagnostic.severity === "error");
   if (invalid?.length) return blocks.map(block => failedResult(block, invalid.map(diagnostic => diagnostic.message).join("\n")));
   let ids: string[];
@@ -372,8 +385,12 @@ export function readCurrentRunResults(markdown: string, sourceFile: string): Blo
     if (visiting.has(block.index)) return failedResult(block, "Cyclic run dependency");
     visiting.add(block.index);
     const invalid = block.configDiagnostics?.filter(diagnostic => diagnostic.severity === "error");
-    if (invalid?.length) {
-      const result = failedResult(block, invalid.map(diagnostic => `Line ${diagnostic.line}: ${diagnostic.message}`).join("\n"));
+    if (invalid?.length || block.parsingError) {
+      const result = failedResult(block, block.parsingError || invalid!.map(diagnostic => `Line ${diagnostic.line}: ${diagnostic.message}`).join("\n"));
+      visiting.delete(block.index); results.set(block.index, result); return result;
+    }
+    if (!LANG_COMMANDS[block.lang.toLowerCase()]) {
+      const result = failedResult(block, `Unsupported language: ${block.lang}`);
       visiting.delete(block.index); results.set(block.index, result); return result;
     }
     const upstream: Record<string, string> = {};
@@ -387,7 +404,7 @@ export function readCurrentRunResults(markdown: string, sourceFile: string): Blo
     let result: BlockResult;
     try {
       const interpreter = resolveInterpreter(block.lang.toLowerCase(), block.env, runConfig, projectRoot, docDir);
-      const fingerprint = fingerprintBlock(block, docDir, projectRoot, interpreter, upstream);
+      const fingerprint = fingerprintBlock(block, docDir, projectRoot, interpreter, upstream, runLimits(runConfig));
       if (Object.values(fingerprint.inputs).some(hash => hash === "missing")) error = "A declared input is missing.";
       result = error ? failedResult(block, error) : store.current(block, ids[block.index], fingerprint) || failedResult(block, "Run output is missing or stale. Run this block again.");
     } catch (reason) { result = failedResult(block, String(reason)); }
@@ -399,11 +416,13 @@ export function readCurrentRunResults(markdown: string, sourceFile: string): Blo
 export async function runAllBlocks(
   markdown: string, sourceFile: string, cancel?: RunCancellation,
   onProgress?: (progress: BlockProgress) => void,
+  selectedIndices?: number[],
 ): Promise<BlockResult[]> {
   const runConfig = parseRunConfig(markdown, sourceFile);
   const blocks = applyRunDefaults(parseCodeBlocks(markdown), runConfig); if (!blocks.length) return [];
   const projectRoot = getInkwellProjectRoot(sourceFile); const docDir = path.dirname(sourceFile);
-  const store = new RunStore(projectRoot, sourceFile);
+  if (vscode.workspace.isTrusted === false) return blocks.map(block => failedResult(block, "Trust this workspace before running document code."));
+  const store = new RunStore(projectRoot, sourceFile, runLimits(runConfig));
   const invalid = runConfig.diagnostics?.filter(diagnostic => diagnostic.severity === "error");
   if (invalid?.length) return blocks.map(block => {
     const result = failedResult(block, invalid.map(diagnostic => diagnostic.message).join("\n"));
@@ -423,8 +442,12 @@ export async function runAllBlocks(
       error: result?.exitCode ? result.stderr.split("\n")[0] : undefined,
     });
     const invalid = block.configDiagnostics?.filter(diagnostic => diagnostic.severity === "error");
-    if (invalid?.length) {
-      const result = failedResult(block, invalid.map(diagnostic => `Line ${diagnostic.line}: ${diagnostic.message}`).join("\n"));
+    if (invalid?.length || block.parsingError) {
+      const result = failedResult(block, block.parsingError || invalid!.map(diagnostic => `Line ${diagnostic.line}: ${diagnostic.message}`).join("\n"));
+      report("failed", result); visiting.delete(block.index); results.set(block.index, result); return result;
+    }
+    if (!LANG_COMMANDS[block.lang.toLowerCase()]) {
+      const result = failedResult(block, `Unsupported language: ${block.lang}`);
       report("failed", result); visiting.delete(block.index); results.set(block.index, result); return result;
     }
     const upstream: Record<string, string> = {}; let dependencyError: string | undefined;
@@ -437,32 +460,60 @@ export async function runAllBlocks(
       const result = failedResult(block, "Run cache was cleared; remaining blocks were discarded.");
       report("cancelled", result); visiting.delete(block.index); results.set(block.index, result); return result;
     }
-    const interpreter = resolveInterpreter(block.lang.toLowerCase(), block.env, runConfig, projectRoot, docDir);
-    const fingerprint = fingerprintBlock(block, docDir, projectRoot, interpreter, upstream);
+    let interpreter: ResolvedInterpreter;
+    let fingerprint;
+    try {
+      interpreter = resolveInterpreter(block.lang.toLowerCase(), block.env, runConfig, projectRoot, docDir);
+      fingerprint = fingerprintBlock(block, docDir, projectRoot, interpreter, upstream, runLimits(runConfig));
+    }
+    catch (error) {
+      const result = failedResult(block, String(error));
+      report("failed", result); visiting.delete(block.index); results.set(block.index, result); return result;
+    }
     if (Object.values(fingerprint.inputs).some(hash => hash === "missing")) dependencyError = "A declared input is missing. Check the block inputs attribute.";
     let result = !block.noCache && !cancel?.cancelled && !dependencyError ? store.current(block, ids[block.index], fingerprint) : undefined;
     if (result) report("cached", result);
     else {
-      const attempt = store.begin(ids[block.index]); report("running");
+      const attempt = store.begin(ids[block.index], Boolean(block.id || block.label)); report("running");
       try {
         result = dependencyError ? failedResult(block, dependencyError)
-          : await runBlock(block, projectRoot, docDir, attempt.artifactsDir, cancel, runConfig);
+          : await runBlock(block, projectRoot, docDir, attempt.artifactsDir, cancel, runConfig, { interpreter, fingerprint });
       } catch (error) { result = failedResult(block, String(error)); }
       const outcome: ProcessOutcome = result.process || { stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode,
         rawExitCode: null, signal: null, timedOut: false, cancelled: Boolean(cancel?.cancelled), maxBufferExceeded: false };
-      if (outcome.exitCode === 0 && fingerprintBlock(block, docDir, projectRoot, interpreter, upstream).hash !== fingerprint.hash) {
-        outcome.exitCode = 1; outcome.stderr = "Source, inputs, or environment changed during execution; run again.";
-      }
+      try {
+        const currentUpstream: Record<string, string> = {};
+        if (outcome.exitCode === 0 && block.dependsOn?.length) {
+          const verified = new Map(readCurrentRunResults(markdown, sourceFile).map(item => [item.block.id || item.block.label, item]));
+          for (const dependency of block.dependsOn) {
+            const current = verified.get(dependency);
+            if (!current?.resultHash || current.exitCode !== 0 || current.cacheStatus === "miss") throw new Error(`Upstream dependency changed during execution: ${dependency}. Run again.`);
+            currentUpstream[dependency] = current.resultHash;
+          }
+        }
+        const currentInterpreter = resolveInterpreter(block.lang.toLowerCase(), block.env, runConfig, projectRoot, docDir);
+        if (outcome.exitCode === 0 && fingerprintBlock(block, docDir, projectRoot, currentInterpreter, currentUpstream, runLimits(runConfig)).hash !== fingerprint.hash) {
+          outcome.exitCode = 1; outcome.stderr = "Source, inputs, or environment changed during execution; run again.";
+        }
+      } catch (error) { outcome.exitCode = 1; outcome.stderr = String(error); }
       const argv = [...interpreter.args, block.file ? fingerprint.sourcePath : path.join(attempt.directory, `source${block.lang.toLowerCase().startsWith("python") ? ".py" : block.lang.toLowerCase() === "r" ? ".R" : ["node", "javascript"].includes(block.lang.toLowerCase()) ? ".js" : ".sh"}`)];
-      try { store.finish(attempt, fingerprint, argv, outcome); }
+      let manifest;
+      try { manifest = store.finish(attempt, fingerprint, argv, outcome); }
       catch (error) { outcome.exitCode = 1; outcome.error = String(error); outcome.stderr = String(error); }
-      const published = outcome.exitCode === 0 ? store.current(block, ids[block.index], fingerprint) : undefined;
+      const published = outcome.exitCode === 0 && manifest ? store.resultForManifest(block, manifest, fingerprint) : undefined;
+      if (outcome.exitCode === 0 && !published) {
+        outcome.exitCode = 1;
+        outcome.error = "The generated result could not be verified after execution.";
+        outcome.stderr = outcome.error;
+        if (manifest) store.discardPublished(manifest);
+      }
+      if (published && manifest) store.confirmPublished(manifest);
       result = published ? { ...published, cached: false, interpreter: interpreter.label, warning: interpreter.warning }
         : { ...result, ...outcome, artifacts: new Map(), cached: false, cacheStatus: "miss" };
       report(outcome.cancelled ? "cancelled" : result.exitCode === 0 ? "done" : "failed", result, Date.now() - Date.parse(attempt.startedAt));
     }
     visiting.delete(block.index); results.set(block.index, result); return result;
   };
-  for (const block of blocks) await execute(block);
-  return blocks.map(block => results.get(block.index)!);
+  for (const block of blocks) if (!selectedIndices || selectedIndices.includes(block.index)) await execute(block);
+  return blocks.filter(block => results.has(block.index)).map(block => results.get(block.index)!);
 }

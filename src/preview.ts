@@ -7,7 +7,9 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
+import { randomBytes } from "crypto";
 import MarkdownIt from "markdown-it";
+import { installSafeHtmlRendering } from "./html-safety";
 import { compile, detectMode, isCompilable, readLastSuccessfulOutput } from "./compiler";
 import { InkwellDiagnostics } from "./diagnostics";
 import { parseCodeBlocks, BlockProgress } from "./runner";
@@ -21,13 +23,14 @@ import { buildTypographyCss, resolveTypography } from "./style-model";
 import { extractTablePresentation } from "./table-preview";
 import { resolveTableStyle, buildTableCss } from "./table-model";
 import { TABLE_ATTRIBUTE_SCHEMA } from "./table-values";
-import { ViewerState, FontScaleAction, normalizeFontScale, changeFontScale, readViewerState, viewerStateRuntime } from "./viewer-state";
+import { ViewerState, FontScaleAction, normalizeFontScale, changeFontScale, readViewerState } from "./viewer-state";
 
 const md = new MarkdownIt({
   html: true,
   linkify: true,
   typographer: true,
 });
+installSafeHtmlRendering(md);
 
 export class InkwellPreviewProvider {
   private panel: vscode.WebviewPanel | undefined;
@@ -38,16 +41,16 @@ export class InkwellPreviewProvider {
   private currentDocument: vscode.TextDocument | undefined;
   private outputChannel: vscode.OutputChannel = getInkwellOutputChannel();
   private initialized = false;
-  private pdfCache: { path: string; mtimeMs: number; base64: string } | undefined;
-  private compileInFlight = false;
-  private compileQueued = false;
+  private pdfCache: { path: string; fingerprint: string; uri: string } | undefined;
   private readonly previewState = new PreviewState();
   private runRequest: PreviewRun | null = null;
   private nextRunId = 0;
   private showSequence = 0;
   private viewerState: ViewerState;
   private viewerStateStored: boolean;
+  private renderGuard?: { revision: number; isCurrent: () => boolean };
   onRun?: () => Promise<void>;
+  onCompile?: (document: vscode.TextDocument) => ReturnType<typeof compile> | Promise<Awaited<ReturnType<typeof compile>> | undefined>;
   ensureReady?: (document: vscode.TextDocument, allowPrompt?: boolean) => Promise<boolean>;
 
   constructor(context: vscode.ExtensionContext) {
@@ -57,8 +60,11 @@ export class InkwellPreviewProvider {
       vscode.workspace.getConfiguration("inkwell").get<number>("preview.fontScale", 100));
   }
 
-  async refresh(): Promise<void> {
-    if (this.currentDocument && this.panel && this.initialized) await this.sendContentUpdate(this.currentDocument);
+  async refresh(document = this.currentDocument, isCurrent: () => boolean = () => true): Promise<void> {
+    if (!document || document.uri.toString() !== this.currentDocument?.uri.toString() || !this.panel || !this.initialized || !isCurrent()) return;
+    const request = this.beginRender(document);
+    this.renderGuard = { revision: request.revision, isCurrent };
+    await this.sendContentUpdate(document, request);
   }
 
   async changeFontScale(action: FontScaleAction): Promise<void> {
@@ -87,12 +93,12 @@ export class InkwellPreviewProvider {
     await this.sendContentUpdate(document);
   }
 
-  sendRunStarted(blockCount: number, document = this.currentDocument): PreviewRun | null {
+  sendRunStarted(blockCount: number, document = this.currentDocument, blockIndices?: number[]): PreviewRun | null {
     if (!this.panel || !this.initialized || !document) return null;
     const current = this.previewState.current;
     if (!current || current.documentUri !== document.uri.toString() || current.sourceVersion !== document.version) return null;
     this.runRequest = Object.freeze({ ...current, runId: ++this.nextRunId });
-    this.postMessage({ type: "runStarted", blockCount }, this.runRequest);
+    this.postMessage({ type: "runStarted", blockCount, ...(blockIndices ? { blockIndices: [...new Set(blockIndices.filter(index => Number.isInteger(index) && index >= 0))] } : {}) }, this.runRequest);
     return this.runRequest;
   }
 
@@ -115,6 +121,7 @@ export class InkwellPreviewProvider {
 
   private isCurrent(request: PreviewRevision): boolean {
     return !!this.panel && this.initialized && this.previewState.isCurrent(request) &&
+      (this.renderGuard?.revision !== request.revision || this.renderGuard.isCurrent()) &&
       (!("runId" in request) || request.runId === this.runRequest?.runId) &&
       this.currentDocument?.uri.toString() === request.documentUri &&
       this.currentDocument.version === request.sourceVersion;
@@ -330,7 +337,7 @@ export class InkwellPreviewProvider {
     if (!this.isCurrent(request)) return;
     try {
       if (this.ensureReady && !await this.ensureReady(document, false)) {
-        this.postMessage({ type: "updateContent", html: "<p>Use Inkwell: Open Preview to set up this workspace.</p>", pdfData: null,
+        this.postMessage({ type: "updateContent", html: "<p>Use Inkwell: Open Preview to set up this workspace.</p>", pdfUri: null,
           pdfOutput: null, title: path.basename(document.uri.fsPath), hasCodeBlocks: false, blockCount: 0, layoutCss: "", bodyClasses: [] }, request);
         return;
       }
@@ -389,6 +396,11 @@ export class InkwellPreviewProvider {
       );
 
       const projectRoot = getInkwellProjectRoot(sourceFile);
+      if (/(?:^|[^\\\w])@[-\w:.]+|^nocite\s*:/m.test(text)) {
+        const quickMath = shieldMathForMarkdown(body);
+        const quickHtml = this.convertLocalImages(quickMath.restore(md.render(quickMath.shielded)), document);
+        this.postMessage({ type: "draftContent", html: quickHtml, title: fm.title || "", featureStatus: "Resolving references…" }, request);
+      }
       const citeResult = await renderCitations(body, {
         sourceFile,
         projectRoot,
@@ -524,16 +536,7 @@ export class InkwellPreviewProvider {
 
     const baseName = path.basename(sourceFile, path.extname(sourceFile));
     const pdfPath = path.join(path.dirname(sourceFile), `${baseName}.pdf`);
-    let existingPdfData: string | undefined;
-    try {
-      const stat = fs.statSync(pdfPath);
-      if (this.pdfCache && this.pdfCache.path === pdfPath && this.pdfCache.mtimeMs === stat.mtimeMs) {
-        existingPdfData = this.pdfCache.base64;
-      } else {
-        existingPdfData = fs.readFileSync(pdfPath).toString("base64");
-        this.pdfCache = { path: pdfPath, mtimeMs: stat.mtimeMs, base64: existingPdfData };
-      }
-    } catch {}
+    const pdfUri = await this.pdfResource(pdfPath, sourceFile);
 
     const blocks = isTeX ? [] : parseCodeBlocks(text);
     const hasCodeBlocks = blocks.length > 0;
@@ -543,8 +546,8 @@ export class InkwellPreviewProvider {
     this.postMessage({
       type: "updateContent",
       html: htmlBody,
-      pdfData: existingPdfData || null,
-      pdfOutput: existingPdfData ? readLastSuccessfulOutput(sourceFile, pdfPath) || null : null,
+      pdfUri,
+      pdfOutput: pdfUri ? readLastSuccessfulOutput(sourceFile, pdfPath) || null : null,
       isTeX,
       hasCodeBlocks,
       blockCount: blocks.length,
@@ -553,6 +556,25 @@ export class InkwellPreviewProvider {
       typographyNotice: layout.typographyNotice || "",
       bodyClasses: layout.bodyClasses,
     }, request);
+  }
+
+  /** Transfer a versioned local resource reference, never the PDF bytes. The
+   * public PDF must be a regular file alongside this document, not a symlink. */
+  private async pdfResource(pdfPath: string, sourceFile: string): Promise<string | null> {
+    if (!this.panel) return null;
+    try {
+      const [stat, directory, actual] = await Promise.all([
+        fs.promises.lstat(pdfPath), fs.promises.realpath(path.dirname(sourceFile)), fs.promises.realpath(pdfPath),
+      ]);
+      if (!stat.isFile() || stat.isSymbolicLink() || path.dirname(actual) !== directory) return null;
+      const fingerprint = `${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`;
+      if (this.pdfCache?.path === actual && this.pdfCache.fingerprint === fingerprint) return this.pdfCache.uri;
+      if (!this.panel) return null;
+      const resource = this.panel.webview.asWebviewUri(vscode.Uri.file(actual)).toString();
+      const uri = `${resource}${resource.includes("?") ? "&" : "?"}inkwellPdf=${encodeURIComponent(fingerprint)}`;
+      this.pdfCache = { path: actual, fingerprint, uri };
+      return uri;
+    } catch { return null; }
   }
 
   private convertLocalImages(html: string, document: vscode.TextDocument): string {
@@ -588,101 +610,89 @@ export class InkwellPreviewProvider {
   }
 
   private async handleCompile(): Promise<void> {
-    if (!this.panel || !this.currentDocument) return;
-    if (this.compileInFlight) {
-      this.compileQueued = true;
-      return;
-    }
+    const doc = this.currentDocument;
+    if (!this.panel || !doc) return;
 
-    this.compileInFlight = true;
+    const request = this.previewState.current;
+    if (this.ensureReady && !await this.ensureReady(doc, true)) return;
+    if (!request || !this.isCurrent(request)) return;
+    this.postMessage({ type: "compileStarted" }, request);
+
     try {
-      do {
-        this.compileQueued = false;
-        const doc = this.currentDocument;
-        if (!this.panel || !doc) break;
+      const result = await (this.onCompile ? this.onCompile(doc) : compile(doc));
+      if (!result) {
+        this.postMessage({ type: "compileDone", success: false, retainPdf: true, duration: 0, errors: [], log: "" }, request);
+        return;
+      }
+      if (!this.isCurrent(request)) return;
 
-        const request = this.previewState.current;
-        if (this.ensureReady && !await this.ensureReady(doc, true)) break;
-        if (!request || !this.isCurrent(request)) break;
-        this.postMessage({ type: "compileStarted" }, request);
-
-        try {
-          const result = await compile(doc);
-
-          this.outputChannel.clear();
-          this.outputChannel.appendLine(`Inkwell compile: ${doc.uri.fsPath}`);
-          this.outputChannel.appendLine(
-            `Result: ${result.success ? "success" : "failed"} (${result.duration.toFixed(1)}s)`
-          );
-          if (result.errors.length) {
-            this.outputChannel.appendLine(`\n--- Errors (${result.errors.length}) ---`);
-            for (const err of result.errors) {
-              const loc = err.line ? `line ${err.line}` : "unknown location";
-              this.outputChannel.appendLine(`  [${err.severity}] ${loc}: ${err.message}`);
-            }
-          }
-          if (result.log.trim()) {
-            this.outputChannel.appendLine("\n--- Full Log ---");
-            this.outputChannel.appendLine(result.log);
-          }
-
-          if (this.diagnostics) {
-            this.diagnostics.report(doc.uri, result.errors);
-          }
-
-          if (!this.isCurrent(request)) continue;
-
-          if (result.success && result.pdfPath) {
-            const pdfData = fs.readFileSync(result.pdfPath).toString("base64");
-            this.postMessage({
-              type: "compileDone",
-              success: true,
-              pdfData,
-              pdfOutput: result.lastSuccessfulOutput || null,
-              duration: result.duration,
-              errors: [],
-              log: "",
-            }, request);
-            const warnings = result.errors.filter(e => e.severity === "warning");
-            for (const w of warnings) {
-              const loc = w.line ? `line ${w.line}: ` : "";
-              this.sendLogEntry("warn", `${loc}${w.message}`, undefined, request);
-            }
-          } else {
-            const retained = result.lastSuccessfulOutput;
-            const existingPath = retained?.pdfPath || path.join(path.dirname(doc.uri.fsPath), `${path.basename(doc.uri.fsPath, path.extname(doc.uri.fsPath))}.pdf`);
-            // An older installation (or lost metadata cache) can leave a valid
-            // existing PDF with unknown provenance. Keep it for this document.
-            const pdfData = fs.existsSync(existingPath) ? fs.readFileSync(existingPath).toString("base64") : null;
-            this.postMessage({
-              type: "compileDone",
-              success: false,
-              pdfData,
-              pdfOutput: retained || null,
-              duration: result.duration,
-              errors: result.errors.map((e) => {
-                const loc = e.line ? `Line ${e.line}: ` : "";
-                return `${loc}${e.message}`;
-              }),
-              log: result.log,
-            }, request);
-          }
-        } catch (err) {
-          if (this.isCurrent(request)) {
-            this.postMessage({
-              type: "compileDone",
-              success: false,
-              retainPdf: true,
-              duration: 0,
-              errors: [String(err)],
-              log: "",
-            }, request);
-          }
+      this.outputChannel.clear();
+      this.outputChannel.appendLine(`Inkwell compile: ${doc.uri.fsPath}`);
+      this.outputChannel.appendLine(
+        `Result: ${result.success ? "success" : "failed"} (${result.duration.toFixed(1)}s)`
+      );
+      if (result.errors.length) {
+        this.outputChannel.appendLine(`\n--- Errors (${result.errors.length}) ---`);
+        for (const err of result.errors) {
+          const loc = err.line ? `line ${err.line}` : "unknown location";
+          this.outputChannel.appendLine(`  [${err.severity}] ${loc}: ${err.message}`);
         }
-      } while (this.compileQueued);
-    } finally {
-      this.compileInFlight = false;
-      this.compileQueued = false;
+      }
+      if (result.log.trim()) {
+        this.outputChannel.appendLine("\n--- Full Log ---");
+        this.outputChannel.appendLine(result.log);
+      }
+
+      if (this.diagnostics) {
+        this.diagnostics.report(doc.uri, result.errors);
+      }
+
+      if (result.success && result.pdfPath) {
+        const pdfUri = await this.pdfResource(result.pdfPath, doc.uri.fsPath);
+        this.postMessage({
+          type: "compileDone",
+          success: true,
+          pdfUri,
+          pdfOutput: result.lastSuccessfulOutput || null,
+          duration: result.duration,
+          errors: [],
+          log: "",
+        }, request);
+        const warnings = result.errors.filter(e => e.severity === "warning");
+        for (const w of warnings) {
+          const loc = w.line ? `line ${w.line}: ` : "";
+          this.sendLogEntry("warn", `${loc}${w.message}`, undefined, request);
+        }
+      } else {
+        const retained = result.lastSuccessfulOutput;
+        const existingPath = retained?.pdfPath || path.join(path.dirname(doc.uri.fsPath), `${path.basename(doc.uri.fsPath, path.extname(doc.uri.fsPath))}.pdf`);
+        // An older installation (or lost metadata cache) can leave a valid
+        // existing PDF with unknown provenance. Keep it for this document.
+        const pdfUri = await this.pdfResource(existingPath, doc.uri.fsPath);
+        this.postMessage({
+          type: "compileDone",
+          success: false,
+          pdfUri,
+          pdfOutput: retained || null,
+          duration: result.duration,
+          errors: result.errors.map((e) => {
+            const loc = e.line ? `Line ${e.line}: ` : "";
+            return `${loc}${e.message}`;
+          }),
+          log: result.log,
+        }, request);
+      }
+    } catch (err) {
+      if (this.isCurrent(request)) {
+        this.postMessage({
+          type: "compileDone",
+          success: false,
+          retainPdf: true,
+          duration: 0,
+          errors: [String(err)],
+          log: "",
+        }, request);
+      }
     }
   }
 
@@ -709,19 +719,17 @@ export class InkwellPreviewProvider {
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'none';
-      style-src ${webview.cspSource} 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
-      font-src https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
-      script-src 'nonce-${nonce}' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
-      worker-src blob:;
-      img-src ${webview.cspSource} data: https:;
+      style-src ${webview.cspSource} 'unsafe-inline';
+      font-src ${webview.cspSource} data:;
+      script-src 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval';
+      worker-src ${webview.cspSource} blob:;
+      connect-src ${webview.cspSource};
+      img-src ${webview.cspSource} data:;
       object-src ${webview.cspSource};
       frame-src ${webview.cspSource};">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-  <link rel="stylesheet" id="hljs-light" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
-  <link rel="stylesheet" id="hljs-dark" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
   <link rel="stylesheet" href="${cssUri}">
-  <style>
+  <style nonce="${nonce}">
     :root {
       --body-font: var(--vscode-font-family, sans-serif);
       --heading-font: var(--body-font);
@@ -1152,807 +1160,7 @@ export class InkwellPreviewProvider {
     </div>
   </div>
 
-  <script nonce="${nonce}" src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-  <script nonce="${nonce}" src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
-  <script nonce="${nonce}" src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-  <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-  <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
-  <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/bash.min.js"></script>
-  <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
-  <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/r.min.js"></script>
-  <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
-  <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/julia.min.js"></script>
-  <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/yaml.min.js"></script>
-  <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/json.min.js"></script>
-  <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/latex.min.js"></script>
-  <script nonce="${nonce}">
-  (function() {
-    var vscodeApi = acquireVsCodeApi();
-    var viewerApi = (${viewerStateRuntime.toString()})();
-    var changeFontScale = viewerApi.changeFontScale;
-    var readViewerState = viewerApi.readViewerState;
-    var viewerState = readViewerState(vscodeApi.getState ? vscodeApi.getState() : undefined, ${this.viewerState.fontScale}, "${initialTab}");
-    var currentTab = viewerState.selectedTab;
-    var currentPdfData = null;
-    var currentPdfDoc = null;
-    var pdfRenderVersion = 0;
-    var contentRevision = 0;
-    var documentUri = null;
-    var sourceVersion = null;
-    var currentPdfOutput = null;
-    var runId = 0;
-
-    if (typeof pdfjsLib !== "undefined") {
-      pdfjsLib.GlobalWorkerOptions.workerSrc =
-        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-    }
-
-    var tabs = document.querySelectorAll(".inkwell-tab");
-    var previewPane = document.getElementById("pane-preview");
-    var pdfPane = document.getElementById("pane-pdf");
-    var printPane = document.getElementById("pane-print");
-    var printStage = document.getElementById("print-page-stage");
-    var articleEl = document.getElementById("article-content");
-    var compileBtn = document.getElementById("compile-btn");
-    var compileIcon = document.getElementById("compile-icon");
-    var compileStatus = document.getElementById("compile-status");
-    var pdfPlaceholder = document.getElementById("pdf-placeholder");
-    var pdfOutputStatus = document.getElementById("pdf-output-status");
-    var compileErrors = document.getElementById("compile-errors");
-    var runBtn = document.getElementById("run-btn");
-    var runIcon = document.getElementById("run-icon");
-    var runPanel = document.getElementById("run-panel");
-    var runSummary = document.getElementById("run-summary");
-    var runBlockList = document.getElementById("run-block-list");
-    var runCancelBtn = document.getElementById("run-cancel-btn");
-    var runPanelClose = document.getElementById("run-panel-close");
-    var printBtn = document.getElementById("print-btn");
-    var logPane = document.getElementById("pane-log");
-    var logEntries = document.getElementById("log-entries");
-    var logClearBtn = document.getElementById("log-clear-btn");
-    var logBadge = document.getElementById("log-badge");
-    var isRunning = false;
-    var logErrorCount = 0;
-    var docTitle = "";
-    var printPaginated = false;
-
-    var STATUS_ICONS = {
-      pending: "\\u25CB",
-      running: "\\u25F7",
-      cached: "\\u21BB",
-      done: "\\u2713",
-      failed: "\\u2717",
-      cancelled: "\\u2014"
-    };
-
-    function persistViewerState(notify) {
-      if (vscodeApi.setState) vscodeApi.setState(viewerState);
-      if (notify !== false) vscodeApi.postMessage({ type: "viewerStateChanged", state: viewerState });
-    }
-
-    function applyViewerState(next, notify) {
-      var previous = viewerState;
-      viewerState = readViewerState(next);
-      articleEl.style.zoom = String(viewerState.fontScale / 100);
-      printStage.style.zoom = String(viewerState.fontScale / 100);
-      document.getElementById("font-scale").textContent = viewerState.fontScale + "%";
-      document.getElementById("font-decrease").disabled = viewerState.fontScale <= 50;
-      document.getElementById("font-increase").disabled = viewerState.fontScale >= 200;
-      document.getElementById("pdf-fit-mode").value = viewerState.pdfFitMode;
-      document.getElementById("pdf-zoom").value = String(viewerState.pdfZoom);
-      if (viewerState.selectedTab !== currentTab) switchTab(viewerState.selectedTab, false);
-      else if (currentTab === "pdf" && currentPdfData && (previous.pdfFitMode !== viewerState.pdfFitMode || previous.pdfZoom !== viewerState.pdfZoom)) renderPdf(currentPdfData);
-      persistViewerState(notify);
-    }
-
-    ["decrease", "increase", "reset"].forEach(function(action) {
-      document.getElementById("font-" + action).addEventListener("click", function() {
-        applyViewerState(Object.assign({}, viewerState, { fontScale: changeFontScale(viewerState.fontScale, action) }));
-      });
-    });
-    document.getElementById("pdf-fit-mode").addEventListener("change", function(event) {
-      applyViewerState(Object.assign({}, viewerState, { pdfFitMode: event.target.value }));
-    });
-    document.getElementById("pdf-zoom").addEventListener("change", function(event) {
-      applyViewerState(Object.assign({}, viewerState, { pdfFitMode: "custom", pdfZoom: Number(event.target.value) }));
-    });
-
-    function switchTab(tab, notify) {
-      currentTab = tab;
-      viewerState = Object.assign({}, viewerState, { selectedTab: tab });
-      persistViewerState(notify);
-      tabs.forEach(function(t) {
-        t.classList.toggle("active", t.getAttribute("data-tab") === tab);
-      });
-      previewPane.classList.toggle("active", tab === "preview");
-      if (printPane) printPane.classList.toggle("active", tab === "print");
-      pdfPane.classList.toggle("active", tab === "pdf");
-      logPane.classList.toggle("active", tab === "log");
-      if (tab === "pdf" && currentPdfData) {
-        renderPdf(currentPdfData);
-      }
-      if (tab === "print") {
-        paginateForPrint();
-      }
-      if (tab === "log") {
-        logErrorCount = 0;
-        logBadge.classList.remove("visible");
-        logBadge.textContent = "";
-      }
-    }
-
-    /* Populate #print-page-stage by cloning the article-content and
-       splitting children across fixed-height page sheets. Purely visual
-       — the original article is never modified. Uses overflow detection
-       with getBoundingClientRect after each append. Re-runs on content
-       updates and on explicit window resize. */
-    function paginateForPrint() {
-      if (!printStage || !articleEl) return;
-      if (printPaginated) return;
-
-      var source = articleEl.cloneNode(true);
-      var children = Array.prototype.slice.call(source.childNodes).filter(function(n) {
-        if (n.nodeType === 1) return true;
-        if (n.nodeType === 3 && n.textContent.trim()) return true;
-        return false;
-      });
-
-      printStage.innerHTML = "";
-      var pageIndex = 0;
-      var page = createPageSheet(++pageIndex);
-      printStage.appendChild(page);
-      var body = page.querySelector(".page-body");
-
-      function overflowing(el) {
-        return el.scrollHeight > el.clientHeight + 2;
-      }
-
-      for (var i = 0; i < children.length; i++) {
-        var node = children[i].cloneNode(true);
-        body.appendChild(node);
-
-        if (overflowing(body)) {
-          if (body.childNodes.length === 1) {
-            // single oversized element — leave it on its page.
-            page = createPageSheet(++pageIndex);
-            printStage.appendChild(page);
-            body = page.querySelector(".page-body");
-          } else {
-            body.removeChild(node);
-            page = createPageSheet(++pageIndex);
-            printStage.appendChild(page);
-            body = page.querySelector(".page-body");
-            body.appendChild(node);
-            if (overflowing(body) && body.childNodes.length === 1) {
-              // accept the overflow for single oversized nodes.
-            }
-          }
-        }
-      }
-
-      var totalPages = pageIndex;
-      printStage.querySelectorAll(".page-sheet").forEach(function(sheet, idx) {
-        var ft = sheet.querySelector(".page-footer");
-        if (ft) {
-          var right = ft.querySelector(".pf-right");
-          if (right) right.textContent = (idx + 1) + " / " + totalPages;
-        }
-      });
-
-      printPaginated = true;
-    }
-
-    function createPageSheet(idx) {
-      var sheet = document.createElement("div");
-      sheet.className = "page-sheet";
-
-      var header = document.createElement("div");
-      header.className = "page-header";
-      header.innerHTML = '<span class="ph-left">' + esc(docTitle || "") + '</span>' +
-        '<span class="ph-right"></span>';
-      sheet.appendChild(header);
-
-      var body = document.createElement("div");
-      body.className = "page-body";
-      sheet.appendChild(body);
-
-      var footer = document.createElement("div");
-      footer.className = "page-footer";
-      footer.innerHTML = '<span class="pf-left"></span>' +
-        '<span class="pf-right">' + idx + '</span>';
-      sheet.appendChild(footer);
-
-      return sheet;
-    }
-
-    var paginateResizeTimer = null;
-    window.addEventListener("resize", function() {
-      if (currentTab !== "print" && currentTab !== "pdf") return;
-      if (paginateResizeTimer) clearTimeout(paginateResizeTimer);
-      paginateResizeTimer = setTimeout(function() {
-        if (currentTab === "pdf") { if (currentPdfData) renderPdf(currentPdfData); return; }
-        printPaginated = false;
-        paginateForPrint();
-      }, 300);
-    });
-
-    function addLogEntry(tag, tagClass, message, details) {
-      var empty = logEntries.querySelector(".log-empty");
-      if (empty) empty.remove();
-
-      var now = new Date();
-      var ts = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-
-      var entry = document.createElement("div");
-      entry.className = "log-entry";
-
-      var header = document.createElement("div");
-      header.className = "log-entry-header";
-      header.innerHTML = '<span class="log-tag ' + tagClass + '">' + tag + '</span>' +
-        '<span>' + ts + '</span>';
-      entry.appendChild(header);
-
-      var body = document.createElement("div");
-      body.className = "log-entry-body" + (tagClass === "log-tag-error" ? " is-error" : "");
-      body.textContent = message;
-      entry.appendChild(body);
-
-      if (details && details.trim()) {
-        var toggle = document.createElement("button");
-        toggle.className = "log-entry-toggle";
-        toggle.textContent = "Show details";
-        entry.appendChild(toggle);
-
-        var detailsEl = document.createElement("div");
-        detailsEl.className = "log-entry-details";
-        detailsEl.textContent = details;
-        entry.appendChild(detailsEl);
-
-        toggle.addEventListener("click", function() {
-          detailsEl.classList.toggle("visible");
-          toggle.textContent = detailsEl.classList.contains("visible") ? "Hide details" : "Show details";
-        });
-      }
-
-      logEntries.appendChild(entry);
-      logEntries.scrollTop = logEntries.scrollHeight;
-
-      if (tagClass === "log-tag-error" && currentTab !== "log") {
-        logErrorCount++;
-        logBadge.textContent = String(logErrorCount);
-        logBadge.classList.add("visible");
-      }
-    }
-
-    function destroyPdf(pdf) {
-      if (!pdf) return;
-      try { Promise.resolve(pdf.destroy()).catch(function() {}); } catch (e) {}
-    }
-
-    function clearPdf() {
-      currentPdfData = null;
-      currentPdfOutput = null;
-      pdfRenderVersion++;
-      destroyPdf(currentPdfDoc);
-      currentPdfDoc = null;
-      var existing = pdfPane.querySelector(".pdf-canvas-container");
-      if (existing) existing.remove();
-      var embed = pdfPane.querySelector("embed");
-      if (embed) embed.remove();
-      compileErrors.style.display = "none";
-      compileErrors.innerHTML = "";
-      pdfOutputStatus.textContent = "";
-      pdfOutputStatus.style.display = "none";
-      pdfPlaceholder.innerHTML = "<p>No PDF yet.</p><p>Click <strong>Compile</strong> to build.</p>";
-      pdfPlaceholder.style.display = "block";
-    }
-
-    function labelPdf() {
-      if (!currentPdfData) return;
-      var label = "Last successful output";
-      if (currentPdfOutput) {
-        label += " — source version " + currentPdfOutput.sourceVersion +
-          " — " + new Date(currentPdfOutput.publishedAt).toLocaleString();
-      } else {
-        label = "Existing PDF — source version and build time unavailable";
-      }
-      pdfOutputStatus.textContent = label;
-      pdfOutputStatus.style.display = "block";
-    }
-
-    function updatePdf(data, output) {
-      if (data === null) { clearPdf(); return; }
-      if (typeof data !== "string") return;
-      currentPdfData = data;
-      currentPdfOutput = output || null;
-      labelPdf();
-      if (currentTab === "pdf") renderPdf(data);
-    }
-
-    function resetDocument() {
-      articleEl.innerHTML = "";
-      document.getElementById("typography-notice").style.display = "none";
-      if (printStage) printStage.innerHTML = "";
-      printPaginated = false;
-      docTitle = "";
-      clearPdf();
-      runPanel.classList.remove("visible");
-      runBlockList.innerHTML = "";
-      runSummary.textContent = "";
-      runBtn.style.display = "none";
-      logEntries.innerHTML = '<div class="log-empty">No output yet.</div>';
-      logErrorCount = 0;
-      logBadge.classList.remove("visible");
-      logBadge.textContent = "";
-    }
-
-    function renderPdf(base64Data) {
-      currentPdfData = base64Data;
-      pdfRenderVersion++;
-      var version = pdfRenderVersion;
-
-      pdfPlaceholder.style.display = "none";
-      compileErrors.style.display = "none";
-
-      var existing = pdfPane.querySelector(".pdf-canvas-container");
-      if (existing) existing.remove();
-
-      if (currentPdfDoc) {
-        destroyPdf(currentPdfDoc);
-        currentPdfDoc = null;
-      }
-
-      if (typeof pdfjsLib === "undefined") {
-        pdfPlaceholder.innerHTML = "<p>PDF compiled but viewer failed to load.</p>";
-        pdfPlaceholder.style.display = "block";
-        return;
-      }
-
-      var binary = atob(base64Data);
-      var bytes = new Uint8Array(binary.length);
-      for (var i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-      }
-
-      var container = document.createElement("div");
-      container.className = "pdf-canvas-container";
-      pdfPane.appendChild(container);
-
-      pdfjsLib.getDocument({ data: bytes }).promise.then(function(pdf) {
-        if (version !== pdfRenderVersion) {
-          destroyPdf(pdf);
-          return;
-        }
-        currentPdfDoc = pdf;
-        for (var pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-          (function(num) {
-            pdf.getPage(num).then(function(page) {
-              if (version !== pdfRenderVersion) return;
-              var natural = page.getViewport({ scale: 1 });
-              var widthScale = Math.max(0.1, (pdfPane.clientWidth - 24) / natural.width);
-              var scale = viewerState.pdfFitMode === "custom" ? viewerState.pdfZoom / 100 : viewerState.pdfFitMode === "page" ? Math.min(widthScale, Math.max(0.1, (pdfPane.clientHeight - 90) / natural.height)) : widthScale;
-              var viewport = page.getViewport({ scale: scale });
-              var canvas = document.createElement("canvas");
-              canvas.width = viewport.width;
-              canvas.height = viewport.height;
-              container.appendChild(canvas);
-              return page.render({
-                canvasContext: canvas.getContext("2d"),
-                viewport: viewport
-              }).promise;
-            }).catch(function(err) {
-              if (version !== pdfRenderVersion) return;
-              pdfPlaceholder.textContent = "Failed to render PDF page: " + String(err);
-              pdfPlaceholder.style.display = "block";
-            });
-          })(pageNum);
-        }
-      }).catch(function(err) {
-        if (version !== pdfRenderVersion) return;
-        pdfPlaceholder.innerHTML = "<p>Failed to render PDF: " + esc(String(err)) + "</p>";
-        pdfPlaceholder.style.display = "block";
-      });
-    }
-
-    function showErrors(errors, log) {
-      pdfPlaceholder.style.display = "none";
-      var existing = pdfPane.querySelector("embed");
-      if (existing) existing.remove();
-      var existingCanvas = pdfPane.querySelector(".pdf-canvas-container");
-      if (existingCanvas) existingCanvas.remove();
-
-      var html = '<div class="compile-errors-header">' +
-        errors.length + ' compilation error' + (errors.length === 1 ? '' : 's') + '</div>';
-      errors.forEach(function(e) {
-        html += '<div class="compile-error-item">' + esc(e) + '</div>';
-      });
-      if (log && log.trim()) {
-        html += '<div class="compile-log-toggle" id="log-toggle">Show full log</div>';
-        html += '<div class="compile-log" id="log-content">' + esc(log) + '</div>';
-      }
-      compileErrors.innerHTML = html;
-      compileErrors.style.display = "block";
-
-      var toggle = document.getElementById("log-toggle");
-      var logEl = document.getElementById("log-content");
-      if (toggle && logEl) {
-        toggle.addEventListener("click", function() {
-          logEl.classList.toggle("visible");
-          toggle.textContent = logEl.classList.contains("visible") ? "Hide full log" : "Show full log";
-        });
-      }
-    }
-
-    function esc(text) {
-      var d = document.createElement("div");
-      d.textContent = text;
-      return d.innerHTML;
-    }
-
-    function highlightCode() {
-      if (!articleEl || typeof hljs === "undefined") return;
-      articleEl.querySelectorAll("pre code").forEach(function(block) {
-        if (block.classList.contains("hljs")) return;
-        // Skip mermaid, it's converted separately.
-        if (block.className && block.className.indexOf("language-mermaid") !== -1) return;
-        try {
-          hljs.highlightElement(block);
-        } catch (e) {}
-      });
-    }
-
-    function renderMath() {
-      if (typeof renderMathInElement !== "undefined" && articleEl) {
-        renderMathInElement(articleEl, {
-          ignoredClasses: ["inkwell-table-literal"],
-          delimiters: [
-            { left: "$$", right: "$$", display: true },
-            { left: "$", right: "$", display: false },
-            { left: "\\\\[", right: "\\\\]", display: true },
-            { left: "\\\\(", right: "\\\\)", display: false }
-          ],
-          throwOnError: false
-        });
-      }
-    }
-
-    var mermaidInited = false;
-    var mermaidSvgCache = {};
-
-    /* Normalize common mermaid-v10 syntax quirks in the raw source.
-       - <br/> (XHTML self-closing) -> <br> which v10 accepts more reliably.
-       - Collapse trailing whitespace that can confuse the parser. */
-    function normalizeMermaidSrc(src) {
-      return src
-        .replace(/<br[^>]*>/g, "<br>")
-        .replace(/[ \\t]+$/gm, "")
-        .trim();
-    }
-
-    var mermaidRenderCounter = 0;
-
-    function renderMermaid() {
-      var revision = contentRevision;
-      var uri = documentUri;
-      if (!articleEl || typeof mermaid === "undefined") return;
-
-      var isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      if (!mermaidInited) {
-        mermaid.initialize({
-          startOnLoad: false,
-          theme: isDark ? "dark" : "default",
-          securityLevel: "loose",
-          flowchart: { htmlLabels: true }
-        });
-        mermaidInited = true;
-      }
-
-      var blocks = Array.prototype.slice.call(
-        articleEl.querySelectorAll("code.language-mermaid")
-      );
-
-      blocks.forEach(function(block) {
-        var pre = block.parentElement;
-        if (!pre || !pre.parentNode) return;
-        var src = normalizeMermaidSrc(block.textContent || "");
-
-        var wrapper = document.createElement("div");
-        wrapper.className = "mermaid";
-        wrapper.setAttribute("data-original-src", src);
-        pre.parentNode.replaceChild(wrapper, pre);
-
-        var cached = mermaidSvgCache[src];
-        if (cached) {
-          wrapper.innerHTML = cached;
-          wrapper.setAttribute("data-processed", "true");
-          return;
-        }
-
-        var id = "inkwell-mermaid-" + (++mermaidRenderCounter);
-        try {
-          var result = mermaid.render(id, src);
-          var handleResult = function(r) {
-            if (revision !== contentRevision || uri !== documentUri) return;
-            var svg = typeof r === "string" ? r : r.svg;
-            wrapper.innerHTML = svg;
-            wrapper.setAttribute("data-processed", "true");
-            if (typeof r !== "string" && r.bindFunctions) {
-              try { r.bindFunctions(wrapper); } catch (e) {}
-            }
-            mermaidSvgCache[src] = svg;
-          };
-          if (result && typeof result.then === "function") {
-            result.then(handleResult).catch(function(err) {
-              if (revision !== contentRevision || uri !== documentUri) return;
-              renderMermaidError(wrapper, src, err);
-            });
-          } else {
-            handleResult(result);
-          }
-        } catch (err) {
-          renderMermaidError(wrapper, src, err);
-        }
-      });
-    }
-
-    function renderMermaidError(wrapper, src, err) {
-      var msg = (err && (err.message || err.str)) || String(err);
-      var line = err && err.hash && err.hash.line ? " (line " + err.hash.line + ")" : "";
-      wrapper.className = "mermaid mermaid-error";
-      wrapper.innerHTML =
-        '<div class="mermaid-error-box">' +
-          '<div class="mermaid-error-title">Mermaid error' + esc(line) + '</div>' +
-          '<div class="mermaid-error-msg">' + esc(msg) + '</div>' +
-          '<details><summary>Show source</summary><pre class="mermaid-error-src">' + esc(src) + '</pre></details>' +
-        '</div>';
-    }
-
-    tabs.forEach(function(t) {
-      t.addEventListener("click", function() {
-        switchTab(t.getAttribute("data-tab"));
-      });
-    });
-
-    runBtn.addEventListener("click", function() {
-      vscodeApi.postMessage({ type: "run" });
-    });
-
-    runCancelBtn.addEventListener("click", function() {
-      vscodeApi.postMessage({ type: "cancelRun" });
-    });
-
-    runPanelClose.addEventListener("click", function() {
-      runPanel.classList.remove("visible");
-    });
-
-    logClearBtn.addEventListener("click", function() {
-      logEntries.innerHTML = '<div class="log-empty">Log cleared.</div>';
-      logErrorCount = 0;
-      logBadge.classList.remove("visible");
-      logBadge.textContent = "";
-    });
-
-    compileBtn.addEventListener("click", function() {
-      vscodeApi.postMessage({ type: "compile" });
-    });
-
-    function wireCitationScroll() {
-      if (!articleEl) return;
-      articleEl.querySelectorAll(".citation a[href^='#'], .cross-ref[href^='#']").forEach(function(a) {
-        a.addEventListener("click", function(ev) {
-          var href = a.getAttribute("href") || "";
-          if (!href.startsWith("#")) return;
-          var target = articleEl.querySelector(href) || document.querySelector(href);
-          if (target) {
-            ev.preventDefault();
-            target.scrollIntoView({ behavior: "smooth", block: "start" });
-          }
-        });
-      });
-    }
-
-    printBtn.addEventListener("click", function() {
-      // window.print() is unreliable inside a VS Code webview (the
-      // sandbox often swallows the dialog silently), so rebind Print
-      // to the same pipeline as the Compile button: pandoc + xelatex
-      // produces a real PDF and the extension then switches to the
-      // PDF tab to display it. This matches what "print" means for a
-      // typeset document anyway.
-      vscodeApi.postMessage({ type: "compile" });
-    });
-
-    window.addEventListener("message", function(event) {
-      var msg = event.data;
-      if (msg && msg.type === "viewerState") { applyViewerState(msg.state, false); return; }
-      if (!msg || typeof msg.revision !== "number" || typeof msg.documentUri !== "string") return;
-      var startsRender = msg.type === "renderStarted" || msg.type === "updateContent";
-      if (msg.revision < contentRevision) return;
-      if (msg.revision === contentRevision && documentUri !== null && msg.documentUri !== documentUri) return;
-      if (!startsRender && (msg.revision !== contentRevision || msg.documentUri !== documentUri)) return;
-      if (typeof msg.runId === "number") {
-        if (msg.runId < runId) return;
-        runId = msg.runId;
-      }
-      if (startsRender) {
-        var changed = documentUri !== msg.documentUri;
-        var newer = contentRevision !== msg.revision;
-        if (changed) resetDocument();
-        if (changed || newer) {
-          // Pending old PDF loads and status timers lose authority at once.
-          pdfRenderVersion++;
-          compileBtn.disabled = false;
-          compileIcon.textContent = "\\u25B6";
-          compileStatus.textContent = "";
-          if (changed || sourceVersion !== msg.sourceVersion) {
-            isRunning = false;
-            runBtn.disabled = false;
-            runIcon.textContent = "\\u2699";
-            runCancelBtn.style.display = "none";
-            runPanel.classList.remove("visible");
-            runBlockList.innerHTML = "";
-          }
-        }
-        documentUri = msg.documentUri;
-        sourceVersion = msg.sourceVersion;
-        contentRevision = msg.revision;
-      }
-      if (msg.type === "renderStarted") return;
-
-      if (msg.type === "updateContent") {
-        articleEl.innerHTML = msg.html;
-        docTitle = msg.title || "";
-
-        var layoutStyleEl = document.getElementById("inkwell-layout-style");
-        if (!layoutStyleEl) {
-          layoutStyleEl = document.createElement("style");
-          layoutStyleEl.id = "inkwell-layout-style";
-          document.head.appendChild(layoutStyleEl);
-        }
-        layoutStyleEl.textContent = msg.layoutCss || "";
-        var typographyNotice = document.getElementById("typography-notice");
-        typographyNotice.textContent = msg.typographyNotice || "";
-        typographyNotice.style.display = msg.typographyNotice ? "block" : "none";
-
-        document.body.className = document.body.className
-          .split(" ")
-          .filter(function(c) {
-            return c && c !== "printing" &&
-              c.indexOf("table-style-") !== 0 &&
-              c.indexOf("pagestyle-") !== 0 &&
-              c !== "table-stripe" &&
-              c !== "caption-above" && c !== "caption-below";
-          }).join(" ");
-        if (msg.bodyClasses && msg.bodyClasses.length) {
-          for (var bc = 0; bc < msg.bodyClasses.length; bc++) {
-            document.body.classList.add(msg.bodyClasses[bc]);
-          }
-        }
-        highlightCode();
-        renderMath();
-        renderMermaid();
-        wireCitationScroll();
-        printPaginated = false;
-        if (currentTab === "print") paginateForPrint();
-        updatePdf(msg.pdfData, msg.pdfOutput);
-        if (msg.hasCodeBlocks) {
-          runBtn.style.display = "";
-        } else {
-          runBtn.style.display = "none";
-        }
-      } else if (msg.type === "runStarted") {
-        isRunning = true;
-        runBtn.disabled = true;
-        runIcon.textContent = "\\u23F3";
-        runCancelBtn.style.display = "";
-        runPanel.classList.add("visible");
-        runBlockList.innerHTML = "";
-        runSummary.textContent = "Starting...";
-        addLogEntry("run", "log-tag-run", "Running " + msg.blockCount + " code block" + (msg.blockCount === 1 ? "" : "s") + "...", "");
-        for (var bi = 0; bi < msg.blockCount; bi++) {
-          var item = document.createElement("div");
-          item.className = "run-block-item status-pending";
-          item.id = "run-block-" + bi;
-          item.innerHTML = '<span class="run-block-icon">' + STATUS_ICONS.pending + '</span>' +
-            '<span class="run-block-label">Block ' + (bi + 1) + '</span>' +
-            '<span class="run-block-meta"></span>';
-          runBlockList.appendChild(item);
-        }
-      } else if (msg.type === "blockProgress") {
-        var el = document.getElementById("run-block-" + msg.index);
-        if (el) {
-          el.className = "run-block-item status-" + msg.status;
-          var iconEl = el.querySelector(".run-block-icon");
-          var labelEl = el.querySelector(".run-block-label");
-          var metaEl = el.querySelector(".run-block-meta");
-          if (iconEl) {
-            if (msg.status === "running") {
-              iconEl.innerHTML = '<span class="spinner">' + STATUS_ICONS.running + '</span>';
-            } else {
-              iconEl.textContent = STATUS_ICONS[msg.status] || STATUS_ICONS.pending;
-            }
-          }
-          if (labelEl) labelEl.textContent = msg.label;
-          if (metaEl) {
-            var nocache = msg.noCache ? " (no-cache)" : "";
-            if (msg.status === "cached") metaEl.textContent = "cached";
-            else if (msg.elapsed) metaEl.textContent = (msg.elapsed / 1000).toFixed(1) + "s" + nocache;
-            else if (msg.status === "running") metaEl.textContent = msg.noCache ? "running (no-cache)" : "running";
-          }
-          if (msg.error) {
-            var errDiv = document.createElement("div");
-            errDiv.className = "run-block-error";
-            errDiv.textContent = msg.error;
-            el.after(errDiv);
-            addLogEntry("error", "log-tag-error", "Block " + (msg.index + 1) + " (" + msg.lang + ") failed: " + msg.error, "");
-          }
-        }
-        var doneCount = runBlockList.querySelectorAll(".status-done, .status-cached, .status-failed, .status-cancelled").length;
-        runSummary.textContent = doneCount + "/" + msg.total + " blocks";
-      } else if (msg.type === "runComplete") {
-        isRunning = false;
-        runBtn.disabled = false;
-        runIcon.textContent = "\\u2699";
-        runCancelBtn.style.display = "none";
-        var parts = [];
-        if (msg.ran) parts.push(msg.ran + " ran");
-        if (msg.cached) parts.push(msg.cached + " cached");
-        if (msg.failed) parts.push(msg.failed + " failed");
-        if (msg.cancelled) parts.push(msg.cancelled + " cancelled");
-        var outcomeLabel = msg.outcome === "done" ? "Complete" : msg.outcome === "failed" ? "Errors" : "Cancelled";
-        runSummary.textContent = outcomeLabel + ": " + parts.join(", ");
-        var logTag = msg.outcome === "done" ? "log-tag-run" : msg.outcome === "failed" ? "log-tag-error" : "log-tag-info";
-        addLogEntry("run", logTag, "Run " + outcomeLabel.toLowerCase() + ": " + parts.join(", "), "");
-        if (msg.outcome === "done") {
-          compileStatus.textContent = "Run done. Compile to update PDF.";
-          setTimeout(function() {
-            if (msg.revision === contentRevision && msg.documentUri === documentUri) compileStatus.textContent = "";
-          }, 6000);
-        }
-      } else if (msg.type === "compileStarted") {
-        compileBtn.disabled = true;
-        compileIcon.textContent = "\\u23F3";
-        compileStatus.textContent = "Compiling...";
-        addLogEntry("compile", "log-tag-compile", "LaTeX compilation started...", "");
-      } else if (msg.type === "compileDone") {
-        compileBtn.disabled = false;
-        compileIcon.textContent = "\\u25B6";
-        if (!msg.retainPdf) updatePdf(msg.pdfData, msg.pdfOutput);
-        else labelPdf();
-        if (msg.success && msg.pdfData) {
-          compileStatus.textContent = "Done (" + msg.duration.toFixed(1) + "s)";
-          addLogEntry("compile", "log-tag-compile", "PDF compiled successfully (" + msg.duration.toFixed(1) + "s)", "");
-          if (currentTab !== "pdf") {
-            switchTab("pdf");
-          }
-        } else if (msg.errors && msg.errors.length) {
-          compileStatus.textContent = msg.errors.length + " error(s)";
-          for (var ei = 0; ei < msg.errors.length; ei++) {
-            addLogEntry("error", "log-tag-error", msg.errors[ei], "");
-          }
-          addLogEntry("compile", "log-tag-error", "Compilation failed with " + msg.errors.length + " error(s)", msg.log || "");
-          if (!currentPdfData) showErrors(msg.errors, msg.log || "");
-          switchTab("log");
-        } else {
-          compileStatus.textContent = "Failed";
-          addLogEntry("error", "log-tag-error", "Compilation failed", msg.log || "");
-          if (!currentPdfData) showErrors(["Compilation failed. Check the Log tab for details."], msg.log || "");
-          switchTab("log");
-        }
-        setTimeout(function() {
-          if (msg.revision === contentRevision && msg.documentUri === documentUri) compileStatus.textContent = "";
-        }, 8000);
-      } else if (msg.type === "logEntry") {
-        var lTag = msg.tag === "error" ? "log-tag-error" : msg.tag === "warn" ? "log-tag-warn" : msg.tag === "run" ? "log-tag-run" : msg.tag === "compile" ? "log-tag-compile" : "log-tag-info";
-        addLogEntry(msg.tag, lTag, msg.message, msg.details);
-      }
-    });
-
-    applyViewerState(viewerState, false);
-    switchTab(viewerState.selectedTab, false);
-    vscodeApi.postMessage({ type: "ready" });
-  })();
-  </script>
+  <script nonce="${nonce}" src="${mediaUri("preview-client.js")}" data-inkwell-client data-font-scale="${this.viewerState.fontScale}" data-initial-tab="${initialTab}" data-vendor-root="${mediaUri("vendor")}/"></script>
 </body>
 </html>`;
   }
@@ -2071,12 +1279,7 @@ function escapeHtml(text: string): string {
 }
 
 function getNonce(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let result = "";
-  for (let i = 0; i < 32; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
+  return randomBytes(24).toString("base64");
 }
 
 // ── Cross-references and citations ────────────────────────────────────

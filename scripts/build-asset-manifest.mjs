@@ -2,12 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { readPreviewAssetPaths } from './build-preview-assets.mjs';
 
-export const ASSET_MANIFEST_PATH = 'out/asset-manifest.json';
+export const ASSET_MANIFEST_PATH = 'out/assets-manifest.json';
 export const RUNTIME_TREES = ['templates', 'filters', 'csl', 'media', 'examples'];
 export const RUNTIME_BUNDLES = ['out/extension.js', 'out/doctor-cli.js', 'out/install-cli.js', 'out/smoke-cli.js'];
 export const CORE_ASSETS = ['package.json', ...RUNTIME_BUNDLES, 'guide.md', '.cursor/agents/inkwell-guide.md',
-  'requirements-latex.txt', 'examples/requirements.txt', 'media/icon.png', 'media/preview.css', 'media/preview.js'];
+  'requirements-latex.txt', 'examples/requirements.txt', 'schemas/doctor.schema.json', 'media/icon.png', 'media/preview.css', 'media/preview.js'];
 const privateParts = new Set(['.git', '.github', '.husky', '.inkwell', '.codex', '.agents', 'node_modules',
   '__pycache__', '.venv', 'venv', '.ds_store', '.ssh', '.aws', '.azure', '.config', '.cache', '.vscode']);
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -30,6 +31,41 @@ export function isPrivatePath(value) {
     || ['src', 'tests', 'benchmarks'].includes(parts[0])
     || (parts[0] === '.cursor' && normalized !== '.cursor/agents/inkwell-guide.md')
     || /\.(?:pem|key|p12|pfx|vsix)$/i.test(value);
+}
+
+/** A release can load scripts/styles only from its packaged resource tree. */
+export function verifyRuntimeResourceUrls(relative, bytes) {
+  if (!/\.(?:[cm]?js|css|html)$/i.test(relative)) return;
+  // Unescape quotes from HTML shells embedded in a bundled JavaScript string.
+  const source = bytes.toString('utf8').replace(/\\(["'])/g, '$1');
+  const remote = '(?:https?:)?//';
+  const patterns = [
+    new RegExp(`<script\\b[^>]*\\bsrc\\s*=\\s*["']\\s*${remote}`, 'i'),
+    new RegExp(`<link\\b(?=[^>]*\\brel\\s*=\\s*["'](?:stylesheet|modulepreload)["'])[^>]*\\bhref\\s*=\\s*["']\\s*${remote}`, 'i'),
+    new RegExp(`\\b(?:import|importScripts)\\s*\\(\\s*["']${remote}`, 'i'),
+    new RegExp(`\\bimport\\s*["']${remote}`, 'i'),
+    new RegExp(`\\b(?:import|export)\\s+[^;\\n]*?\\bfrom\\s*["']${remote}`, 'i'),
+    new RegExp(`@import\\s+(?:url\\(\\s*)?["']?${remote}`, 'i'),
+  ];
+  if (patterns.some(pattern => pattern.test(source))) throw new Error(`Remote runtime script/style URL is forbidden: ${relative}`);
+}
+
+/** Validate the vendor's independent provenance against the bytes being shipped. */
+export function verifyPreviewAssets(readAsset) {
+  const provenanceBytes = readAsset('media/vendor/versions.json');
+  if (!provenanceBytes) throw new Error('Missing required preview vendor provenance.');
+  const provenance = JSON.parse(provenanceBytes.toString('utf8'));
+  const required = readPreviewAssetPaths(undefined, provenance);
+  for (const relative of required) {
+    const bytes = readAsset(relative);
+    if (!bytes?.length) throw new Error(`Missing required preview asset: ${relative}`);
+    const expected = provenance.files[relative.slice('media/vendor/'.length)];
+    if (relative.startsWith('media/vendor/') && expected && (bytes.length !== expected.size
+        || crypto.createHash('sha256').update(bytes).digest('hex') !== expected.sha256)) {
+      throw new Error(`Preview vendor hash/size mismatch: ${relative}`);
+    }
+  }
+  return required;
 }
 
 /** Read the explicit runtime list without executing extension code or requiring a tsc build. */
@@ -59,7 +95,8 @@ function regularFile(root, relative) {
 /** Inventory only runtime trees, skipping private directories before descending into them. */
 export function buildAssetManifest(root = repositoryRoot) {
   root = path.resolve(root);
-  const files = new Set([...CORE_ASSETS, ...readBundledAssetPaths(root)]);
+  const previewPaths = verifyPreviewAssets(relative => fs.readFileSync(regularFile(root, relative)));
+  const files = new Set([...CORE_ASSETS, ...readBundledAssetPaths(root), ...previewPaths]);
   const walk = relative => {
     if (isPrivatePath(relative)) return;
     const full = path.join(root, relative);
@@ -83,10 +120,12 @@ export function buildAssetManifest(root = repositoryRoot) {
     name: packageJson.name, files: {} };
   const names = new Set();
   for (const relative of [...files].sort()) {
+    if (relative.startsWith('media/vendor/') && !previewPaths.includes(relative)) throw new Error(`Unlisted preview vendor asset: ${relative}`);
     const canonical = relative.normalize('NFC').toLowerCase();
     if (names.has(canonical)) throw new Error(`Colliding asset path: ${relative}`);
     names.add(canonical);
     const bytes = fs.readFileSync(regularFile(root, relative));
+    verifyRuntimeResourceUrls(relative, bytes);
     manifest.files[relative] = { sha256: crypto.createHash('sha256').update(bytes).digest('hex'), size: bytes.length };
   }
   return manifest;

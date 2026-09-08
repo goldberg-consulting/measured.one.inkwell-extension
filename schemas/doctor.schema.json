@@ -1,0 +1,85 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:inkwell:doctor:1",
+  "title": "Inkwell doctor JSON, schema version 1",
+  "description": "The shared extension and headless doctor report. Exit 0 means all required checks passed; exit 1 returns a completed report that is not ready; exit 2 returns an invocation or internal-failure envelope. Optional warning checks can accompany exit 0. Check details are diagnostic JSON whose shape depends on the check ID.",
+  "oneOf": [
+    { "$ref": "#/definitions/report" },
+    { "$ref": "#/definitions/failure" }
+  ],
+  "definitions": {
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "mode", "ready", "status", "checks", "tools", "missingPackages", "fingerprint", "extensionVersion", "cacheHit", "durationMs", "processCount", "generatedAt"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "mode": { "enum": ["light", "full"] },
+        "ready": { "type": "boolean" },
+        "status": { "enum": ["ok", "warning", "error"] },
+        "checks": { "type": "array", "items": { "$ref": "#/definitions/check" } },
+        "tools": { "type": "object", "additionalProperties": { "$ref": "#/definitions/tool" } },
+        "tex": { "$ref": "#/definitions/texOwnership" },
+        "missingPackages": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "fingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "extensionVersion": { "type": "string", "minLength": 1, "description": "Observed package version, or unknown when package metadata cannot be read." },
+        "cacheHit": { "type": "boolean" },
+        "durationMs": { "type": "number", "minimum": 0 },
+        "processCount": { "type": "integer", "minimum": 0 },
+        "generatedAt": { "type": "string", "format": "date-time", "description": "UTC time of the original observation; a cached report retains this timestamp." }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "required", "message"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["ok", "warning", "error", "skipped"] },
+        "required": { "type": "boolean" },
+        "message": { "type": "string" },
+        "details": { "description": "Check-specific diagnostic data, including process outcomes, asset failures, editor information, migration conflicts, or smoke-build results." },
+        "durationMs": { "type": "number", "minimum": 0 }
+      }
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state"],
+      "properties": {
+        "path": { "type": "string" },
+        "version": { "type": "string" },
+        "state": { "enum": ["ready", "missing", "broken"] },
+        "exitCode": { "type": "integer" },
+        "signal": { "type": ["string", "null"] },
+        "error": { "type": "string" }
+      }
+    },
+    "texOwnership": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "distribution", "ownerUid", "currentUid", "writable", "privilege", "message"],
+      "properties": {
+        "root": { "type": "string", "minLength": 1 },
+        "distribution": { "enum": ["mactex", "basictex", "tinytex", "texlive", "unknown"] },
+        "ownerUid": { "type": "integer", "minimum": 0 },
+        "currentUid": { "type": "integer", "minimum": 0 },
+        "writable": { "type": "boolean" },
+        "privilege": { "enum": ["user", "system-admin", "repair-required"] },
+        "message": { "type": "string" },
+        "platform": { "type": "string", "description": "Optional platform supplied to the ownership classifier." }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "ready", "status", "error"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "ready": { "const": false },
+        "status": { "const": "error" },
+        "error": { "type": "string" }
+      }
+    }
+  }
+}

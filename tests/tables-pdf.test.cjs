@@ -5,6 +5,7 @@ const path = require('node:path');
 const os = require('node:os');
 const cp = require('node:child_process');
 const Module = require('node:module');
+const { selectPackagedCompiler, checkPdfGolden } = require('./helpers/pdf-goldens.cjs');
 const { resolveDocumentConfig } = require('../out/document-config');
 const { resolveTableStyle } = require('../out/table-model');
 const { resolveTypography, TEX_POINT_TO_CSS_POINT } = require('../out/style-model');
@@ -17,6 +18,7 @@ test('actual PDF table presets preserve layout tables, physical sizes and captio
   const originalLoad = Module._load;
   Module._load = function (name, ...args) { return name === 'vscode' ? headless : originalLoad.call(this, name, ...args); };
   let compile; try { ({ compile } = require('../out/compiler')); } finally { Module._load = originalLoad; }
+  compile = selectPackagedCompiler(root, compile);
   fs.mkdirSync(path.join(root, '.inkwell'));
   fs.writeFileSync(path.join(root, '.inkwell/manifest.json'), '{"schemaVersion":4,"defaults":{},"managedFiles":{}}');
   const evidence = [];
@@ -28,6 +30,7 @@ test('actual PDF table presets preserve layout tables, physical sizes and captio
     const result = await compile({ uri: headless.Uri.file(file), languageId: 'markdown', version: 1, isUntitled: false, getText: () => text });
     fs.writeFileSync(path.join(root, `${template}-${preset}.result.json`), JSON.stringify(result, null, 2));
     assert.equal(result.success, true, `${template}-${preset}: ${result.message}; ${result.logPath}`);
+    checkPdfGolden({ id: `tables-${template}-${preset}`, template, sourcePath: file, pdfPath: result.pdfPath, logPath: result.logPath });
     const probe = cp.spawnSync(process.env.INKWELL_PDF_PYTHON || 'python3', ['-c', `import fitz,json,sys\ndoc=fitz.open(sys.argv[1])\nprint(json.dumps(dict(spans=[dict(s,page=i+1) for i,p in enumerate(doc) for b in p.get_text('dict')['blocks'] if 'lines' in b for l in b['lines'] for s in l['spans']],drawings=[dict(page=i+1,color=d['color'],fill=d['fill'],width=d['width'],rect=list(d['rect']),items=[list(item[0:1])+[list(v) if hasattr(v,'x') or hasattr(v,'x0') else v for v in item[1:]] for item in d['items']]) for i,p in enumerate(doc) for d in p.get_drawings()]),default=str))`, result.pdfPath], { encoding: 'utf8' });
     assert.equal(probe.status, 0, probe.stderr);
     const actual = JSON.parse(probe.stdout);
@@ -66,6 +69,7 @@ test('wide generated tables retain the four existing two-column bridges', { skip
   const originalLoad = Module._load;
   Module._load = function (name, ...args) { return name === 'vscode' ? headless : originalLoad.call(this, name, ...args); };
   let compile; try { ({ compile } = require('../out/compiler')); } finally { Module._load = originalLoad; }
+  compile = selectPackagedCompiler(root, compile);
   fs.mkdirSync(path.join(root, '.inkwell'));
   fs.writeFileSync(path.join(root, '.inkwell/manifest.json'), '{"schemaVersion":4,"defaults":{},"managedFiles":{}}');
   const evidence = [];
@@ -76,6 +80,7 @@ test('wide generated tables retain the four existing two-column bridges', { skip
     const result = await compile({ uri: headless.Uri.file(file), languageId: 'markdown', version: 1, isUntitled: false, getText: () => text });
     fs.writeFileSync(path.join(root, `${template}.result.json`), JSON.stringify(result, null, 2));
     assert.equal(result.success, true, `${template}: ${result.message}; ${result.logPath}`);
+    checkPdfGolden({ id: `table-bridge-${template}`, template, sourcePath: file, pdfPath: result.pdfPath, logPath: result.logPath });
     const probe = cp.spawnSync(process.env.INKWELL_PDF_PYTHON || 'python3', ['-c', `import fitz,json,sys\nd=fitz.open(sys.argv[1])\nprint(json.dumps(dict(pages=len(d),text='\\n'.join(p.get_text() for p in d),bounds=[list(p.rect) for p in d],spans=[dict(s,page=i) for i,p in enumerate(d) for b in p.get_text('dict')['blocks'] if 'lines' in b for l in b['lines'] for s in l['spans']])))`, result.pdfPath], { encoding: 'utf8' });
     assert.equal(probe.status, 0, probe.stderr);
     const actual = JSON.parse(probe.stdout);
@@ -96,6 +101,7 @@ test('styled native cells retain images, math, links, citations and semantic gen
   const originalLoad = Module._load;
   Module._load = function (name, ...args) { return name === 'vscode' ? headless : originalLoad.call(this, name, ...args); };
   let compile; try { ({ compile } = require('../out/compiler')); } finally { Module._load = originalLoad; }
+  compile = selectPackagedCompiler(root, compile);
   fs.mkdirSync(path.join(root, '.inkwell'));
   fs.writeFileSync(path.join(root, '.inkwell/manifest.json'), '{"schemaVersion":4,"defaults":{},"managedFiles":{}}');
   fs.copyFileSync(path.resolve(__dirname, '../media/icon.png'), path.join(root, 'cell.png'));
@@ -107,6 +113,7 @@ test('styled native cells retain images, math, links, citations and semantic gen
     const result = await compile({ uri: headless.Uri.file(file), languageId: 'markdown', version: 1, isUntitled: false, getText: () => text });
     fs.writeFileSync(path.join(root, `${template}.result.json`), JSON.stringify(result, null, 2));
     assert.equal(result.success, true, `${template}: ${result.message}; ${result.logPath}`);
+    checkPdfGolden({ id: `table-rich-${template}`, template, sourcePath: file, pdfPath: result.pdfPath, logPath: result.logPath });
     const probe = cp.spawnSync(process.env.INKWELL_PDF_PYTHON || 'python3', ['-c', `import fitz,json,sys\nd=fitz.open(sys.argv[1])\nprint(json.dumps(dict(text='\\n'.join(p.get_text() for p in d),images=sum(len(p.get_images()) for p in d),links=[l for p in d for l in p.get_links() if 'uri' in l],spans=[s for p in d for b in p.get_text('dict')['blocks'] if 'lines' in b for l in b['lines'] for s in l['spans']]),default=str))`, result.pdfPath], { encoding: 'utf8' });
     assert.equal(probe.status, 0, probe.stderr);
     const actual = JSON.parse(probe.stdout);

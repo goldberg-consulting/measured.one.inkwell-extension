@@ -306,6 +306,13 @@ Rendered artifacts are cached in `.inkwell/mermaid/` by content hash. A diagram 
 
 **Requirements:** Homebrew `mermaid-cli` (installed by Setup / Repair) for PDF compilation. If `mmdc` is not installed, mermaid blocks pass through as code listings.
 
+### Editable run scripts
+
+**Extract Code Block to Script** creates editable source under `.inkwell/scripts/`.
+Use **Run This Block**, **Run Changed Blocks**, and **Show Current Run Details**
+from the Command Palette or CodeLens. Run commands save stable fence IDs before
+execution and reject stale or failed results. See the [run-file guide](docs/run-files.md).
+
 ### Citations and bibliography
 
 Add a `.bib` file and reference it in your frontmatter:
@@ -366,6 +373,11 @@ The preview toolbar's **A− / A+ / Reset** controls change readability from 50%
 `inkwell.preview.fontScale` supplies its initial value. PDF **Fit width**, **Fit
 page**, and **Custom zoom** are separate controls. These viewer controls never
 change the PDF or saved document.
+
+Math, diagrams, highlighting, and PDF viewing work offline. The PDF viewer keeps
+at most six page canvases and reuses the loaded file while you zoom or scroll.
+Compile requests preserve each document, and unchanged timed builds reuse a
+verified successful output. See [preview and compilation](docs/preview-and-performance.md).
 
 ### Self-contained `.inkwell/` workspace
 

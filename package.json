@@ -131,6 +131,31 @@
         "command": "inkwell.preview.resetFontScale",
         "title": "Reset Preview Text Size",
         "category": "Inkwell"
+      },
+      {
+        "command": "inkwell.extractCodeBlockToScript",
+        "title": "Inkwell: Extract Code Block to Script",
+        "category": "Inkwell"
+      },
+      {
+        "command": "inkwell.openRunScript",
+        "title": "Inkwell: Open Run Script",
+        "category": "Inkwell"
+      },
+      {
+        "command": "inkwell.runThisBlock",
+        "title": "Inkwell: Run This Block",
+        "category": "Inkwell"
+      },
+      {
+        "command": "inkwell.runChangedBlocks",
+        "title": "Inkwell: Run Changed Blocks",
+        "category": "Inkwell"
+      },
+      {
+        "command": "inkwell.showCurrentRunDetails",
+        "title": "Inkwell: Show Current Run Details",
+        "category": "Inkwell"
       }
     ],
     "walkthroughs": [
@@ -284,22 +309,24 @@
     "compile": "tsc -p ./",
     "typecheck": "tsc -p ./ --noEmit",
     "watch": "tsc -watch -p ./",
-    "package": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node18 --minify && esbuild src/doctor-cli.ts src/install-cli.ts --bundle --outdir=out --format=cjs --platform=node --target=node18 --minify && esbuild src/smoke-cli.ts --bundle --outfile=out/smoke-cli.js --alias:vscode=./src/headless-vscode.ts --format=cjs --platform=node --target=node18 --minify && node scripts/build-asset-manifest.mjs",
+    "package": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node18 --minify && esbuild src/doctor-cli.ts src/install-cli.ts --bundle --outdir=out --format=cjs --platform=node --target=node18 --minify && esbuild src/smoke-cli.ts --bundle --outfile=out/smoke-cli.js --alias:vscode=./src/headless-vscode.ts --format=cjs --platform=node --target=node18 --minify && npm run build:preview && node scripts/build-asset-manifest.mjs",
     "package:vsix": "vsce package --no-dependencies",
     "verify:vsix": "node scripts/verify-vsix.mjs",
     "doctor": "node out/doctor-cli.js",
-    "lint": "eslint src --ext ts",
+    "lint": "eslint src --ext ts,js",
     "test:regressions": "node scripts/check-template-regressions.mjs",
     "test:stability": "node scripts/check-shortcuts-and-commands.mjs",
     "test:errors": "npm run compile && node scripts/check-error-parsing.mjs",
     "test:preamble": "npm run compile && node scripts/check-preamble-merge.mjs",
     "test:installer": "bash -n scripts/install-inkwell-macos.sh && bash -n scripts/compile-demo.sh && bash -n scripts/compile-all-demos.sh",
     "verify": "npm run typecheck && npm run lint && npm run test:regressions && npm run test:stability && npm run test:errors && npm run test:preamble && npm run test:installer && npm run test:behavior",
-    "test:behavior": "npm run compile && node --test tests/*.test.cjs tests/*.test.mjs",
-    "test:demos": "bash scripts/compile-all-demos.sh"
+    "test:behavior": "npm run compile && npm run build:preview && node --test tests/*.test.cjs tests/*.test.mjs",
+    "test:demos": "bash scripts/compile-all-demos.sh",
+    "build:preview": "node scripts/build-preview-assets.mjs"
   },
   "dependencies": {
     "csv-parse": "7.0.2",
+    "htmlparser2": "10.1.0",
     "markdown-it": "^14.1.0",
     "yaml": "2.9.0"
   },
@@ -309,10 +336,15 @@
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "3.9.2",
+    "ajv": "6.14.0",
     "esbuild": "^0.27.3",
     "eslint": "^10.0.3",
     "globals": "^17.4.0",
+    "highlight.js": "11.12.0",
     "husky": "^9.1.7",
+    "katex": "0.18.7",
+    "mermaid": "11.17.2",
+    "pdfjs-dist": "6.3.289",
     "typescript": "^5.3.0",
     "typescript-eslint": "^8.56.1"
   }

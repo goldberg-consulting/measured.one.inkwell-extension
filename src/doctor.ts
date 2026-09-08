@@ -22,7 +22,7 @@ export interface DoctorCheck {
   durationMs?: number;
 }
 export interface DoctorTool { path?: string; version?: string; state: "ready" | "missing" | "broken"; exitCode?: number; signal?: string | null; error?: string }
-export const DOCTOR_REQUIRED_ASSETS: readonly string[] = [...new Set([...BUNDLED_ASSET_PATHS, "out/doctor-cli.js", "out/install-cli.js", "out/smoke-cli.js"])];
+export const DOCTOR_REQUIRED_ASSETS: readonly string[] = [...new Set([...BUNDLED_ASSET_PATHS, "out/doctor-cli.js", "out/install-cli.js", "out/smoke-cli.js", "schemas/doctor.schema.json"])];
 export interface DoctorAssetsManifest { schemaVersion: 1; extensionVersion: string; files: Record<string, { sha256: string; size?: number }> }
 export interface DoctorEditor { id: string; path?: string; version?: string; extensionVersion?: string; error?: string }
 export interface TexOwnership {
@@ -122,10 +122,20 @@ export function classifyTexOwnership(input: { root: string; ownerUid: number; cu
 }
 
 function readAssets(options: DoctorOptions, expectedVersion: string): { manifest?: DoctorAssetsManifest; check: DoctorCheck; facts: unknown[] } {
-  const manifestPath = typeof options.assetsManifest === "string" ? options.assetsManifest : path.join(options.extensionRoot, "out/asset-manifest.json");
+  let manifestPath = typeof options.assetsManifest === "string" ? options.assetsManifest : path.join(options.extensionRoot, "out/assets-manifest.json");
   try {
     const packagedVersion = JSON.parse(fs.readFileSync(resolveContainedPath(options.extensionRoot, "package.json"), "utf8")).version;
     if (packagedVersion !== expectedVersion) throw new Error(`Packaged extension version ${packagedVersion} does not match expected version ${expectedVersion}.`);
+    if (!options.assetsManifest) {
+      // Transitional 0.5 bundles used the singular filename. Only its absence
+      // permits fallback: a damaged canonical contract must remain an error.
+      try { fs.lstatSync(manifestPath); }
+      catch (error: any) {
+        if (error.code !== "ENOENT") throw error;
+        manifestPath = path.join(options.extensionRoot, "out/asset-manifest.json");
+      }
+      manifestPath = resolveContainedPath(options.extensionRoot, path.relative(options.extensionRoot, manifestPath).split(path.sep).join("/"));
+    }
     const raw = options.assetsManifest && typeof options.assetsManifest === "object" ? options.assetsManifest : JSON.parse(fs.readFileSync(manifestPath, "utf8"));
     if (raw.schemaVersion !== 1 || raw.extensionVersion !== expectedVersion || !raw.files || Array.isArray(raw.files) || typeof raw.files !== "object") {
       throw new Error("The packaged asset manifest is invalid or does not match the expected extension version.");

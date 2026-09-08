@@ -8,6 +8,7 @@ import * as path from "path";
 import * as fs from "fs";
 import * as crypto from "crypto";
 import { DocumentConfig, resolveDocumentConfig } from "./document-config";
+import { ResolutionSnapshot, isPathWithin, resolutionCache } from "./resolution-cache";
 import { ResolvedReferences, resolveBibliographyConfiguration } from "./bibliography-service";
 export type { ResolvedReferences } from "./bibliography-service";
 
@@ -53,19 +54,44 @@ export function saveManifestField(
   } finally { fs.rmSync(temporary, { force: true }); }
 }
 
-export function findInkwellRoot(
-  documentUri: vscode.Uri
-): string | undefined {
-  let dir = path.dirname(documentUri.fsPath);
-  const root = path.parse(dir).root;
+/** Resolve absent descendants through their nearest existing physical ancestor. */
+function physicalLocation(directory: string, snapshot: ResolutionSnapshot): string | undefined {
+  let current = directory;
+  const missing: string[] = [];
+  while (true) {
+    const observed = snapshot.inspect(current, false);
+    if (observed.realPath) return path.join(observed.realPath, ...missing.reverse());
+    if (observed.signature !== "missing") return undefined;
+    const parent = path.dirname(current);
+    if (parent === current) return undefined;
+    missing.push(path.basename(current)); current = parent;
+  }
+}
 
+function hasInkwellMarker(directory: string, snapshot: ResolutionSnapshot): boolean {
+  const boundary = snapshot.inspect(directory, false);
+  const marker = snapshot.inspect(path.join(directory, ".inkwell"), false);
+  // The chosen project/workspace root may be an intentional filesystem alias.
+  // The marker itself must remain a real directory contained in that root.
+  return marker.directory && !!marker.realPath && !!boundary.realPath && isPathWithin(boundary.realPath, marker.realPath);
+}
+
+function nearestInkwellRoot(directory: string, snapshot: ResolutionSnapshot): string | undefined {
+  const source = physicalLocation(directory, snapshot);
+  let dir = directory;
+  const root = path.parse(dir).root;
   while (dir !== root) {
-    if (fs.existsSync(path.join(dir, ".inkwell"))) {
-      return dir;
-    }
+    const ancestor = snapshot.inspect(dir, false);
+    if (source && ancestor.realPath && isPathWithin(ancestor.realPath, source) &&
+        hasInkwellMarker(dir, snapshot)) return dir;
     dir = path.dirname(dir);
   }
   return undefined;
+}
+
+export function findInkwellRoot(documentUri: vscode.Uri): string | undefined {
+  const directory = path.resolve(path.dirname(documentUri.fsPath));
+  return resolutionCache.get(`nearest:${directory}`, snapshot => nearestInkwellRoot(directory, snapshot));
 }
 
 /**
@@ -77,18 +103,20 @@ export function findInkwellRoot(
  * uses the document's directory.
  */
 export function getInkwellProjectRoot(sourcePath: string): string {
-  const uri = vscode.Uri.file(sourcePath);
-  const normalized = path.normalize(sourcePath);
-  const folder = vscode.workspace.getWorkspaceFolder(uri);
-  if (folder) {
-    const wsRoot = folder.uri.fsPath;
-    const underWs =
-      normalized === wsRoot || normalized.startsWith(wsRoot + path.sep);
-    if (underWs && fs.existsSync(path.join(wsRoot, ".inkwell"))) {
-      return wsRoot;
+  resolutionCache.start();
+  const normalized = path.resolve(sourcePath), directory = path.dirname(normalized);
+  // Workspace assignment is cheap live state, and is part of the key. It never
+  // waits for a filesystem watcher to notice editor workspace changes.
+  const folder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(sourcePath));
+  const wsRoot = folder ? path.resolve(folder.uri.fsPath) : undefined;
+  return resolutionCache.get(`project:${JSON.stringify([directory, wsRoot])}`, snapshot => {
+    if (wsRoot && isPathWithin(wsRoot, normalized)) {
+      const source = physicalLocation(directory, snapshot), workspace = snapshot.inspect(wsRoot, false);
+      if (source && workspace.realPath && isPathWithin(workspace.realPath, source) &&
+          hasInkwellMarker(wsRoot, snapshot)) return wsRoot;
     }
-  }
-  return findInkwellRoot(uri) ?? path.dirname(normalized);
+    return nearestInkwellRoot(directory, snapshot) ?? directory;
+  });
 }
 
 /**

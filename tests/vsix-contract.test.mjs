@@ -6,7 +6,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deflateRawSync } from 'node:zlib';
 import { spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import { ASSET_MANIFEST_PATH, CORE_ASSETS, buildAssetManifest, readBundledAssetPaths, writeAssetManifest, isReleaseVersion } from '../scripts/build-asset-manifest.mjs';
+import { PREVIEW_VENDOR_VERSIONS } from '../scripts/build-preview-assets.mjs';
 import { readZipEntries, verifyVsix } from '../scripts/verify-vsix.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -23,7 +25,17 @@ function fixture(t) {
   write('src/bundled-assets.ts', fs.readFileSync(path.join(repo, 'src/bundled-assets.ts')));
   for (const relative of new Set([...CORE_ASSETS, ...readBundledAssetPaths(repo)])) write(relative, `fixture:${relative}\n`);
   write('package.json', JSON.stringify({ publisher: 'measure-one', name: 'inkwell', version: '0.5.0', main: './out/extension.js' }));
-  write('media/vendor/pdfjs/pdf.mjs', 'export const local = true;\n');
+  write('media/preview-client.js', 'console.log("local preview");\n');
+  const vendorFiles = {};
+  for (const relative of ['math.js', 'mermaid.js', 'highlight.js', 'katex/katex.min.css', 'katex/fonts/KaTeX_Main-Regular.woff2',
+    'highlight/github.min.css', 'highlight/github-dark.min.css', 'pdfjs/pdf.mjs', 'pdfjs/pdf.worker.mjs',
+    'pdfjs/standard_fonts/LiberationSans-Regular.ttf', 'pdfjs/cmaps/Adobe-Japan1-UCS2.bcmap', 'pdfjs/wasm/openjpeg.wasm',
+    'pdfjs/cmaps/optional-language.bcmap', ...Object.keys(PREVIEW_VENDOR_VERSIONS).map(name => `licenses/${name}.txt`)]) {
+    const bytes = Buffer.from(`fixture:${relative}\n`);
+    write(`media/vendor/${relative}`, bytes);
+    vendorFiles[relative] = { size: bytes.length, sha256: crypto.createHash('sha256').update(bytes).digest('hex') };
+  }
+  write('media/vendor/versions.json', JSON.stringify({ schemaVersion: 1, packages: PREVIEW_VENDOR_VERSIONS, files: vendorFiles }));
   write('examples/demo-default.pdf', '%PDF-1.4 reference example\n');
   write('templates/nested/new/support.sty', 'nested support\n');
   write('out/doctor-cli.js', 'console.log("doctor");\n');
@@ -78,11 +90,71 @@ test('asset contract is deterministic and inventories recursive runtime assets w
   f.write('.cursor/skills/private/SKILL.md', 'private skill');
   f.write('out/accidental-tsc-output.js', 'not a bundle');
   assert.deepEqual(buildAssetManifest(f.root), f.manifest);
-  for (const relative of ['media/vendor/pdfjs/pdf.mjs', 'examples/demo-default.pdf', 'templates/nested/new/support.sty', 'out/doctor-cli.js', 'out/install-cli.js']) {
+  for (const relative of ['media/vendor/pdfjs/pdf.mjs', 'media/preview-client.js', 'media/vendor/versions.json', 'schemas/doctor.schema.json', 'examples/demo-default.pdf', 'templates/nested/new/support.sty', 'out/doctor-cli.js', 'out/install-cli.js']) {
     assert.match(f.manifest.files[relative].sha256, /^[a-f0-9]{64}$/);
   }
   assert.equal(f.manifest.files[ASSET_MANIFEST_PATH], undefined);
   assert.equal(Object.keys(f.manifest.files).some(relative => /private|accidental/.test(relative)), false);
+});
+
+test('new packages require the canonical plural manifest instead of a legacy alias', t => {
+  const f = fixture(t);
+  assert.equal(ASSET_MANIFEST_PATH, 'out/assets-manifest.json');
+  const entries = f.entries().map(([name, bytes]) => [name === `extension/${ASSET_MANIFEST_PATH}` ? 'extension/out/asset-manifest.json' : name, bytes]);
+  assert.throws(() => verifyVsix(zip(entries), { tag }), /Missing.*out\/assets-manifest.json/);
+});
+
+test('vendor provenance checks every promised file even when its package contract entry is removed', t => {
+  const f = fixture(t), relative = 'media/vendor/pdfjs/cmaps/optional-language.bcmap';
+  const changed = structuredClone(f.manifest); delete changed.files[relative];
+  const entries = f.entries().filter(([name]) => name !== `extension/${relative}`).map(([name, bytes]) =>
+    [name, name === `extension/${ASSET_MANIFEST_PATH}` ? JSON.stringify(changed) : bytes]);
+  assert.throws(() => verifyVsix(zip(entries), { tag }), /Missing required preview asset/);
+  fs.unlinkSync(path.join(f.root, relative));
+  assert.throws(() => buildAssetManifest(f.root), /ENOENT/);
+});
+
+test('vendor provenance rejects changed bytes even when the package hash was updated', t => {
+  const f = fixture(t), relative = 'media/vendor/math.js', bytes = Buffer.from('changed vendor');
+  const changed = structuredClone(f.manifest);
+  changed.files[relative] = { size: bytes.length, sha256: crypto.createHash('sha256').update(bytes).digest('hex') };
+  const entries = f.entries().map(([name, original]) => [name, name === `extension/${relative}` ? bytes
+    : name === `extension/${ASSET_MANIFEST_PATH}` ? JSON.stringify(changed) : original]);
+  assert.throws(() => verifyVsix(zip(entries), { tag }), /Preview vendor hash\/size mismatch/);
+  f.write(relative, bytes);
+  assert.throws(() => buildAssetManifest(f.root), /Preview vendor hash\/size mismatch/);
+});
+
+test('vendor version and digest records are validated before accepting packaged assets', t => {
+  const f = fixture(t), relative = 'media/vendor/versions.json';
+  const original = JSON.parse(fs.readFileSync(path.join(f.root, relative), 'utf8'));
+  for (const mutate of [p => { p.packages.katex = '0.0.0'; }, p => { p.files['math.js'].sha256 = 'invalid'; }]) {
+    const changed = structuredClone(original); mutate(changed); f.write(relative, JSON.stringify(changed));
+    assert.throws(() => buildAssetManifest(f.root), /versions do not match|Invalid preview vendor hash/);
+  }
+});
+
+for (const [relative, source] of [
+  ['out/extension.js', 'const shell = `<script src="https://cdn.example.test/library.js"></script>`;'],
+  ['media/preview-client.js', 'import("https://cdn.example.test/library.js");'],
+  ['media/preview-client.js', 'import "https://cdn.example.test/library.js";'],
+  ['media/preview.css', '@import url("//cdn.example.test/style.css");'],
+  ['media/preview-client.js', 'const shell = `<link href="https://cdn.example.test/style.css" rel="stylesheet">`;'],
+]) test(`remote runtime script/style dependencies fail ${relative} packaging`, t => {
+  const f = fixture(t); f.write(relative, source);
+  assert.throws(() => buildAssetManifest(f.root), /Remote runtime script\/style URL/);
+  const changed = structuredClone(f.manifest), bytes = Buffer.from(source);
+  changed.files[relative] = { size: bytes.length, sha256: crypto.createHash('sha256').update(bytes).digest('hex') };
+  const entries = f.entries().map(([name, original]) => [name, name === `extension/${relative}` ? bytes
+    : name === `extension/${ASSET_MANIFEST_PATH}` ? JSON.stringify(changed) : original]);
+  assert.throws(() => verifyVsix(zip(entries), { tag }), /Remote runtime script\/style URL/);
+});
+
+test('extra vendor files cannot bypass the pinned provenance inventory', t => {
+  const f = fixture(t), relative = 'media/vendor/unlisted.js';
+  assert.throws(() => verifyVsix(zip([...f.entries(), [`extension/${relative}`, 'unlisted']]), { tag }), /Unlisted preview vendor asset/);
+  f.write(relative, 'unlisted');
+  assert.throws(() => buildAssetManifest(f.root), /Unlisted preview vendor asset/);
 });
 
 test('asset generation fails when an explicitly required example is missing', t => {
@@ -117,7 +189,7 @@ test('rejects a release tag mismatch and a missing tag', t => {
   for (const wrong of ['0.5.0', 'v0.4.0', 'refs/tags/v0.5.0', undefined]) assert.throws(() => verifyVsix(archive, { tag: wrong }), /Release tag must be exactly v0.5.0/);
 });
 
-for (const relative of ['examples/demo-default.md', 'out/doctor-cli.js', 'out/install-cli.js', 'out/smoke-cli.js']) test(`a missing ${relative} cannot be hidden by deleting its contract entry too`, t => {
+for (const relative of ['examples/demo-default.md', 'out/doctor-cli.js', 'out/install-cli.js', 'out/smoke-cli.js', 'schemas/doctor.schema.json']) test(`a missing ${relative} cannot be hidden by deleting its contract entry too`, t => {
   const f = fixture(t);
   const changed = structuredClone(f.manifest); delete changed.files[relative];
   const entries = f.entries().filter(([name]) => name !== `extension/${relative}`).map(([name, bytes]) =>

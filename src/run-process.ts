@@ -35,7 +35,7 @@ export interface ProcessOutcome {
 /** spawn is required: Node's execFile does not forward detached to its child. */
 export async function executeRunProcess(
   cmd: string, args: string[], options: {
-    cwd: string; env: NodeJS.ProcessEnv; timeoutMs?: number; maxBuffer?: number;
+    cwd: string; env: NodeJS.ProcessEnv; timeoutMs?: number; maxBuffer?: number; maxStdoutBytes?: number; maxStderrBytes?: number;
   }, cancel?: RunCancellation,
 ): Promise<ProcessOutcome> {
   if (cancel?.cancelled) return {
@@ -49,7 +49,8 @@ export async function executeRunProcess(
     let error: Error | undefined;
     let outBytes = 0; let errBytes = 0;
     const stdout: Buffer[] = []; const stderr: Buffer[] = [];
-    const maxBuffer = options.maxBuffer ?? 10 * 1024 * 1024;
+    const stdoutLimit = options.maxStdoutBytes ?? options.maxBuffer ?? 10 * 1024 * 1024;
+    const stderrLimit = options.maxStderrBytes ?? options.maxBuffer ?? 10 * 1024 * 1024;
     const stop = () => {
       terminateProcessGroup(proc);
       if (!escalation) {
@@ -57,12 +58,12 @@ export async function executeRunProcess(
         escalation.unref();
       }
     };
-    const collect = (chunks: Buffer[], chunk: Buffer, bytes: number): number => {
-      const remaining = Math.max(0, maxBuffer - bytes);
+    const collect = (chunks: Buffer[], chunk: Buffer, bytes: number, limit: number): number => {
+      const remaining = Math.max(0, limit - bytes);
       if (remaining) chunks.push(chunk.subarray(0, remaining));
       if (chunk.length > remaining) {
         maxBufferExceeded = true;
-        error = new Error(`Process output exceeded ${maxBuffer} bytes`);
+        error = new Error(`Process output exceeded ${limit} bytes`);
         stop();
       }
       return bytes + chunk.length;
@@ -70,8 +71,8 @@ export async function executeRunProcess(
     try {
       proc = spawn(cmd, args, { cwd: options.cwd, env: options.env,
         detached: process.platform !== "win32", stdio: ["ignore", "pipe", "pipe"] });
-      proc.stdout?.on("data", (chunk: Buffer) => { outBytes = collect(stdout, Buffer.from(chunk), outBytes); });
-      proc.stderr?.on("data", (chunk: Buffer) => { errBytes = collect(stderr, Buffer.from(chunk), errBytes); });
+      proc.stdout?.on("data", (chunk: Buffer) => { outBytes = collect(stdout, Buffer.from(chunk), outBytes, stdoutLimit); });
+      proc.stderr?.on("data", (chunk: Buffer) => { errBytes = collect(stderr, Buffer.from(chunk), errBytes, stderrLimit); });
       proc.on("error", (reason: Error & { code?: string }) => {
         error = reason;
         if (reason.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") maxBufferExceeded = true;

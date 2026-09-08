@@ -12,18 +12,19 @@
 import * as path from "path";
 import * as fs from "fs";
 import * as crypto from "crypto";
+import MarkdownIt from "markdown-it";
 import { execFileSync } from "child_process";
 import { BlockResult, CodeBlock, DisplayMode, readCurrentRunResults, parseCodeBlocks, parseQuotedAttrs, parseRunConfig, resolveVenvPython, RunConfig } from "./runner";
 import { buildCodeBlockPath, findBinaryViaShell } from "./shell-env";
 import { getInkwellOutputChannel } from "./inkwell-output";
-import { fingerprintBlock } from "./run-store";
+import { fingerprintBlock, resolveRunSource } from "./run-store";
+import * as vscode from "vscode";
 import { artifactTableLabel, decodeTableData, encodeTableData, literalFence, parseCsvTable, parseJsonTable, TABLE_DATA_LIMITS,
   TABLE_DATA_ERROR_FENCE, TableDataDiagnostic, TableDataError, tableDataDiagnostic } from "./table-data";
 import {
   getInkwellCompiledPath,
   getInkwellOutputsDir,
   getInkwellProjectRoot,
-  resolveBlockFilePath,
 } from "./config";
 
 /** Session-local dirs prepended after `mmdc` is resolved via login shell. */
@@ -149,8 +150,10 @@ function shieldTableFences(markdown: string, inspectMetadata?: (values: string[]
     }
     let token: string;
     do { token = `INKWELL_LITERAL_${crypto.randomUUID()}_END`; } while (markdown.includes(token));
-    protectedText.set(token, markdown.slice(match.index, nextOffset));
-    text += markdown.slice(offset, match.index) + token;
+    const original = markdown.slice(match.index, nextOffset);
+    const placeholder = token + (original.match(/\r?\n$/)?.[0] || "");
+    protectedText.set(placeholder, original);
+    text += markdown.slice(offset, match.index) + placeholder;
     offset = nextOffset;
     opening.lastIndex = nextOffset;
   }
@@ -161,12 +164,68 @@ function shieldTableFences(markdown: string, inspectMetadata?: (values: string[]
   } };
 }
 
+function escapedBacktick(text: string, offset: number): boolean {
+  let slashes = 0;
+  while (offset > 0 && text[--offset] === "\\") slashes++;
+  return slashes % 2 === 1;
+}
+
+/** Code examples are literal; only explicit single-backtick Python spans run.
+ * Parse Markdown blocks so nested fences and indented code stay protected too.
+ * YAML metadata remains eligible for binding before configuration resolution.
+ */
+function shieldBindingLiterals(markdown: string, inspectMetadata?: (values: string[]) => void): { text: string; restore: (text: string) => string } {
+  const tables = shieldTableFences(markdown, inspectMetadata);
+  const frontmatter = /^(?:\uFEFF)?---[ \t]*(?:\r\n|\r|\n)[\s\S]*?(?:\r\n|\r|\n)(?:---|\.\.\.)[ \t]*(?:\r\n|\r|\n|$)/.exec(tables.text)?.[0].length || 0;
+  const body = tables.text.slice(frontmatter), starts = [0];
+  for (const match of body.matchAll(/\r\n|\r|\n/g)) starts.push(match.index! + match[0].length);
+  const ranges: Array<[number, number]> = [];
+  const tokens = new MarkdownIt().parse(body, {});
+  for (const token of tokens) {
+    if (!token.map) continue;
+    const start = starts[token.map[0]], end = starts[token.map[1]] ?? body.length;
+    if (token.type === "fence" || token.type === "code_block") {
+      ranges.push([start, end]);
+    } else if (token.type === "inline") {
+      const runs = [...body.slice(start, end).matchAll(/`+/g)].map(match => ({ start: start + match.index!, length: match[0].length }));
+      const next = new Map<number, number>(), closing = new Map<number, number>();
+      for (let i = runs.length - 1; i >= 0; i--) {
+        const found = next.get(runs[i].length);
+        if (found !== undefined) closing.set(i, found);
+        next.set(runs[i].length, i);
+      }
+      for (let i = 0; i < runs.length; i++) {
+        const close = closing.get(i);
+        if (escapedBacktick(body, runs[i].start) || close === undefined) continue;
+        const from = runs[i].start, to = runs[close].start + runs[close].length;
+        if (runs[i].length !== 1 || !/^`\{python\}\s+[^`]+`$/.test(body.slice(from, to))) ranges.push([from, to]);
+        i = close;
+      }
+    }
+  }
+  const literals = new Map<string, string>();
+  let text = tables.text.slice(0, frontmatter), offset = 0;
+  for (const [start, end] of ranges.sort(([a], [b]) => a - b)) {
+    if (start < offset) continue;
+    let token: string;
+    do { token = `INKWELL_CODE_${crypto.randomUUID()}_END`; } while (tables.text.includes(token));
+    literals.set(token, body.slice(start, end));
+    text += body.slice(offset, start) + token;
+    offset = end;
+  }
+  text += body.slice(offset);
+  return { text, restore: transformed => {
+    for (const [token, original] of literals) transformed = transformed.replace(token, () => original);
+    return tables.restore(transformed);
+  } };
+}
+
 export function substituteVariables(
   markdown: string,
   vars: Map<string, string>,
 ): string {
   if (!vars.size) return markdown;
-  const literal = shieldTableFences(markdown);
+  const literal = shieldBindingLiterals(markdown);
   return literal.restore(literal.text.replace(/\{\{(\w+)\}\}/g, (_match, key) => {
     return vars.get(key) ?? `{{${key}}}`;
   }));
@@ -247,9 +306,9 @@ function pandocLang(lang: string): string {
 function formatCodeBlock(block: CodeBlock, docDir: string, projectRoot: string): string {
   const lang = pandocLang(block.lang);
   if (block.file) {
-    const filePath = resolveBlockFilePath(block.file, docDir, projectRoot);
     let source: string;
     try {
+      const filePath = resolveRunSource(block.file, docDir, projectRoot);
       source = fs.readFileSync(filePath, "utf-8").trim();
     } catch {
       source = `# ${block.file}`;
@@ -381,7 +440,7 @@ export function gatherCachedResults(
 
 // ── Layer 2: Inline expressions ───────────────────────────────────────
 
-const INLINE_EXPR_RE = /`\{python\}\s+([^`]+)`/g;
+const INLINE_EXPR_RE = /(?<!`)`\{python\}\s+([^`]+)`(?!`)/g;
 
 function resolvePython(runConfig: RunConfig, docDir: string, projectRoot: string): string {
   if (runConfig.pythonEnv) {
@@ -399,18 +458,20 @@ export function evaluateInlineExpressions(
   projectRoot: string,
   cacheDir: string,
 ): string {
-  const literal = shieldTableFences(markdown);
+  if (vscode.workspace.isTrusted === false) return markdown;
+  const literal = shieldBindingLiterals(markdown);
   return literal.restore(evaluateDocumentExpressions(literal.text, vars, runConfig, docDir, projectRoot, cacheDir));
 }
 
 function evaluateDocumentExpressions(
   markdown: string, vars: Map<string, string>, runConfig: RunConfig, docDir: string, projectRoot: string, cacheDir: string,
 ): string {
-  const matches: { full: string; expr: string }[] = [];
+  const matches: { full: string; expr: string; start: number }[] = [];
   let m: RegExpExecArray | null;
   const re = new RegExp(INLINE_EXPR_RE.source, "g");
   while ((m = re.exec(markdown)) !== null) {
-    matches.push({ full: m[0], expr: m[1].trim() });
+    if (escapedBacktick(markdown, m.index)) continue;
+    matches.push({ full: m[0], expr: m[1].trim(), start: m.index });
   }
   if (!matches.length) return markdown;
 
@@ -489,12 +550,13 @@ function evaluateDocumentExpressions(
 
 function applyInlineResults(
   markdown: string,
-  matches: { full: string; expr: string }[],
+  matches: { full: string; expr: string; start: number }[],
   values: string[],
 ): string {
   let result = markdown;
-  for (let i = 0; i < matches.length; i++) {
-    result = result.replace(matches[i].full, values[i]);
+  for (let i = matches.length - 1; i >= 0; i--) {
+    const { start, full } = matches[i];
+    result = result.slice(0, start) + values[i] + result.slice(start + full.length);
   }
   return result;
 }
@@ -642,7 +704,7 @@ function normalizeMermaidForPreview(markdown: string): string {
 export function collectUnresolvedVars(markdown: string): string[] {
   const out = new Set<string>();
   const collect = (text: string) => { for (const m of text.matchAll(/\{\{(\w+)\}\}/g)) out.add(m[1]); };
-  collect(shieldTableFences(markdown, values => values.forEach(collect)).text);
+  collect(shieldBindingLiterals(markdown, values => values.forEach(collect)).text);
   return [...out];
 }
 
@@ -677,7 +739,7 @@ export function prepareForCompilation(
   injected = substituteVariables(injected, vars);
 
   const cacheDir = getInkwellOutputsDir(sourceFile);
-  injected = evaluateInlineExpressions(injected, vars, runConfig, docDir, projectRoot, cacheDir);
+  if (vscode.workspace.isTrusted) injected = evaluateInlineExpressions(injected, vars, runConfig, docDir, projectRoot, cacheDir);
 
   // A leftover {{key}} means a typo or a stale/missing binding; it ships
   // literally into the PDF, so the compile surfaces it as a warning.
@@ -717,7 +779,7 @@ export function prepareForPreview(
   injected = substituteVariables(injected, vars);
 
   const cacheDir = getInkwellOutputsDir(sourceFile);
-  injected = evaluateInlineExpressions(injected, vars, runConfig, docDir, projectRoot, cacheDir);
+  if (vscode.workspace.isTrusted) injected = evaluateInlineExpressions(injected, vars, runConfig, docDir, projectRoot, cacheDir);
 
   return injected;
 }
