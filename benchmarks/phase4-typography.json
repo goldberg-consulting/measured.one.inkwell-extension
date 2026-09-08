@@ -1,0 +1,620 @@
+{
+  "schemaVersion": 1,
+  "phase": 4,
+  "platform": "Darwin",
+  "architecture": "arm64",
+  "success": true,
+  "measurements": [
+    {
+      "template": "default",
+      "classSize": 10,
+      "pdfPath": "<temporary-project>/default-10.pdf",
+      "expectedTeXPoints": {
+        "BodyMarker": 10,
+        "LayoutMarker": 10,
+        "HeadingMarker": 17.28,
+        "SubheadingMarker": 14.4,
+        "MinorHeadingMarker": 12,
+        "CodeMarker": 8,
+        "RawCodeMarker": 8,
+        "TableMarker": 10,
+        "CaptionMarker": 9,
+        "ReferenceMarker": 7
+      },
+      "expectedBaselineTeXPoints": 16.8,
+      "measuredBaseline": 16.73699951171875,
+      "measured": {
+        "BodyMarker": [
+          {
+            "size": 9.962599754333496,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 3
+          }
+        ],
+        "LayoutMarker": [
+          {
+            "size": 9.962599754333496,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 1
+          }
+        ],
+        "HeadingMarker": [
+          {
+            "size": 17.21540069580078,
+            "font": "ArialMT",
+            "color": 3368601,
+            "page": 3
+          }
+        ],
+        "SubheadingMarker": [
+          {
+            "size": 14.346199989318848,
+            "font": "ArialMT",
+            "color": 3368601,
+            "page": 3
+          }
+        ],
+        "MinorHeadingMarker": [
+          {
+            "size": 11.9552001953125,
+            "font": "ArialMT",
+            "color": 3368601,
+            "page": 3
+          }
+        ],
+        "CodeMarker": [
+          {
+            "size": 7.970099925994873,
+            "font": "CourierNewPSMT",
+            "color": 0,
+            "page": 3
+          }
+        ],
+        "RawCodeMarker": [
+          {
+            "size": 7.970099925994873,
+            "font": "CourierNewPSMT",
+            "color": 0,
+            "page": 3
+          }
+        ],
+        "TableMarker": [
+          {
+            "size": 9.962599754333496,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 3
+          }
+        ],
+        "CaptionMarker": [
+          {
+            "size": 8.966400146484375,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 3
+          }
+        ],
+        "ReferenceMarker": [
+          {
+            "size": 6.973800182342529,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 3
+          }
+        ]
+      }
+    },
+    {
+      "template": "default",
+      "classSize": 11,
+      "pdfPath": "<temporary-project>/default-11.pdf",
+      "expectedTeXPoints": {
+        "BodyMarker": 10.95,
+        "LayoutMarker": 10.95,
+        "HeadingMarker": 17.28,
+        "SubheadingMarker": 14.4,
+        "MinorHeadingMarker": 13.14,
+        "CodeMarker": 8,
+        "RawCodeMarker": 8,
+        "TableMarker": 10,
+        "CaptionMarker": 9,
+        "ReferenceMarker": 7
+      },
+      "expectedBaselineTeXPoints": 19.04,
+      "measuredBaseline": 18.968994140625,
+      "measured": {
+        "BodyMarker": [
+          {
+            "size": 10.909099578857422,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 3
+          }
+        ],
+        "LayoutMarker": [
+          {
+            "size": 10.909099578857422,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 1
+          }
+        ],
+        "HeadingMarker": [
+          {
+            "size": 17.21540069580078,
+            "font": "Arial-BoldMT",
+            "color": 3368601,
+            "page": 3
+          }
+        ],
+        "SubheadingMarker": [
+          {
+            "size": 14.346199989318848,
+            "font": "Arial-BoldMT",
+            "color": 3368601,
+            "page": 3
+          }
+        ],
+        "MinorHeadingMarker": [
+          {
+            "size": 13.090900421142578,
+            "font": "Arial-BoldMT",
+            "color": 3368601,
+            "page": 3
+          }
+        ],
+        "CodeMarker": [
+          {
+            "size": 7.970099925994873,
+            "font": "CourierNewPSMT",
+            "color": 0,
+            "page": 3
+          }
+        ],
+        "RawCodeMarker": [
+          {
+            "size": 7.970099925994873,
+            "font": "CourierNewPSMT",
+            "color": 0,
+            "page": 3
+          }
+        ],
+        "TableMarker": [
+          {
+            "size": 9.962599754333496,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 3
+          }
+        ],
+        "CaptionMarker": [
+          {
+            "size": 8.966400146484375,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 3
+          }
+        ],
+        "ReferenceMarker": [
+          {
+            "size": 6.973800182342529,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 3
+          }
+        ]
+      }
+    },
+    {
+      "template": "default",
+      "classSize": 12,
+      "pdfPath": "<temporary-project>/default-12.pdf",
+      "expectedTeXPoints": {
+        "BodyMarker": 12,
+        "LayoutMarker": 12,
+        "HeadingMarker": 20.736,
+        "SubheadingMarker": 17.28,
+        "MinorHeadingMarker": 14.4,
+        "CodeMarker": 8,
+        "RawCodeMarker": 8,
+        "TableMarker": 10,
+        "CaptionMarker": 9,
+        "ReferenceMarker": 10.95
+      },
+      "expectedBaselineTeXPoints": 20.3,
+      "measuredBaseline": 20.2239990234375,
+      "measured": {
+        "BodyMarker": [
+          {
+            "size": 11.9552001953125,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 3
+          }
+        ],
+        "LayoutMarker": [
+          {
+            "size": 11.9552001953125,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 1
+          }
+        ],
+        "HeadingMarker": [
+          {
+            "size": 20.65850067138672,
+            "font": "ArialMT",
+            "color": 3368601,
+            "page": 3
+          }
+        ],
+        "SubheadingMarker": [
+          {
+            "size": 17.21540069580078,
+            "font": "ArialMT",
+            "color": 3368601,
+            "page": 3
+          }
+        ],
+        "MinorHeadingMarker": [
+          {
+            "size": 14.346199989318848,
+            "font": "ArialMT",
+            "color": 3368601,
+            "page": 3
+          }
+        ],
+        "CodeMarker": [
+          {
+            "size": 7.970099925994873,
+            "font": "CourierNewPSMT",
+            "color": 0,
+            "page": 3
+          }
+        ],
+        "RawCodeMarker": [
+          {
+            "size": 7.970099925994873,
+            "font": "CourierNewPSMT",
+            "color": 0,
+            "page": 3
+          }
+        ],
+        "TableMarker": [
+          {
+            "size": 9.962599754333496,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 3
+          }
+        ],
+        "CaptionMarker": [
+          {
+            "size": 8.966400146484375,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 3
+          }
+        ],
+        "ReferenceMarker": [
+          {
+            "size": 10.909099578857422,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 3
+          }
+        ]
+      }
+    },
+    {
+      "template": "eth-report",
+      "classSize": 10,
+      "pdfPath": "<temporary-project>/eth-report-10.pdf",
+      "expectedTeXPoints": {
+        "BodyMarker": 10,
+        "LayoutMarker": 10,
+        "HeadingMarker": 17.28,
+        "SubheadingMarker": 14.4,
+        "MinorHeadingMarker": 12,
+        "CodeMarker": 8,
+        "RawCodeMarker": 8,
+        "TableMarker": 10,
+        "CaptionMarker": 9,
+        "ReferenceMarker": 7
+      },
+      "expectedBaselineTeXPoints": 14.892,
+      "measuredBaseline": 14.83697509765625,
+      "measured": {
+        "BodyMarker": [
+          {
+            "size": 9.962599754333496,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 2
+          }
+        ],
+        "LayoutMarker": [
+          {
+            "size": 9.962599754333496,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 1
+          }
+        ],
+        "HeadingMarker": [
+          {
+            "size": 17.21540069580078,
+            "font": "ArialMT",
+            "color": 3368601,
+            "page": 2
+          }
+        ],
+        "SubheadingMarker": [
+          {
+            "size": 14.346199989318848,
+            "font": "ArialMT",
+            "color": 3368601,
+            "page": 2
+          }
+        ],
+        "MinorHeadingMarker": [
+          {
+            "size": 11.9552001953125,
+            "font": "ArialMT",
+            "color": 3368601,
+            "page": 2
+          }
+        ],
+        "CodeMarker": [
+          {
+            "size": 7.970099925994873,
+            "font": "CourierNewPSMT",
+            "color": 0,
+            "page": 2
+          }
+        ],
+        "RawCodeMarker": [
+          {
+            "size": 7.970099925994873,
+            "font": "CourierNewPSMT",
+            "color": 0,
+            "page": 2
+          }
+        ],
+        "TableMarker": [
+          {
+            "size": 9.962599754333496,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 2
+          }
+        ],
+        "CaptionMarker": [
+          {
+            "size": 8.966400146484375,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 2
+          }
+        ],
+        "ReferenceMarker": [
+          {
+            "size": 6.973800182342529,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 2
+          }
+        ]
+      }
+    },
+    {
+      "template": "eth-report",
+      "classSize": 11,
+      "pdfPath": "<temporary-project>/eth-report-11.pdf",
+      "expectedTeXPoints": {
+        "BodyMarker": 10.95,
+        "LayoutMarker": 10.95,
+        "HeadingMarker": 17.28,
+        "SubheadingMarker": 14.4,
+        "MinorHeadingMarker": 13.14,
+        "CodeMarker": 8,
+        "RawCodeMarker": 8,
+        "TableMarker": 10,
+        "CaptionMarker": 9,
+        "ReferenceMarker": 7
+      },
+      "expectedBaselineTeXPoints": 16.8776,
+      "measuredBaseline": 16.81500244140625,
+      "measured": {
+        "BodyMarker": [
+          {
+            "size": 10.909099578857422,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 2
+          }
+        ],
+        "LayoutMarker": [
+          {
+            "size": 10.909099578857422,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 1
+          }
+        ],
+        "HeadingMarker": [
+          {
+            "size": 17.21540069580078,
+            "font": "Arial-BoldMT",
+            "color": 3368601,
+            "page": 2
+          }
+        ],
+        "SubheadingMarker": [
+          {
+            "size": 14.346199989318848,
+            "font": "Arial-BoldMT",
+            "color": 3368601,
+            "page": 2
+          }
+        ],
+        "MinorHeadingMarker": [
+          {
+            "size": 13.090900421142578,
+            "font": "Arial-BoldMT",
+            "color": 3368601,
+            "page": 2
+          }
+        ],
+        "CodeMarker": [
+          {
+            "size": 7.970099925994873,
+            "font": "CourierNewPSMT",
+            "color": 0,
+            "page": 2
+          }
+        ],
+        "RawCodeMarker": [
+          {
+            "size": 7.970099925994873,
+            "font": "CourierNewPSMT",
+            "color": 0,
+            "page": 2
+          }
+        ],
+        "TableMarker": [
+          {
+            "size": 9.962599754333496,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 2
+          }
+        ],
+        "CaptionMarker": [
+          {
+            "size": 8.966400146484375,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 2
+          }
+        ],
+        "ReferenceMarker": [
+          {
+            "size": 6.973800182342529,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 2
+          }
+        ]
+      }
+    },
+    {
+      "template": "eth-report",
+      "classSize": 12,
+      "pdfPath": "<temporary-project>/eth-report-12.pdf",
+      "expectedTeXPoints": {
+        "BodyMarker": 12,
+        "LayoutMarker": 12,
+        "HeadingMarker": 20.736,
+        "SubheadingMarker": 17.28,
+        "MinorHeadingMarker": 14.4,
+        "CodeMarker": 8,
+        "RawCodeMarker": 8,
+        "TableMarker": 10,
+        "CaptionMarker": 9,
+        "ReferenceMarker": 10.95
+      },
+      "expectedBaselineTeXPoints": 17.9945,
+      "measuredBaseline": 17.927001953125,
+      "measured": {
+        "BodyMarker": [
+          {
+            "size": 11.9552001953125,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 2
+          }
+        ],
+        "LayoutMarker": [
+          {
+            "size": 11.9552001953125,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 1
+          }
+        ],
+        "HeadingMarker": [
+          {
+            "size": 20.65850067138672,
+            "font": "ArialMT",
+            "color": 3368601,
+            "page": 2
+          }
+        ],
+        "SubheadingMarker": [
+          {
+            "size": 17.21540069580078,
+            "font": "ArialMT",
+            "color": 3368601,
+            "page": 2
+          }
+        ],
+        "MinorHeadingMarker": [
+          {
+            "size": 14.346199989318848,
+            "font": "ArialMT",
+            "color": 3368601,
+            "page": 2
+          }
+        ],
+        "CodeMarker": [
+          {
+            "size": 7.970099925994873,
+            "font": "CourierNewPSMT",
+            "color": 0,
+            "page": 2
+          }
+        ],
+        "RawCodeMarker": [
+          {
+            "size": 7.970099925994873,
+            "font": "CourierNewPSMT",
+            "color": 0,
+            "page": 2
+          }
+        ],
+        "TableMarker": [
+          {
+            "size": 9.962599754333496,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 2
+          }
+        ],
+        "CaptionMarker": [
+          {
+            "size": 8.966400146484375,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 2
+          }
+        ],
+        "ReferenceMarker": [
+          {
+            "size": 10.909099578857422,
+            "font": "TimesNewRomanPSMT",
+            "color": 0,
+            "page": 2
+          }
+        ]
+      }
+    }
+  ],
+  "limitations": [
+    "Actual PDF text spans and baseline positions are compared with the shared model; this does not establish a browser font rasterization match.",
+    "Tests use installed Times New Roman, Arial, and Courier New fonts. Portable font fixtures remain a Linux CI release gate.",
+    "Fixed and custom template layouts show a Draft approximation notice and do not expose unimplemented controls."
+  ]
+}

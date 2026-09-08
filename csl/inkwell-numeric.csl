@@ -22,7 +22,13 @@
       <key variable="citation-number"/>
     </sort>
     <layout prefix="[" suffix="]" delimiter=",">
-      <text variable="citation-number"/>
+      <group delimiter=", ">
+        <text variable="citation-number"/>
+        <group delimiter=" ">
+          <label variable="locator" form="short"/>
+          <text variable="locator"/>
+        </group>
+      </group>
     </layout>
   </citation>
   <!-- Deliberately NOT an aligned-label style: alignment makes pandoc wrap

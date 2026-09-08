@@ -1,83 +1,15 @@
-// Citations and bibliography for the preview. Two resolution paths:
-//   (A) Shell out to `pandoc --citeproc` when pandoc is on PATH, which
-//       gives perfect parity with the compile pipeline (same CSL, same
-//       bib files, same formatting).
-//   (B) Tiny in-process .bib parser fallback for environments where
-//       pandoc is unreachable or the fast path times out.
-//
-// Results are cached under .inkwell/.cache/preview-cites/<hash>.html,
-// keyed on the citation tokens, resolved .bib paths and their mtimes,
-// the optional CSL path and its mtime, and the link-citations flag.
-// The cache lives alongside other Inkwell artifacts so it moves with
-// the project and can be safely wiped by clearing .inkwell/.cache/.
-
+// Pandoc AST/citeproc is authoritative. The local author-year fallback is explicitly approximate.
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
-import { spawn } from "child_process";
-import { findBibFiles, findCslFile, getInkwellProjectRoot } from "./config";
-import { findBinaryViaShell } from "./shell-env";
-
-function runPandoc(
-  binary: string,
-  args: string[],
-  input: string,
-  timeoutMs: number,
-): Promise<string | undefined> {
-  return new Promise((resolve) => {
-    let child;
-    try {
-      child = spawn(binary, args, { stdio: ["pipe", "pipe", "pipe"] });
-    } catch {
-      resolve(undefined);
-      return;
-    }
-
-    const stdoutChunks: Buffer[] = [];
-    const stderrChunks: Buffer[] = [];
-    let settled = false;
-
-    const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      try { child.kill("SIGTERM"); } catch {}
-      resolve(undefined);
-    }, timeoutMs);
-
-    child.stdout.on("data", (c) => stdoutChunks.push(c));
-    child.stderr.on("data", (c) => stderrChunks.push(c));
-    child.on("error", () => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve(undefined);
-    });
-    child.on("close", (code) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      if (code === 0) {
-        resolve(Buffer.concat(stdoutChunks).toString("utf-8"));
-      } else {
-        resolve(undefined);
-      }
-    });
-
-    try {
-      child.stdin.end(input, "utf-8");
-    } catch {
-      if (!settled) {
-        settled = true;
-        clearTimeout(timer);
-        resolve(undefined);
-      }
-    }
-  });
-}
+import { getDocumentConfig, getResolvedReferences, getInkwellProjectRoot, ResolvedReferences } from "./config";
+import { citationPandocEngine } from "./citation-pandoc";
+import { bibliographyService } from "./bibliography-service";
 
 export interface CitationOptions {
   sourceFile: string;
   projectRoot: string;
+  resolvedReferences?: ResolvedReferences;
   bibliography?: string[];
   csl?: string;
   linkCitations?: boolean;
@@ -90,6 +22,8 @@ export interface CitationRenderResult {
   resolvedKeys: Set<string>;
   missingKeys: Set<string>;
   engine: "pandoc" | "fallback" | "none";
+  referencesEmbedded?: boolean;
+  approximate?: boolean;
 }
 
 /** Shape of a pandoc-style inline citation: [@key, p. 23], [-@key], [@a; @b]. */
@@ -128,49 +62,6 @@ export function extractCitations(markdown: string): CitationToken[] {
   return tokens;
 }
 
-function bibFilesMtime(bibFiles: string[]): number[] {
-  return bibFiles.map((f) => {
-    try {
-      return fs.statSync(f).mtimeMs;
-    } catch {
-      return 0;
-    }
-  });
-}
-
-function cacheKey(
-  tokens: CitationToken[],
-  bibFiles: string[],
-  cslFile: string | undefined,
-  linkCitations: boolean,
-): string {
-  const h = crypto.createHash("sha256");
-  h.update("v1\n");
-  h.update(linkCitations ? "link\n" : "nolink\n");
-  for (const t of tokens) {
-    h.update(t.raw);
-    h.update("\0");
-  }
-  const mtimes = bibFilesMtime(bibFiles);
-  for (let i = 0; i < bibFiles.length; i++) {
-    h.update(bibFiles[i]);
-    h.update(":");
-    h.update(String(mtimes[i]));
-    h.update("\0");
-  }
-  if (cslFile) {
-    h.update("csl:");
-    h.update(cslFile);
-    h.update(":");
-    try {
-      h.update(String(fs.statSync(cslFile).mtimeMs));
-    } catch {
-      h.update("0");
-    }
-  }
-  return h.digest("hex").slice(0, 24);
-}
-
 function cacheDirFor(projectRoot: string): string {
   const dir = path.join(projectRoot, ".inkwell", ".cache", "preview-cites");
   try {
@@ -182,10 +73,11 @@ function cacheDirFor(projectRoot: string): string {
 function readCache(
   projectRoot: string,
   key: string,
-): PandocCacheEntry | undefined {
+): FallbackCacheEntry | undefined {
   const file = path.join(cacheDirFor(projectRoot), `${key}.json`);
   try {
-    return JSON.parse(fs.readFileSync(file, "utf-8")) as PandocCacheEntry;
+    const entry = JSON.parse(fs.readFileSync(file, "utf-8")) as FallbackCacheEntry;
+    return entry.engine === "fallback" && Array.isArray(entry.replacements) && Array.isArray(entry.resolved) && Array.isArray(entry.missing) ? entry : undefined;
   } catch {
     return undefined;
   }
@@ -194,7 +86,7 @@ function readCache(
 function writeCache(
   projectRoot: string,
   key: string,
-  entry: PandocCacheEntry,
+  entry: FallbackCacheEntry,
 ): void {
   const file = path.join(cacheDirFor(projectRoot), `${key}.json`);
   try {
@@ -202,158 +94,12 @@ function writeCache(
   } catch {}
 }
 
-interface PandocCacheEntry {
+interface FallbackCacheEntry {
+  engine: "fallback";
   replacements: Array<{ raw: string; html: string }>;
   referencesHtml: string;
   resolved: string[];
   missing: string[];
-}
-
-// ── Path A: pandoc --citeproc ─────────────────────────────────────────
-
-let _pandocPath: string | undefined;
-let _pandocProbed = false;
-
-function resolvePandoc(): string | undefined {
-  if (_pandocProbed) return _pandocPath;
-  _pandocProbed = true;
-  const resolved = findBinaryViaShell("pandoc");
-  if (resolved) {
-    _pandocPath = resolved;
-  }
-  return _pandocPath;
-}
-
-async function renderWithPandoc(
-  tokens: CitationToken[],
-  bibFiles: string[],
-  cslFile: string | undefined,
-  linkCitations: boolean,
-): Promise<PandocCacheEntry | undefined> {
-  const pandoc = resolvePandoc();
-  if (!pandoc) return undefined;
-
-  // Build a minimal markdown doc: one line per citation (with a unique
-  // sentinel we can split on), plus a References container at the end.
-  // We run pandoc with --citeproc and parse the HTML output.
-  const lines: string[] = [];
-  lines.push("---");
-  lines.push("bibliography:");
-  for (const b of bibFiles) {
-    lines.push(`  - ${JSON.stringify(b)}`);
-  }
-  if (cslFile) {
-    lines.push(`csl: ${JSON.stringify(cslFile)}`);
-  }
-  lines.push(`link-citations: ${linkCitations ? "true" : "false"}`);
-  lines.push("suppress-bibliography: false");
-  lines.push("reference-section-title: __INKWELL_REFS__");
-  lines.push("---");
-  lines.push("");
-
-  for (let i = 0; i < tokens.length; i++) {
-    lines.push(`<!--INKWELL_CITE_${i}-->`);
-    lines.push(tokens[i].full);
-    lines.push(`<!--INKWELL_CITE_${i}_END-->`);
-    lines.push("");
-  }
-
-  const input = lines.join("\n");
-
-  const stdout = await runPandoc(
-    pandoc,
-    [
-      "--from=markdown",
-      "--to=html5",
-      "--citeproc",
-      "--wrap=none",
-      "--no-highlight",
-    ],
-    input,
-    15_000,
-  );
-  if (!stdout) return undefined;
-
-  const replacements: Array<{ raw: string; html: string }> = [];
-  for (let i = 0; i < tokens.length; i++) {
-    const startMarker = `<!--INKWELL_CITE_${i}-->`;
-    const endMarker = `<!--INKWELL_CITE_${i}_END-->`;
-    const si = stdout.indexOf(startMarker);
-    const ei = stdout.indexOf(endMarker);
-    if (si === -1 || ei === -1) continue;
-    let chunk = stdout.slice(si + startMarker.length, ei).trim();
-    // Pandoc wraps each paragraph in <p>...</p>, and our markers sit at
-    // paragraph edges — so the <p> tags may straddle the markers. Strip
-    // any leading <p ...> and trailing </p> that got included.
-    chunk = chunk.replace(/^<p\b[^>]*>/, "");
-    chunk = chunk.replace(/<\/p>\s*$/, "");
-    chunk = chunk.trim();
-    replacements.push({ raw: tokens[i].full, html: chunk });
-  }
-
-  const refsHtml = extractReferencesHtml(stdout);
-  const { resolved, missing } = classifyCitations(replacements);
-
-  return {
-    replacements,
-    referencesHtml: refsHtml,
-    resolved,
-    missing,
-  };
-}
-
-function extractReferencesHtml(pandocHtml: string): string {
-  // Pandoc emits a <div id="refs" ...> block containing nested
-  // <div class="csl-entry"> children, so we can't use a lazy regex —
-  // it would stop at the first inner </div>. Walk balanced <div>s.
-  const openRe = /<div[^>]*id="refs"[^>]*>/;
-  const open = pandocHtml.match(openRe);
-  if (!open || open.index === undefined) return "";
-  const start = open.index + open[0].length;
-
-  const tagRe = /<\/?div\b[^>]*>/g;
-  tagRe.lastIndex = start;
-  let depth = 1;
-  let end = -1;
-  let m: RegExpExecArray | null;
-  while ((m = tagRe.exec(pandocHtml)) !== null) {
-    if (m[0].startsWith("</")) {
-      depth--;
-      if (depth === 0) {
-        end = m.index;
-        break;
-      }
-    } else {
-      depth++;
-    }
-  }
-  if (end === -1) return "";
-
-  let body = pandocHtml.slice(start, end);
-  // Re-wrap the whole thing so consumers get a single top-level container
-  // with the same classes pandoc used.
-  body = body.replace(/<h[1-6][^>]*>[\s\S]*?<\/h[1-6]>/g, "").trim();
-  return body;
-}
-
-function classifyCitations(
-  replacements: Array<{ raw: string; html: string }>,
-): { resolved: string[]; missing: string[] } {
-  const resolved = new Set<string>();
-  const missing = new Set<string>();
-  for (const r of replacements) {
-    const re = /@([\w:./-]+)/g;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(r.raw)) !== null) {
-      const key = m[1];
-      if (/citation-missing/.test(r.html) || /\?\?\?/.test(r.html)) {
-        missing.add(key);
-      } else {
-        resolved.add(key);
-      }
-    }
-  }
-  return { resolved: [...resolved], missing: [...missing] };
 }
 
 // ── Path B: fallback .bib parser ──────────────────────────────────────
@@ -461,7 +207,7 @@ function loadBibEntries(bibFiles: string[]): Map<string, BibEntry> {
   for (const f of bibFiles) {
     try {
       const text = fs.readFileSync(f, "utf-8");
-      for (const e of parseBibFile(text)) {
+      for (const e of new Map(parseBibFile(text).map(entry => [entry.key, entry])).values()) {
         if (!map.has(e.key)) map.set(e.key, e);
       }
     } catch {}
@@ -553,7 +299,8 @@ function renderReferenceEntryFallback(entry: BibEntry): string {
   const pages = fields.get("pages");
   const publisher = fields.get("publisher");
   const doi = fields.get("doi");
-  const url = fields.get("url");
+  const candidateUrl = fields.get("url");
+  const url = candidateUrl && /^(?:https?:\/\/|mailto:)/i.test(candidateUrl) ? candidateUrl : undefined;
 
   const parts: string[] = [];
   if (author) parts.push(escapeHtmlCit(author) + ".");
@@ -570,7 +317,7 @@ function renderReferenceEntryFallback(entry: BibEntry): string {
   }
   if (doi) {
     parts.push(
-      `<a href="https://doi.org/${encodeURI(doi)}">https://doi.org/${escapeHtmlCit(doi)}</a>`,
+      `<a href="https://doi.org/${escapeAttr(encodeURI(doi))}">https://doi.org/${escapeHtmlCit(doi)}</a>`,
     );
   } else if (url) {
     parts.push(`<a href="${escapeAttr(url)}">${escapeHtmlCit(url)}</a>`);
@@ -608,7 +355,7 @@ async function renderWithFallback(
   tokens: CitationToken[],
   bibFiles: string[],
   linkCitations: boolean,
-): Promise<PandocCacheEntry> {
+): Promise<FallbackCacheEntry> {
   const entries = loadBibEntries(bibFiles);
   const replacements: Array<{ raw: string; html: string }> = [];
   const resolved = new Set<string>();
@@ -623,6 +370,7 @@ async function renderWithFallback(
 
   const refsHtml = renderReferencesFallback(entries, resolved);
   return {
+    engine: "fallback",
     replacements,
     referencesHtml: refsHtml,
     resolved: [...resolved],
@@ -632,81 +380,59 @@ async function renderWithFallback(
 
 // ── Public entry point ────────────────────────────────────────────────
 
+/** Shared path resolution, with a compatibility bridge for existing programmatic callers. */
+export function resolveCitationReferences(markdown: string, opts: CitationOptions): ResolvedReferences {
+  if (opts.resolvedReferences) return opts.resolvedReferences;
+  const config = getDocumentConfig(markdown, opts.sourceFile);
+  const overrides: Record<string, unknown> = {};
+  if (opts.bibliography !== undefined) overrides.bibliography = opts.bibliography;
+  if (opts.csl !== undefined) overrides.csl = opts.csl;
+  if (opts.linkCitations !== undefined) overrides["link-citations"] = opts.linkCitations;
+  if (opts.referencesHeading !== undefined) overrides["reference-section-title"] = opts.referencesHeading;
+  return getResolvedReferences({ ...config,
+    references: { ...config.references,
+      ...(opts.bibliography === undefined ? {} : { bibliography: opts.bibliography }),
+      ...(opts.csl === undefined ? {} : { csl: opts.csl }),
+      ...(opts.linkCitations === undefined ? {} : { links: opts.linkCitations }),
+      ...(opts.referencesHeading === undefined ? {} : { heading: opts.referencesHeading }),
+    },
+    provenance: { ...config.provenance, ...Object.fromEntries(Object.keys(overrides).map(key => [
+      `references.${({ bibliography: "bibliography", csl: "csl", "link-citations": "links", "reference-section-title": "heading" } as Record<string, string>)[key]}`,
+      { source: "document" as const, sourcePath: opts.sourceFile, line: 1, column: 1, key },
+    ])) },
+    compatibility: { ...config.compatibility, ...overrides },
+    documentMetadata: { ...config.documentMetadata, ...overrides },
+  }, opts.sourceFile);
+}
+
 export async function renderCitations(
   markdown: string,
   opts: CitationOptions,
 ): Promise<CitationRenderResult> {
   const tokens = extractCitations(markdown);
 
-  // Resolve candidate .bib files. Frontmatter wins (may be absolute or
-  // relative to the document directory); otherwise discover via config.
-  const docDir = path.dirname(opts.sourceFile);
-  const bibFiles: string[] = [];
-  const seen = new Set<string>();
-
-  const addBib = (p: string): void => {
-    let resolved = p;
-    if (!path.isAbsolute(resolved)) {
-      const fromDoc = path.resolve(docDir, resolved);
-      const fromRoot = path.resolve(opts.projectRoot, resolved);
-      if (fs.existsSync(fromDoc)) resolved = fromDoc;
-      else if (fs.existsSync(fromRoot)) resolved = fromRoot;
-      else resolved = fromDoc;
-    }
-    if (!seen.has(resolved) && fs.existsSync(resolved)) {
-      seen.add(resolved);
-      bibFiles.push(resolved);
-    }
-  };
-
-  if (opts.bibliography?.length) {
-    for (const b of opts.bibliography) addBib(b);
-  }
-  if (!bibFiles.length) {
-    for (const b of findBibFiles(opts.projectRoot)) addBib(b);
-  }
-
+  const references = resolveCitationReferences(markdown, opts);
+  try {
+    const full = await citationPandocEngine.render(markdown, references, opts.projectRoot);
+    if (full) return full;
+  } catch { /* A labelled local approximation remains available after a probe/render failure. */ }
+  const bibFiles = [...references.bibliography];
   if (!tokens.length) {
     return {
       body: markdown,
       resolvedKeys: new Set(),
       missingKeys: new Set(),
       engine: "none",
+      approximate: /(^|[\s[(])[-]?@[\w]/m.test(markdown) || references.nocite.length > 0,
     };
   }
 
-  let cslFile: string | undefined;
-  if (opts.csl) {
-    cslFile = findCslFile(opts.projectRoot, opts.csl);
-  } else {
-    // Parity with the compile pipeline: without a declared csl the PDF
-    // uses the bundled numeric style ([1,2,3]), so the preview should
-    // render the same numbers rather than Chicago author-date.
-    const bundled = path.join(__dirname, "..", "csl", "inkwell-numeric.csl");
-    if (fs.existsSync(bundled)) cslFile = bundled;
-  }
-
-  const linkCitations = opts.linkCitations !== false;
-
-  const key = cacheKey(tokens, bibFiles, cslFile, linkCitations);
+  const snapshot = await bibliographyService.snapshot(references, "approximate-author-year-v2");
+  const key = crypto.createHash("sha256").update(JSON.stringify(["fallback-v2", markdown, snapshot.fingerprint])).digest("hex");
   let cached = readCache(opts.projectRoot, key);
-  let engine: CitationRenderResult["engine"] = "none";
-
-  if (!cached) {
-    cached = await renderWithPandoc(tokens, bibFiles, cslFile, linkCitations);
-    if (cached) {
-      engine = "pandoc";
-    } else if (bibFiles.length) {
-      cached = await renderWithFallback(tokens, bibFiles, linkCitations);
-      engine = "fallback";
-    }
-    if (cached) {
-      writeCache(opts.projectRoot, key, cached);
-    }
-  } else {
-    // Guess engine from the payload shape: pandoc CSL output includes
-    // csl-entry or citation-missing classes.
-    engine = cached.referencesHtml.includes("csl-entry") ? "pandoc" : "fallback";
+  if (!cached && bibFiles.length) {
+    cached = await renderWithFallback(tokens, bibFiles, references.linkCitations);
+    writeCache(opts.projectRoot, key, cached);
   }
 
   if (!cached) {
@@ -715,7 +441,7 @@ export async function renderCitations(
       body: applyCosmeticFallback(markdown, tokens),
       resolvedKeys: new Set(),
       missingKeys: new Set(tokens.flatMap((t) => t.keys)),
-      engine: "none",
+      engine: "none", approximate: true,
     };
   }
 
@@ -727,7 +453,7 @@ export async function renderCitations(
     }
   }
 
-  const refsHeading = opts.referencesHeading || "References";
+  const refsHeading = references.referencesHeading || "References";
   let referencesHtml: string | undefined;
   if (cached.referencesHtml && cached.referencesHtml.trim()) {
     referencesHtml = `<section class="references-section"><h2 class="references-heading">${escapeHtmlCit(refsHeading)}</h2>${cached.referencesHtml}</section>`;
@@ -738,7 +464,7 @@ export async function renderCitations(
     referencesHtml,
     resolvedKeys: new Set(cached.resolved),
     missingKeys: new Set(cached.missing),
-    engine,
+    engine: cached.engine, approximate: true,
   };
 }
 

@@ -5,28 +5,166 @@ on:
     branches: [main]
   push:
     branches: [main]
+  workflow_dispatch: {}
+  workflow_call: {}
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
-  verify:
-    runs-on: ubuntu-latest
+  candidate:
+    runs-on: ubuntu-22.04
+    outputs:
+      commit: ${{ steps.identity.outputs.commit }}
+      filename: ${{ steps.identity.outputs.filename }}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
+      - run: npm ci
+      - name: Build the candidate once
+        id: identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run package:vsix
+          version="$(node -p 'require("./package.json").version')"
+          commit="$(git rev-parse HEAD)"
+          mkdir candidate
+          mv "inkwell-$version.vsix" candidate/
+          node scripts/release-evidence.mjs init --vsix "candidate/inkwell-$version.vsix" --commit "$commit" --output candidate/candidate.json
+          node scripts/verify-vsix.mjs "candidate/inkwell-$version.vsix" --tag "v$version" --json > candidate/package.json
+          node scripts/release-evidence.mjs record --candidate candidate/candidate.json --gate package --report candidate/package.json --output evidence/package.evidence.json
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "filename=inkwell-$version.vsix" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: inkwell-candidate
+          path: candidate/
+          if-no-files-found: error
+          retention-days: 90
+      - uses: actions/upload-artifact@v4
+        with:
+          name: evidence-package
+          path: evidence/
+          if-no-files-found: error
 
-      - name: Install dependencies
-        run: npm ci
+  verify:
+    needs: candidate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            platform: linux
+            editor_download: linux-x64
+            editor_binary: VSCode-linux-x64/code
+          - os: macos-14
+            platform: macos
+            editor_download: darwin-arm64
+            editor_binary: Visual Studio Code.app/Contents/MacOS/Electron
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    env:
+      INKWELL_REQUIRE_BROWSER: 1
+      FORCE_COLOR: 0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.candidate.outputs.commit }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: inkwell-candidate
+          path: candidate
+      - name: Verify and extract the unchanged candidate
+        env:
+          VSIX: ${{ needs.candidate.outputs.filename }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/release-evidence.mjs init --vsix "candidate/$VSIX" --commit "$(git rev-parse HEAD)" --output candidate/rechecked.json
+          cmp candidate/candidate.json candidate/rechecked.json
+          unzip -q "candidate/$VSIX" -d "$RUNNER_TEMP/inkwell-artifact"
+          echo "INKWELL_PREVIEW_ASSET_ROOT=$RUNNER_TEMP/inkwell-artifact/extension" >> "$GITHUB_ENV"
+          echo "INKWELL_PREVIEW_REPORT=$GITHUB_WORKSPACE/offline.json" >> "$GITHUB_ENV"
+      - name: Install pinned Pandoc for computed citation and style checks
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$PLATFORM" = linux ]; then
+            asset=pandoc-3.9-1-amd64.deb
+            checksum=f95d6e280da0daec1297bc2608bd537de563eadc31b56088d258532abcd257f4
+          else
+            asset=pandoc-3.9-arm64-macOS.pkg
+            checksum=c1b2dc8bd3abe2d56a7d2ca73dcf2d2c7f6e623b37b1f328de1b36bdee480a05
+          fi
+          curl --fail --location --proto '=https' --retry 3 "https://github.com/jgm/pandoc/releases/download/3.9/$asset" --output "$RUNNER_TEMP/$asset"
+          node - "$RUNNER_TEMP/$asset" "$checksum" <<'NODE'
+          const fs = require('node:fs'), crypto = require('node:crypto');
+          if (crypto.createHash('sha256').update(fs.readFileSync(process.argv[2])).digest('hex') !== process.argv[3]) throw new Error('Pandoc download checksum mismatch');
+          NODE
+          if [ "$PLATFORM" = linux ]; then sudo dpkg -i "$RUNNER_TEMP/$asset"; else sudo installer -pkg "$RUNNER_TEMP/$asset" -target /; fi
+          pandoc --version
+      - name: Behavioral, migration, installer and required offline preview checks
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run verify 2>&1 | tee behavior.log
+          node --test tests/extension-host/process-cleanup.test.cjs
+          node scripts/release-evidence.mjs record --candidate candidate/candidate.json --gate "behavior-$PLATFORM" --report behavior.log --output "evidence/behavior-$PLATFORM.evidence.json"
+          node scripts/release-evidence.mjs record --candidate candidate/candidate.json --gate "offline-$PLATFORM" --report offline.json --output "evidence/offline-$PLATFORM.evidence.json"
+      - name: Download a clean editor application
+        env:
+          EDITOR_PLATFORM: ${{ matrix.editor_download }}
+          PLATFORM: ${{ matrix.platform }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/inkwell-editor"
+          curl --fail --location --proto '=https' --retry 3 "https://update.code.visualstudio.com/latest/$EDITOR_PLATFORM/stable" --output "$RUNNER_TEMP/editor-archive"
+          if [ "$PLATFORM" = linux ]; then
+            tar -xzf "$RUNNER_TEMP/editor-archive" -C "$RUNNER_TEMP/inkwell-editor"
+          else
+            ditto -x -k "$RUNNER_TEMP/editor-archive" "$RUNNER_TEMP/inkwell-editor"
+          fi
+      - name: Activate the exact packaged extension in disposable editor profiles
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          EDITOR_BINARY: ${{ matrix.editor_binary }}
+          VSIX: ${{ needs.candidate.outputs.filename }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          command=(node scripts/check-extension-host.cjs --vsix "candidate/$VSIX" --editor "$RUNNER_TEMP/inkwell-editor/$EDITOR_BINARY" --mode activation --samples 5 --warmups 1 --report host.json)
+          if [ "$PLATFORM" = linux ]; then xvfb-run -a "${command[@]}"; else "${command[@]}"; fi
+          node scripts/release-evidence.mjs record --candidate candidate/candidate.json --gate "activation-$PLATFORM" --report host.json --output "evidence/activation-$PLATFORM.evidence.json"
+      - name: Retain evidence and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-${{ matrix.platform }}
+          path: |
+            evidence/
+            behavior.log
+            offline.json
+            host.json
+          if-no-files-found: error
 
-      - name: Bundle extension
-        run: npm run package
-
-      - name: Verify
-        run: npm run verify
+  demos:
+    needs: candidate
+    uses: ./.github/workflows/compile-demos.yml
+    with:
+      candidate-artifact: inkwell-candidate
+      release-commit: ${{ needs.candidate.outputs.commit }}

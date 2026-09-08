@@ -1,49 +1,21 @@
-// Shared YAML frontmatter primitives. Several modules previously each
-// re-implemented "find the --- ... --- block and pull a value out of the
-// inkwell: sub-mapping" with subtly different regexes. The variants
-// anchored on a literal "\n" silently failed on CRLF documents, so on
-// Windows the preview styling, code-block display mode, python-env, and
-// LaTeX preamble all no-opped. These helpers handle CRLF once, in one
-// place, by normalizing the captured frontmatter to LF (the body is left
-// byte-for-byte untouched).
+// Compatibility accessors backed by the shared YAML parser. New consumers use
+// DocumentConfig directly; these preserve the existing internal helper API.
+import { parseDocumentFrontmatter } from "./document-config";
 
-export interface SplitFrontmatter {
-  /** The YAML between the leading and trailing `---`, normalized to LF. */
-  fm: string;
-  /** Everything after the closing `---`, unmodified. */
-  body: string;
-}
+export interface SplitFrontmatter { fm: string; body: string }
 
 export function splitFrontmatter(text: string): SplitFrontmatter | undefined {
-  const match = text.match(
-    /^---\r?\n([\s\S]*?)\r?\n---[ \t]*\r?\n?([\s\S]*)$/,
-  );
-  if (!match) return undefined;
-  return { fm: match[1].replace(/\r\n/g, "\n"), body: match[2] };
+  const parsed = parseDocumentFrontmatter(text);
+  return parsed.hasFrontmatter ? { fm: parsed.rawYaml.replace(/\r\n/g, "\n"), body: parsed.body } : undefined;
 }
 
-/**
- * The indented block beneath a `key:` line with nothing after the colon
- * (e.g. the `inkwell:` mapping). Returns the raw indented lines joined by
- * LF, or undefined when the key is absent.
- */
 export function extractIndentedBlock(fm: string, key: string): string | undefined {
-  const m = fm.match(new RegExp(`^${key}:\\s*$`, "m"));
-  if (!m) return undefined;
-  const start = m.index! + m[0].length;
-  const lines = fm.substring(start).split("\n");
-  const block: string[] = [];
-  for (const line of lines) {
-    if (/^\S/.test(line) && line.trim()) break;
-    block.push(line);
-  }
-  return block.join("\n");
+  const parsed = parseDocumentFrontmatter(`---\n${fm}\n---\n`);
+  const value = parsed.metadata[key];
+  return value && typeof value === "object" && !Array.isArray(value) ? JSON.stringify(value) : undefined;
 }
 
-/** An indented scalar inside a block returned by {@link extractIndentedBlock}. */
 export function extractIndentedValue(block: string, key: string): string | undefined {
-  const m = block.match(
-    new RegExp(`^\\s+${key}:\\s*["']?([^"'\\n]+?)["']?\\s*$`, "m"),
-  );
-  return m ? m[1].trim() : undefined;
+  const value = parseDocumentFrontmatter(`---\n${block}\n---\n`).metadata[key];
+  return typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : undefined;
 }

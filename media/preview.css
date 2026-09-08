@@ -53,9 +53,9 @@
 * { box-sizing: border-box; }
 
 body {
-    font-family: var(--body-font);
-    font-size: var(--base-size);
-    line-height: var(--line-height);
+    font-family: var(--vscode-font-family, sans-serif);
+    font-size: var(--vscode-font-size, 13px);
+    line-height: 1.5;
     color: var(--text);
     background: var(--bg);
     margin: 0;
@@ -158,77 +158,39 @@ blockquote {
     font-size: 0.95em;
 }
 
-/* Booktabs-style tables: horizontal rules only (toprule/midrule/bottomrule),
-   no vertical borders, no row stripes by default. Matches LaTeX booktabs. */
-table {
-    border-collapse: collapse;
-    width: 100%;
-    margin: 1.5em 0;
-    font-size: var(--table-font-size);
+/* Only semantic body tables receive document table styles. Raw HTML/layout
+   tables and template-owned PDF tables retain their own presentation. */
+.inkwell-table-scroll { max-width: 100%; overflow-x: auto; margin: 1.5em 0; }
+.inkwell-table-scroll:focus-visible { outline: 2px solid var(--vscode-focusBorder, var(--accent)); }
+.inkwell-document table.inkwell-table {
+    width: var(--inkwell-table-width, 100%); max-width: 100%;
+    border-collapse: collapse; table-layout: fixed; margin: 0; line-height: 1.2;
+    font-size: var(--inkwell-table-font-size, var(--inkwell-table-size));
+    border: 0; border-top: var(--inkwell-table-rule-thickness) solid var(--inkwell-table-rule-color);
+    border-bottom: var(--inkwell-table-rule-thickness) solid var(--inkwell-table-rule-color);
 }
-table.booktabs,
-table {
-    border-top: var(--table-rule-thick) solid var(--rule-color);
-    border-bottom: var(--table-rule-thick) solid var(--rule-color);
+.inkwell-table th, .inkwell-table td {
+    padding: var(--inkwell-table-padding-vertical) var(--inkwell-table-padding-horizontal);
+    border: 0; overflow-wrap: anywhere; text-align: left; vertical-align: top;
 }
-thead {
-    border-bottom: var(--table-rule-thin) solid var(--rule-color);
+.inkwell-table th {
+    font-weight: var(--inkwell-table-header-weight); background: var(--inkwell-table-header-background);
 }
-thead th {
-    font-weight: 600;
-    padding: 8px 12px;
-    text-align: left;
-    border: none;
-    background: transparent;
+.inkwell-table thead { border-bottom: var(--inkwell-table-rule-thickness) solid var(--inkwell-table-rule-color); }
+.inkwell-table tbody tr:nth-child(even) { background: var(--inkwell-table-stripe-color); }
+.inkwell-document table.inkwell-table.table-preset-grid,
+.inkwell-table.table-preset-grid th, .inkwell-table.table-preset-grid td {
+    border: var(--inkwell-table-rule-thickness) solid var(--inkwell-table-rule-color);
 }
-tbody td {
-    padding: 6px 12px;
-    text-align: left;
-    border: none;
+.inkwell-document table.inkwell-table.table-preset-plain, .inkwell-table.table-preset-plain thead { border: 0; }
+.inkwell-table caption {
+    font-size: var(--inkwell-caption-size); font-style: var(--inkwell-table-caption-style);
+    text-align: left; padding: 0.5em 0; color: var(--text); line-height: 1.2;
 }
-tbody tr:last-child td { border-bottom: none; }
-
-/* Optional row striping when frontmatter sets inkwell.table-stripe */
-body.table-stripe tbody tr:nth-child(even) {
-    background: var(--table-stripe-bg);
-}
-
-/* Grid style: vertical+horizontal rules like tabular{|c|c|} */
-body.table-style-grid table {
-    border: var(--table-rule-thin) solid var(--rule-color);
-}
-body.table-style-grid th,
-body.table-style-grid td {
-    border: var(--table-rule-thin) solid var(--rule-color);
-}
-
-/* Plain style: no rules at all */
-body.table-style-plain table,
-body.table-style-plain thead,
-body.table-style-plain tbody tr,
-body.table-style-plain tbody tr:last-child {
-    border: none;
-}
-
-/* Table captions. Default is below-table; caption-above flips it. */
-.table-caption {
-    font-size: var(--caption-font-size);
-    color: var(--blockquote);
-    margin-top: 0.4em;
-    margin-bottom: 1.5em;
-    text-align: left;
-}
-.table-caption strong { color: var(--text); }
-
-body.caption-above .table-caption {
-    margin-top: 0;
-    margin-bottom: 0.4em;
-}
-body.caption-above table + .table-caption {
-    /* when caption-above is set and DOM order still has the caption after,
-       visually lift it by negative margin */
-    margin-top: -1.5em;
-    order: -1;
+.inkwell-table-literal { white-space: pre-wrap; }
+.inkwell-raw-table-notice, .inkwell-table-error {
+    margin: 1em 0; padding: 0.7em 1em; border-left: 3px solid var(--accent);
+    background: var(--code-bg); font: 12px var(--vscode-font-family, sans-serif);
 }
 
 /* Unresolved variable placeholders */
@@ -393,6 +355,9 @@ em { font-style: italic; }
 .references ol { padding-left: 1.5em; }
 .references li { margin-bottom: 0.75em; line-height: 1.5; }
 .references a { color: var(--accent); text-decoration: none; }
+.inkwell-document .csl-bib-body .csl-entry { margin-bottom: var(--inkwell-reference-entry-space, 0); }
+.inkwell-document .csl-bib-body.hanging-indent .csl-entry { margin-left: var(--inkwell-reference-indent, 2em); text-indent: calc(-1 * var(--inkwell-reference-indent, 2em)); }
+.citation-preview-notice { font: 12px var(--vscode-font-family, sans-serif); border-left: 3px solid var(--accent); padding: .6em 1em; }
 
 /* Pandoc citeproc emits .csl-entry, .csl-left-margin, .csl-right-inline */
 .csl-entry {
@@ -478,3 +443,22 @@ em { font-style: italic; }
 
     .citation-missing { color: #000 !important; }
 }
+
+/* Normalized document typography. Physical point sizes match the selected
+   PDF class; viewer scaling is applied outside these document values. */
+.inkwell-document h1:not(.title-block h1) { font-size: var(--inkwell-heading-1-size); }
+.inkwell-document h2 { font-size: var(--inkwell-heading-2-size); }
+.inkwell-document h3 { font-size: var(--inkwell-heading-3-size); }
+.inkwell-document h4 { font-size: var(--inkwell-heading-4-size); }
+.inkwell-document h5 { font-size: var(--inkwell-heading-5-size); }
+.inkwell-document h6 { font-size: var(--inkwell-heading-6-size); }
+.inkwell-document :is(h1, h2, h3, h4, h5, h6):not(.title-block h1) {
+    font-family: var(--inkwell-heading-font);
+    font-weight: var(--inkwell-heading-weight);
+    color: var(--inkwell-heading-color);
+    font-style: normal;
+}
+.inkwell-document pre code,
+.inkwell-document pre code.hljs,
+.inkwell-document pre code span { font-size: var(--inkwell-code-size); }
+.inkwell-document :is(.references, .references-section, .csl-bib-body) { font-size: var(--inkwell-reference-size); }

@@ -15,7 +15,8 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { splitFrontmatter, extractIndentedBlock, extractIndentedValue } from "./frontmatter";
+import { DocumentConfig, resolveDocumentConfig } from "./document-config";
+import { buildTypographyPreamble } from "./style-model";
 
 export interface InkwellStyle {
   "code-bg"?: string;
@@ -30,49 +31,22 @@ export interface InkwellStyle {
   "caption-style"?: "above" | "below";
 }
 
-export function parseInkwellStyle(text: string): InkwellStyle {
-  const fm = splitFrontmatter(text);
-  if (!fm) return {};
-
+export function parseInkwellStyle(text: string, resolved?: DocumentConfig): InkwellStyle {
+  const metadata = (resolved || resolveDocumentConfig({ text })).compatibility;
+  const raw = metadata.inkwell;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const values = raw as Record<string, unknown>;
   const style: InkwellStyle = {};
-
-  const inkwellBlock = extractIndentedBlock(fm.fm, "inkwell");
-  if (!inkwellBlock) return style;
-
-  const codeBg = extractIndentedValue(inkwellBlock, "code-bg");
-  if (codeBg) style["code-bg"] = codeBg;
-
-  const codeBorder = extractIndentedValue(inkwellBlock, "code-border");
-  if (codeBorder === "true") style["code-border"] = true;
-
-  const codeFontSize = extractIndentedValue(inkwellBlock, "code-font-size");
-  if (codeFontSize) style["code-font-size"] = codeFontSize;
-
-  const codeRounded = extractIndentedValue(inkwellBlock, "code-rounded");
-  if (codeRounded === "true") style["code-rounded"] = true;
-
-  const tables = extractIndentedValue(inkwellBlock, "tables");
-  if (tables === "booktabs" || tables === "grid" || tables === "plain") {
-    style.tables = tables;
+  for (const key of ["code-bg", "code-font-size", "table-font-size"] as const) {
+    if (typeof values[key] === "string") style[key] = values[key];
   }
-
-  const tableFontSize = extractIndentedValue(inkwellBlock, "table-font-size");
-  if (tableFontSize) style["table-font-size"] = tableFontSize;
-
-  const tableStripe = extractIndentedValue(inkwellBlock, "table-stripe");
-  if (tableStripe === "true") style["table-stripe"] = true;
-
-  const hangingIndent = extractIndentedValue(inkwellBlock, "hanging-indent");
-  if (hangingIndent === "true") style["hanging-indent"] = true;
-
-  const columns = extractIndentedValue(inkwellBlock, "columns");
-  if (columns) style.columns = parseInt(columns, 10) || undefined;
-
-  const captionStyle = extractIndentedValue(inkwellBlock, "caption-style");
-  if (captionStyle === "above" || captionStyle === "below") {
-    style["caption-style"] = captionStyle;
+  for (const key of ["code-border", "code-rounded", "table-stripe", "hanging-indent"] as const) {
+    if (typeof values[key] === "boolean") style[key] = values[key];
   }
-
+  const table = values.tables && typeof values.tables === "object" ? (values.tables as Record<string, unknown>).preset : values.tables;
+  if (table === "booktabs" || table === "grid" || table === "plain") style.tables = table;
+  if (typeof values.columns === "number") style.columns = values.columns;
+  if (values["caption-style"] === "above" || values["caption-style"] === "below") style["caption-style"] = values["caption-style"];
   return style;
 }
 
@@ -143,6 +117,7 @@ export function generatePreamble(style: InkwellStyle): string {
     if (style["code-font-size"]) {
       const size = style["code-font-size"];
       if (VALID_LATEX_FONT_SIZES.includes(size)) {
+        lines.push("\\usepackage{fvextra}");
         // breaklines/breakanywhere must be restated: this redefinition
         // replaces the template's own Highlighting environment, and
         // dropping them silently re-enables overfull code lines.
@@ -151,33 +126,11 @@ export function generatePreamble(style: InkwellStyle): string {
     }
   }
 
-  if (style.tables === "booktabs" || style["table-font-size"] || style["table-stripe"]) {
-    lines.push("");
-    lines.push("% Inkwell table styling");
+  // Body table styles are applied by semantic-tables.lua around native Tables.
+  // Never attach document styling to every tabular/longtable environment.
 
-    if (style["table-stripe"]) {
-      lines.push("\\usepackage{colortbl}");
-      lines.push("\\definecolor{inkwell-stripe}{RGB}{245,245,250}");
-      lines.push("\\rowcolors{2}{white}{inkwell-stripe}");
-    }
-
-    if (style["table-font-size"]) {
-      const size = style["table-font-size"];
-      if (VALID_LATEX_FONT_SIZES.includes(size)) {
-        lines.push(`\\AtBeginEnvironment{longtable}{\\${size}}`);
-        lines.push(`\\AtBeginEnvironment{tabular}{\\${size}}`);
-        lines.push("\\usepackage{etoolbox}");
-      }
-    }
-  }
-
-  if (style["hanging-indent"]) {
-    lines.push("");
-    lines.push("% Inkwell hanging indent for lists");
-    lines.push("\\usepackage{enumitem}");
-    lines.push("\\setlist[enumerate]{leftmargin=2em,labelindent=0pt,itemindent=0pt}");
-    lines.push("\\setlist[itemize]{leftmargin=1.5em,labelindent=0pt}");
-  }
+  // The deprecated hanging-indent alias now applies only to references.
+  // reference-render.lua scopes it to the citeproc bibliography environment.
 
   if (style.columns && style.columns > 1) {
     lines.push("");
@@ -186,23 +139,18 @@ export function generatePreamble(style: InkwellStyle): string {
     lines.push(`\\newcommand{\\inkwellcolumns}{${style.columns}}`);
   }
 
-  if (style["caption-style"] === "above") {
-    lines.push("");
-    lines.push("% Inkwell caption position (above floats). Uses the caption");
-    lines.push("% package (loaded by the built-in templates); floatrow is avoided");
-    lines.push("% because it is incompatible with the float package the templates load.");
-    lines.push("\\usepackage{caption}");
-    lines.push("\\captionsetup[table]{position=top}");
-    lines.push("\\captionsetup[figure]{position=top}");
-  }
-
   return lines.join("\n");
 }
 
 /** The generated preamble for a document, or "" when no style keys are set. */
-export function generatePreambleText(text: string): string {
-  const style = parseInkwellStyle(text);
-  const preamble = generatePreamble(style);
+export function generatePreambleText(text: string, resolved?: DocumentConfig): string {
+  const config = resolved || resolveDocumentConfig({ text });
+  const style = parseInkwellStyle(text, config);
+  // Font sizes use the shared model. In particular, body tables must never
+  // install the old global tabular/longtable hooks that also style title pages.
+  delete style["code-font-size"];
+  delete style["table-font-size"];
+  const preamble = [generatePreamble(style), buildTypographyPreamble(config)].filter(Boolean).join("\n");
   return preamble.trim() ? preamble : "";
 }
 
@@ -243,9 +191,10 @@ export function injectPreambleIntoTemplate(
 
 export function writePreambleFile(
   text: string,
-  cacheDir: string
+  cacheDir: string,
+  resolved?: DocumentConfig,
 ): string | undefined {
-  const preamble = generatePreambleText(text);
+  const preamble = generatePreambleText(text, resolved);
   if (!preamble) return undefined;
 
   const file = path.join(cacheDir, "inkwell-preamble.tex");

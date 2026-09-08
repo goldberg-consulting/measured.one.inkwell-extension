@@ -12,15 +12,19 @@
 import * as path from "path";
 import * as fs from "fs";
 import * as crypto from "crypto";
+import MarkdownIt from "markdown-it";
 import { execFileSync } from "child_process";
-import { BlockResult, CodeBlock, DisplayMode, discoverArtifacts, parseCodeBlocks, parseQuotedAttrs, parseRunConfig, resolveVenvPython, RunConfig } from "./runner";
+import { BlockResult, CodeBlock, DisplayMode, readCurrentRunResults, parseCodeBlocks, parseQuotedAttrs, parseRunConfig, resolveVenvPython, RunConfig } from "./runner";
 import { buildCodeBlockPath, findBinaryViaShell } from "./shell-env";
 import { getInkwellOutputChannel } from "./inkwell-output";
+import { fingerprintBlock, resolveRunSource } from "./run-store";
+import * as vscode from "vscode";
+import { artifactTableLabel, decodeTableData, encodeTableData, literalFence, parseCsvTable, parseJsonTable, TABLE_DATA_LIMITS,
+  TABLE_DATA_ERROR_FENCE, TableDataDiagnostic, TableDataError, tableDataDiagnostic } from "./table-data";
 import {
   getInkwellCompiledPath,
   getInkwellOutputsDir,
   getInkwellProjectRoot,
-  resolveBlockFilePath,
 } from "./config";
 
 /** Session-local dirs prepended after `mmdc` is resolved via login shell. */
@@ -65,7 +69,6 @@ let lastSkippedVarsWarning = "";
 
 function resolveDisplay(block: CodeBlock, defaultDisplay: DisplayMode): DisplayMode {
   if (block.display) return block.display;
-  if (block.file) return "output";
   return defaultDisplay;
 }
 
@@ -127,15 +130,108 @@ export function stripInkwellLines(stdout: string): string {
     .join("\n");
 }
 
+/** Generated cell/diagnostic text is data, including binding-looking strings. */
+function shieldTableFences(markdown: string, inspectMetadata?: (values: string[]) => void): { text: string; restore: (text: string) => string } {
+  const opening = /^(`{3,})inkwell-table-(?:data|error)[ \t]*\r?\n/gm;
+  const protectedText = new Map<string, string>();
+  let text = "";
+  let offset = 0;
+  let match: RegExpExecArray | null;
+  while ((match = opening.exec(markdown))) {
+    const closing = new RegExp("^`{" + match[1].length + ",}[ \\t]*(?:\\r?\\n|$)", "gm");
+    closing.lastIndex = opening.lastIndex;
+    const end = closing.exec(markdown);
+    const nextOffset = end ? closing.lastIndex : markdown.length;
+    if (inspectMetadata && match[0].includes("inkwell-table-data")) {
+      try {
+        const table = decodeTableData(markdown.slice(opening.lastIndex, end?.index ?? markdown.length));
+        inspectMetadata([table.caption || "", table.label || "", ...Object.values(table.attributes)]);
+      } catch { /* Invalid private payloads are diagnosed by the table renderer. */ }
+    }
+    let token: string;
+    do { token = `INKWELL_LITERAL_${crypto.randomUUID()}_END`; } while (markdown.includes(token));
+    const original = markdown.slice(match.index, nextOffset);
+    const placeholder = token + (original.match(/\r?\n$/)?.[0] || "");
+    protectedText.set(placeholder, original);
+    text += markdown.slice(offset, match.index) + placeholder;
+    offset = nextOffset;
+    opening.lastIndex = nextOffset;
+  }
+  text += markdown.slice(offset);
+  return { text, restore: (transformed) => {
+    for (const [token, original] of protectedText) transformed = transformed.replace(token, () => original);
+    return transformed;
+  } };
+}
+
+function escapedBacktick(text: string, offset: number): boolean {
+  let slashes = 0;
+  while (offset > 0 && text[--offset] === "\\") slashes++;
+  return slashes % 2 === 1;
+}
+
+/** Code examples are literal; only explicit single-backtick Python spans run.
+ * Parse Markdown blocks so nested fences and indented code stay protected too.
+ * YAML metadata remains eligible for binding before configuration resolution.
+ */
+function shieldBindingLiterals(markdown: string, inspectMetadata?: (values: string[]) => void): { text: string; restore: (text: string) => string } {
+  const tables = shieldTableFences(markdown, inspectMetadata);
+  const frontmatter = /^(?:\uFEFF)?---[ \t]*(?:\r\n|\r|\n)[\s\S]*?(?:\r\n|\r|\n)(?:---|\.\.\.)[ \t]*(?:\r\n|\r|\n|$)/.exec(tables.text)?.[0].length || 0;
+  const body = tables.text.slice(frontmatter), starts = [0];
+  for (const match of body.matchAll(/\r\n|\r|\n/g)) starts.push(match.index! + match[0].length);
+  const ranges: Array<[number, number]> = [];
+  const tokens = new MarkdownIt().parse(body, {});
+  for (const token of tokens) {
+    if (!token.map) continue;
+    const start = starts[token.map[0]], end = starts[token.map[1]] ?? body.length;
+    if (token.type === "fence" || token.type === "code_block") {
+      ranges.push([start, end]);
+    } else if (token.type === "inline") {
+      const runs = [...body.slice(start, end).matchAll(/`+/g)].map(match => ({ start: start + match.index!, length: match[0].length }));
+      const next = new Map<number, number>(), closing = new Map<number, number>();
+      for (let i = runs.length - 1; i >= 0; i--) {
+        const found = next.get(runs[i].length);
+        if (found !== undefined) closing.set(i, found);
+        next.set(runs[i].length, i);
+      }
+      for (let i = 0; i < runs.length; i++) {
+        const close = closing.get(i);
+        if (escapedBacktick(body, runs[i].start) || close === undefined) continue;
+        const from = runs[i].start, to = runs[close].start + runs[close].length;
+        if (runs[i].length !== 1 || !/^`\{python\}\s+[^`]+`$/.test(body.slice(from, to))) ranges.push([from, to]);
+        i = close;
+      }
+    }
+  }
+  const literals = new Map<string, string>();
+  let text = tables.text.slice(0, frontmatter), offset = 0;
+  for (const [start, end] of ranges.sort(([a], [b]) => a - b)) {
+    if (start < offset) continue;
+    let token: string;
+    do { token = `INKWELL_CODE_${crypto.randomUUID()}_END`; } while (tables.text.includes(token));
+    literals.set(token, body.slice(start, end));
+    text += body.slice(offset, start) + token;
+    offset = end;
+  }
+  text += body.slice(offset);
+  return { text, restore: transformed => {
+    for (const [token, original] of literals) transformed = transformed.replace(token, () => original);
+    return tables.restore(transformed);
+  } };
+}
+
 export function substituteVariables(
   markdown: string,
   vars: Map<string, string>,
 ): string {
   if (!vars.size) return markdown;
-  return markdown.replace(/\{\{(\w+)\}\}/g, (_match, key) => {
+  const literal = shieldBindingLiterals(markdown);
+  return literal.restore(literal.text.replace(/\{\{(\w+)\}\}/g, (_match, key) => {
     return vars.get(key) ?? `{{${key}}}`;
-  });
+  }));
 }
+
+export interface InjectionOptions { sourceFile?: string; tableDiagnostics?: TableDataDiagnostic[]; variables?: Map<string, string> }
 
 export function injectResults(
   markdown: string,
@@ -143,8 +239,10 @@ export function injectResults(
   defaultDisplay: DisplayMode = "output",
   docDir: string,
   projectRoot: string,
+  options: InjectionOptions = {},
 ): string {
   if (!results.length) return markdown;
+  const resolvedOptions = { ...options, variables: options.variables ?? collectVariables(results) };
 
   const resultsByIndex = new Map<number, BlockResult>();
   for (const r of results) {
@@ -160,12 +258,13 @@ export function injectResults(
 
   for (const block of blocks) {
     const result = resultsByIndex.get(block.index);
-    const display = resolveDisplay(block, defaultDisplay);
+    const effectiveBlock = result?.block || block;
+    const display = resolveDisplay(effectiveBlock, defaultDisplay);
 
     const start = output.indexOf(block.raw, offset);
     if (start === -1) continue;
 
-    const replacement = buildBlockOutput(block, result, display, docDir, projectRoot);
+    const replacement = buildBlockOutput(effectiveBlock, result, display, docDir, projectRoot, resolvedOptions);
 
     output =
       output.substring(0, start) +
@@ -183,12 +282,13 @@ function buildBlockOutput(
   display: DisplayMode,
   docDir: string,
   projectRoot: string,
+  options: InjectionOptions,
 ): string {
   if (display === "none") return "";
 
   const codeSection = formatCodeBlock(block, docDir, projectRoot);
-  const outputSection = result && result.exitCode === 0
-    ? buildOutputContent(result) : null;
+  const outputSection = result && result.exitCode === 0 && result.cacheStatus !== "miss" && display !== "code"
+    ? buildOutputContent(result, options.sourceFile || docDir, options) : null;
 
   if (display === "code") return codeSection;
   if (display === "output") return outputSection || "";
@@ -206,9 +306,9 @@ function pandocLang(lang: string): string {
 function formatCodeBlock(block: CodeBlock, docDir: string, projectRoot: string): string {
   const lang = pandocLang(block.lang);
   if (block.file) {
-    const filePath = resolveBlockFilePath(block.file, docDir, projectRoot);
     let source: string;
     try {
+      const filePath = resolveRunSource(block.file, docDir, projectRoot);
       source = fs.readFileSync(filePath, "utf-8").trim();
     } catch {
       source = `# ${block.file}`;
@@ -218,16 +318,18 @@ function formatCodeBlock(block: CodeBlock, docDir: string, projectRoot: string):
   return "```" + lang + "\n" + block.source + "\n```";
 }
 
-function buildOutputContent(result: BlockResult): string | null {
+function buildOutputContent(result: BlockResult, sourceFile: string, options: InjectionOptions): string | null {
   const parts: string[] = [];
-  const caption = result.block.caption;
-  const label = result.block.label;
   const stdout = stripInkwellLines(result.stdout);
+  const blockId = result.blockId || result.block.id || crypto.createHash("sha256")
+    .update(JSON.stringify([result.block.lang, result.block.file, result.block.source])).digest("hex");
+  const format = (name: string, filepath: string, multiple: boolean): string => formatArtifact(name, filepath,
+    result.block, sourceFile, blockId, multiple, options);
 
   if (result.block.output) {
     const artifact = result.artifacts.get(result.block.output);
     if (artifact) {
-      parts.push(formatArtifact(result.block.output, artifact, caption, label));
+      parts.push(format(result.block.output, artifact, false));
     } else if (stdout.trim()) {
       const text = stdout.trim();
       if (looksLikeMarkdown(text)) {
@@ -240,7 +342,7 @@ function buildOutputContent(result: BlockResult): string | null {
   }
 
   for (const [name, filepath] of result.artifacts) {
-    parts.push(formatArtifact(name, filepath, caption, label));
+    parts.push(format(name, filepath, result.artifacts.size > 1));
   }
 
   if (stdout.trim()) {
@@ -258,19 +360,31 @@ function buildOutputContent(result: BlockResult): string | null {
 function formatArtifact(
   name: string,
   filepath: string,
-  caption?: string,
-  label?: string,
+  block: CodeBlock,
+  sourceFile: string,
+  blockId: string,
+  multiple: boolean,
+  options: InjectionOptions,
 ): string {
   const ext = path.extname(filepath).toLowerCase();
+  // These strings originate in the authored block, while cell values originate in data files.
+  const bindMetadata = (value: string): string => value.replace(/\{\{(\w+)\}\}/g, (match, key) => options.variables?.get(key) ?? match);
+  const caption = block.caption === undefined ? undefined : bindMetadata(block.caption);
+  const label = block.label === undefined ? undefined : bindMetadata(block.label);
 
   if (IMAGE_EXTS.has(ext)) {
     const alt = caption || name;
-    const labelAttr = label ? `{#fig:${label}}` : "";
+    const explicit = label?.replace(/^fig:/, "");
+    const figureLabel = explicit && artifactTableLabel(sourceFile, blockId, name, explicit, multiple).replace(/^tbl:/, "fig:");
+    const labelAttr = figureLabel ? `{#${figureLabel}}` : "";
     return `![${alt}](${filepath})${labelAttr}`;
   }
 
   try {
-    const content = fs.readFileSync(filepath, "utf-8");
+    const isTable = ext === ".csv" || ext === ".json";
+    const bytes = isTable ? readTableArtifact(filepath) : fs.readFileSync(filepath);
+    const content = bytes.toString("utf-8");
+    if (isTable && !Buffer.from(content, "utf-8").equals(bytes)) throw new TableDataError("table-encoding", "Table artifact is not valid UTF-8. Export the artifact with UTF-8 encoding.");
 
     if (ext === ".md" || ext === ".markdown") {
       return content.trim();
@@ -280,31 +394,35 @@ function formatArtifact(
       return content.trim();
     }
 
-    if (ext === ".csv") {
-      const table = csvToMarkdownTable(content);
-      if (caption) {
-        return table + "\n\n: " + caption + (label ? ` {#tbl:${label}}` : "");
-      }
-      return table;
+    if (isTable) {
+      const metadata = { caption, label: artifactTableLabel(sourceFile, blockId, name, label, multiple),
+        attributes: { ...Object.fromEntries(Object.entries(block.attributes || {}).map(([key, value]) => [key, bindMetadata(value)])),
+          "data-inkwell-artifact": name, "data-inkwell-block": blockId } };
+      const table = ext === ".csv" ? parseCsvTable(content, metadata) : parseJsonTable(content, metadata);
+      return table ? encodeTableData(table) : literalFence(content.trim(), "json");
     }
 
-    if (ext === ".json") {
-      const parsed = JSON.parse(content);
-      if (Array.isArray(parsed) && parsed.length && typeof parsed[0] === "object") {
-        const table = jsonArrayToTable(parsed);
-        if (caption) {
-          return table + "\n\n: " + caption + (label ? ` {#tbl:${label}}` : "");
-        }
-        return table;
-      }
-      return "```json\n" + content.trim() + "\n```";
-    }
-
-    return "```\n" + content.trim() + "\n```";
-  } catch {
-    const alt = caption || name;
-    return `![${alt}](${filepath})`;
+    return literalFence(content.trim(), "");
+  } catch (error) {
+    const diagnostic = tableDataDiagnostic(error, filepath);
+    options.tableDiagnostics?.push(diagnostic);
+    return literalFence(`Inkwell table error: ${diagnostic.message}\nArtifact: ${filepath}`, TABLE_DATA_ERROR_FENCE);
   }
+}
+
+function readTableArtifact(filepath: string): Buffer {
+  const file = fs.openSync(filepath, "r");
+  try {
+    const limit = TABLE_DATA_LIMITS.sourceBytes;
+    const tooLarge = () => new TableDataError("table-source-limit", "Table artifact exceeds the 5 MiB input limit. Export a smaller table or split it into separate artifacts.");
+    if (fs.fstatSync(file).size > limit) throw tooLarge();
+    // The extra byte detects growth after the size check without an unbounded read.
+    const buffer = Buffer.allocUnsafe(limit + 1);
+    let size = 0, read: number;
+    while (size <= limit && (read = fs.readSync(file, buffer, size, buffer.length - size, null))) size += read;
+    if (size > limit) throw tooLarge();
+    return buffer.subarray(0, size);
+  } finally { fs.closeSync(file); }
 }
 
 // Heuristic: if stdout starts with a markdown-ish character, pass it
@@ -313,90 +431,16 @@ function looksLikeMarkdown(text: string): boolean {
   return /^[#|>*\-\d]/.test(text) || text.includes("![");
 }
 
-function csvToMarkdownTable(csv: string): string {
-  const lines = csv.trim().split("\n");
-  if (lines.length < 2) return "```\n" + csv + "\n```";
-
-  const header = parseCsvLine(lines[0]);
-  const separator = header.map(() => "---");
-  const rows = lines.slice(1).map(parseCsvLine);
-
-  return [
-    "| " + header.join(" | ") + " |",
-    "| " + separator.join(" | ") + " |",
-    ...rows.map((r) => "| " + r.join(" | ") + " |"),
-  ].join("\n");
-}
-
-function parseCsvLine(line: string): string[] {
-  const result: string[] = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '"') {
-      inQuotes = !inQuotes;
-    } else if (ch === "," && !inQuotes) {
-      result.push(current.trim());
-      current = "";
-    } else {
-      current += ch;
-    }
-  }
-  result.push(current.trim());
-  return result;
-}
-
-function jsonArrayToTable(arr: Record<string, any>[]): string {
-  const keys = Object.keys(arr[0]);
-  const header = "| " + keys.join(" | ") + " |";
-  const separator = "| " + keys.map(() => "---").join(" | ") + " |";
-  const rows = arr.map(
-    (row) => "| " + keys.map((k) => String(row[k] ?? "")).join(" | ") + " |"
-  );
-  return [header, separator, ...rows].join("\n");
-}
-
 export function gatherCachedResults(
   markdown: string,
   sourceFile: string,
 ): BlockResult[] {
-  const cacheDir = getInkwellOutputsDir(sourceFile);
-
-  const blocks = parseCodeBlocks(markdown);
-  const results: BlockResult[] = [];
-
-  for (const block of blocks) {
-    const blockDir = path.join(cacheDir, `block_${block.index}`);
-    const hasBlockDir = fs.existsSync(blockDir);
-    let stdout = "";
-    try {
-      stdout = fs.readFileSync(path.join(blockDir, "stdout.txt"), "utf-8");
-    } catch {}
-
-    const artifacts = discoverArtifacts(blockDir);
-
-    const cacheStatus: "hit" | "miss" =
-      hasBlockDir && (stdout.trim().length > 0 || artifacts.size > 0) ? "hit" : "miss";
-
-    results.push({
-      block,
-      stdout,
-      stderr: "",
-      exitCode: 0,
-      artifacts,
-      cached: cacheStatus === "hit",
-      cacheStatus,
-    });
-  }
-
-  return results;
+  return readCurrentRunResults(markdown, sourceFile);
 }
 
 // ── Layer 2: Inline expressions ───────────────────────────────────────
 
-const INLINE_EXPR_RE = /`\{python\}\s+([^`]+)`/g;
+const INLINE_EXPR_RE = /(?<!`)`\{python\}\s+([^`]+)`(?!`)/g;
 
 function resolvePython(runConfig: RunConfig, docDir: string, projectRoot: string): string {
   if (runConfig.pythonEnv) {
@@ -414,20 +458,35 @@ export function evaluateInlineExpressions(
   projectRoot: string,
   cacheDir: string,
 ): string {
-  const matches: { full: string; expr: string }[] = [];
+  if (vscode.workspace.isTrusted === false) return markdown;
+  const literal = shieldBindingLiterals(markdown);
+  return literal.restore(evaluateDocumentExpressions(literal.text, vars, runConfig, docDir, projectRoot, cacheDir));
+}
+
+function evaluateDocumentExpressions(
+  markdown: string, vars: Map<string, string>, runConfig: RunConfig, docDir: string, projectRoot: string, cacheDir: string,
+): string {
+  const matches: { full: string; expr: string; start: number }[] = [];
   let m: RegExpExecArray | null;
   const re = new RegExp(INLINE_EXPR_RE.source, "g");
   while ((m = re.exec(markdown)) !== null) {
-    matches.push({ full: m[0], expr: m[1].trim() });
+    if (escapedBacktick(markdown, m.index)) continue;
+    matches.push({ full: m[0], expr: m[1].trim(), start: m.index });
   }
   if (!matches.length) return markdown;
 
   const exprs = matches.map((e) => e.expr);
 
   const h = crypto.createHash("sha256");
+  h.update("inline-evaluation-v2");
   h.update(JSON.stringify(exprs));
   for (const [k, v] of vars) h.update(`\0${k}=${v}`);
-  const hash = h.digest("hex").substring(0, 16);
+  const python = resolvePython(runConfig, docDir, projectRoot);
+  const interpreter = { cmd: python, args: ["-u"], envVars: { PYTHONDONTWRITEBYTECODE: "1" }, label: python };
+  const context = fingerprintBlock({ index: 0, lang: "python", source: JSON.stringify(exprs),
+    startLine: 0, endLine: 0, raw: "" }, docDir, projectRoot, interpreter);
+  h.update(context.hash);
+  const hash = h.digest("hex");
 
   const evalDir = path.join(cacheDir, "inline_eval");
   fs.mkdirSync(evalDir, { recursive: true });
@@ -461,11 +520,9 @@ export function evaluateInlineExpressions(
   const scriptPath = path.join(evalDir, "eval.py");
   fs.writeFileSync(scriptPath, script, "utf-8");
 
-  const python = resolvePython(runConfig, docDir, projectRoot);
-
   let stdout: string;
   try {
-    stdout = execFileSync(python, ["-u", scriptPath], {
+    stdout = execFileSync(context.interpreter.path, ["-u", scriptPath], {
       cwd: projectRoot,
       timeout: 30_000,
       encoding: "utf-8",
@@ -493,12 +550,13 @@ export function evaluateInlineExpressions(
 
 function applyInlineResults(
   markdown: string,
-  matches: { full: string; expr: string }[],
+  matches: { full: string; expr: string; start: number }[],
   values: string[],
 ): string {
   let result = markdown;
-  for (let i = 0; i < matches.length; i++) {
-    result = result.replace(matches[i].full, values[i]);
+  for (let i = matches.length - 1; i >= 0; i--) {
+    const { start, full } = matches[i];
+    result = result.slice(0, start) + values[i] + result.slice(start + full.length);
   }
   return result;
 }
@@ -645,14 +703,15 @@ function normalizeMermaidForPreview(markdown: string): string {
 /** Unique `{{key}}` placeholders that survived substitution (frontmatter included). */
 export function collectUnresolvedVars(markdown: string): string[] {
   const out = new Set<string>();
-  for (const m of markdown.matchAll(/\{\{(\w+)\}\}/g)) out.add(m[1]);
+  const collect = (text: string) => { for (const m of text.matchAll(/\{\{(\w+)\}\}/g)) out.add(m[1]); };
+  collect(shieldBindingLiterals(markdown, values => values.forEach(collect)).text);
   return [...out];
 }
 
 export function prepareForCompilation(
   markdown: string,
   sourceFile: string,
-): { injected: string; tempFile: string; unresolvedVars: string[] } {
+): { injected: string; tempFile: string; unresolvedVars: string[]; tableDiagnostics: TableDataDiagnostic[] } {
   const docDir = path.dirname(sourceFile);
   const projectRoot = getInkwellProjectRoot(sourceFile);
 
@@ -667,19 +726,20 @@ export function prepareForCompilation(
   const hasInlineExprs = /`\{python\}\s+[^`]+`/.test(processed);
 
   if (!hasBlocks && !hasVarRefs && !hasInlineExprs && !hasMermaid) {
-    return { injected: markdown, tempFile: sourceFile, unresolvedVars: [] };
+    return { injected: markdown, tempFile: sourceFile, unresolvedVars: [], tableDiagnostics: [] };
   }
 
-  const runConfig = parseRunConfig(processed);
+  const runConfig = parseRunConfig(processed, sourceFile);
   const defaultDisplay = runConfig.defaultDisplay || "output";
   const results = gatherCachedResults(processed, sourceFile);
   const vars = collectVariables(results);
 
-  let injected = injectResults(processed, results, defaultDisplay, docDir, projectRoot);
+  const tableDiagnostics: TableDataDiagnostic[] = [];
+  let injected = injectResults(processed, results, defaultDisplay, docDir, projectRoot, { sourceFile, tableDiagnostics, variables: vars });
   injected = substituteVariables(injected, vars);
 
   const cacheDir = getInkwellOutputsDir(sourceFile);
-  injected = evaluateInlineExpressions(injected, vars, runConfig, docDir, projectRoot, cacheDir);
+  if (vscode.workspace.isTrusted) injected = evaluateInlineExpressions(injected, vars, runConfig, docDir, projectRoot, cacheDir);
 
   // A leftover {{key}} means a typo or a stale/missing binding; it ships
   // literally into the PDF, so the compile surfaces it as a warning.
@@ -689,7 +749,7 @@ export function prepareForCompilation(
   fs.mkdirSync(path.dirname(tempFile), { recursive: true });
   fs.writeFileSync(tempFile, injected, "utf-8");
 
-  return { injected, tempFile, unresolvedVars };
+  return { injected, tempFile, unresolvedVars, tableDiagnostics };
 }
 
 export function prepareForPreview(
@@ -710,16 +770,16 @@ export function prepareForPreview(
 
   const docDir = path.dirname(sourceFile);
   const projectRoot = getInkwellProjectRoot(sourceFile);
-  const runConfig = parseRunConfig(processed);
+  const runConfig = parseRunConfig(processed, sourceFile);
   const defaultDisplay = runConfig.defaultDisplay || "output";
   const results = gatherCachedResults(processed, sourceFile);
   const vars = collectVariables(results);
 
-  let injected = injectResults(processed, results, defaultDisplay, docDir, projectRoot);
+  let injected = injectResults(processed, results, defaultDisplay, docDir, projectRoot, { sourceFile, variables: vars });
   injected = substituteVariables(injected, vars);
 
   const cacheDir = getInkwellOutputsDir(sourceFile);
-  injected = evaluateInlineExpressions(injected, vars, runConfig, docDir, projectRoot, cacheDir);
+  if (vscode.workspace.isTrusted) injected = evaluateInlineExpressions(injected, vars, runConfig, docDir, projectRoot, cacheDir);
 
   return injected;
 }

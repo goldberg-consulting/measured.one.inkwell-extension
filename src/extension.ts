@@ -4,29 +4,89 @@
 
 import * as vscode from "vscode";
 import { InkwellPreviewProvider } from "./preview";
-import { compile, exportPDF, isCompilable, reportCompileFailure } from "./compiler";
+import { compile, exportPDF, isCompilable, reportCompileFailure, readLastSuccessfulOutput, CompileResult } from "./compiler";
 import { InkwellDiagnostics } from "./diagnostics";
 import { selectTemplateCommand } from "./templates";
 import { findInkwellRoot, getInkwellOutputsDir, getInkwellProjectRoot, saveManifestField } from "./config";
-import { checkToolchain, installLatexPackage, showToolchainStatus, setExtensionPath } from "./toolchain";
+import { checkToolchain, installLatexPackage, showToolchainStatus, setExtensionPath, setToolchainActions } from "./toolchain";
 import { runAllBlocks, parseCodeBlocks, RunCancellation } from "./runner";
 import { clearCache } from "./cache";
 import { setupWorkspace, initProject } from "./scaffold";
 import * as path from "path";
 import * as fs from "fs";
+import * as crypto from "crypto";
+import { setupPythonEnvironment } from "./python-setup";
+import { getInkwellOutputChannel } from "./inkwell-output";
+import { ProjectReadinessGate } from "./project-readiness-ui";
+import { createSetupUI, registerSetupCommands, SetupUI } from "./setup-ui";
+import { invalidateDoctorCache } from "./doctor";
+import { registerDocumentStyleCommand } from "./document-style-ui";
+import { invalidateCitationPandoc } from "./citation-pandoc";
+import { registerBibliographyAuthoring } from "./bibliography-authoring";
+import { registerRunAuthoring, PreparedRunRequest } from "./run-authoring-ui";
+import { registerRunWatchers } from "./run-watchers";
+import { CompileCoordinator } from "./compile-coordinator";
+import { CompileInputs } from "./compile-inputs";
+import { disposeResolutionCaches } from "./resolution-cache";
+import { createDocumentSnapshot } from "./document-snapshot";
+import { templateAssetCache } from "./template-assets";
 
 let diagnostics: InkwellDiagnostics;
 let autoCompileTimer: ReturnType<typeof setInterval> | undefined;
 let activeRunCancel: RunCancellation | undefined;
-let compileInFlight = false;
-let queuedCompile: vscode.TextDocument | undefined;
+interface ScheduledCompile { document: vscode.TextDocument; original: vscode.TextDocument }
+let compileCoordinator: CompileCoordinator<ScheduledCompile, { result?: CompileResult; cacheable: boolean }>;
+let compileInputs: CompileInputs;
+const compileRequests = new Map<string, number>();
+let readiness: ProjectReadinessGate;
+let setup: SetupUI;
 
 export function activate(context: vscode.ExtensionContext) {
   setExtensionPath(context.extensionPath);
   diagnostics = new InkwellDiagnostics();
+  compileInputs = new CompileInputs(() => compileCoordinator?.invalidate());
+  compileCoordinator = new CompileCoordinator<ScheduledCompile, { result?: CompileResult; cacheable: boolean }>(async (request, isCurrent) => {
+    const { document, original } = request.value;
+    const sourceCurrent = () => !original.isClosed && original.version === document.version && original.getText() === document.getText();
+    if (!sourceCurrent() || !vscode.workspace.isTrusted) return { cacheable: false };
+    const before = await compileInputs.fingerprint(document);
+    if (!sourceCurrent() || !isCurrent() || !vscode.workspace.isTrusted) return { cacheable: false };
+    const result = await compile(document);
+    let unchanged = false;
+    try { unchanged = await compileInputs.fingerprint(document) === before; } catch { /* Changed input must never establish a cache hit. */ }
+    if (sourceCurrent() && isCurrent()) reportCompileResult(original, result);
+    return { result, cacheable: result.success && unchanged && before === request.signature && sourceCurrent() };
+  }, value => value.cacheable, (request, cached) => {
+    const previous = readLastSuccessfulOutput(request.value.document.uri.fsPath);
+    return Boolean(previous && previous.sourceHash === crypto.createHash("sha256").update(request.value.document.getText()).digest("hex")
+      && previous.pdfHash === cached.result?.lastSuccessfulOutput?.pdfHash);
+  });
+  context.subscriptions.push(compileInputs, compileCoordinator, { dispose: disposeResolutionCaches });
+  readiness = new ProjectReadinessGate(context);
+  setup = createSetupUI(context);
+  setToolchainActions({ setup: () => setup.run(), installPackage: name => setup.installPackage(name) });
+  registerSetupCommands(context, setup);
 
   const previewProvider = new InkwellPreviewProvider(context);
+  registerDocumentStyleCommand(context, () => previewProvider.refresh());
+  registerBibliographyAuthoring(context, () => previewProvider.refresh());
   previewProvider.setDiagnostics(diagnostics);
+  previewProvider.onCompile = document => runCompile(document);
+  const runWatchers = registerRunWatchers(context, async (document, request) => {
+    if (request.isCurrent()) await previewProvider.refresh(document, request.isCurrent);
+  }, { onError: error => getInkwellOutputChannel().appendLine(`Run dependency refresh: ${String(error)}`) });
+  const runAuthoring = registerRunAuthoring(context, {
+    ensureReady: async document => {
+      if (!await readiness.ensure(document)) return false;
+      runWatchers.observe(document); return true;
+    },
+    execute: request => runCodeBlocksWithProgress(request, previewProvider),
+    onDocumentChanged: document => { runWatchers.observe(document); void previewProvider.refresh(document); },
+  });
+  previewProvider.ensureReady = async (document, allowPrompt) => {
+    if (!await ensureAuthoringReady(document, allowPrompt)) return false;
+    runWatchers.observe(document); return true;
+  };
 
   // n.b. The webview steals focus from the editor, so activeTextEditor
   // is undefined when the user clicks Run in the preview panel. We
@@ -37,12 +97,15 @@ export function activate(context: vscode.ExtensionContext) {
       vscode.window.showWarningMessage("Open a markdown or LaTeX file first.");
       return;
     }
-    await runCodeBlocksWithProgress(doc, previewProvider);
+    await runAuthoring.run(doc);
   };
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("inkwell.preview", () => {
-      previewProvider.show();
+    vscode.commands.registerCommand("inkwell.preview.decreaseFontScale", () => previewProvider.changeFontScale("decrease")),
+    vscode.commands.registerCommand("inkwell.preview.increaseFontScale", () => previewProvider.changeFontScale("increase")),
+    vscode.commands.registerCommand("inkwell.preview.resetFontScale", () => previewProvider.changeFontScale("reset")),
+    vscode.commands.registerCommand("inkwell.preview", async () => {
+      await previewProvider.show();
     }),
 
     vscode.commands.registerCommand("inkwell.compile", async () => {
@@ -62,13 +125,14 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showWarningMessage("Open a markdown or LaTeX file first.");
         return;
       }
-      await exportPDF(doc, diagnostics);
+      if (await ensureAuthoringReady(doc)) await exportPDF(doc, diagnostics);
     }),
 
     vscode.commands.registerCommand("inkwell.selectTemplate", async () => {
       const doc =
         vscode.window.activeTextEditor?.document ?? previewProvider.getDocument();
       const uri = doc?.uri;
+      if (doc && !await readiness.ensure(doc)) return;
       const templateId = await selectTemplateCommand(uri);
       if (!templateId) return;
 
@@ -83,10 +147,6 @@ export function activate(context: vscode.ExtensionContext) {
           `Selected "${templateId}". Add template: ${templateId} to your YAML frontmatter, or create an .inkwell/ project to persist this choice.`
         );
       }
-    }),
-
-    vscode.commands.registerCommand("inkwell.setupToolchain", () => {
-      showToolchainStatus();
     }),
 
     vscode.commands.registerCommand("inkwell.installPackage", async (pkg?: string) => {
@@ -108,7 +168,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showWarningMessage("Open a markdown or LaTeX file first.");
         return;
       }
-      await runCodeBlocksWithProgress(doc, previewProvider);
+      await runAuthoring.run(doc);
     }),
 
     vscode.commands.registerCommand("inkwell.cancelRun", () => {
@@ -122,7 +182,8 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.activeTextEditor?.document ?? previewProvider.getDocument();
       if (!doc) return;
       const cacheDir = getInkwellOutputsDir(doc.uri.fsPath);
-      clearCache(cacheDir);
+      clearCache(cacheDir, doc.uri.fsPath);
+      await previewProvider.refresh(doc);
       vscode.window.showInformationMessage("Inkwell: Code block cache cleared.");
     }),
 
@@ -133,24 +194,25 @@ export function activate(context: vscode.ExtensionContext) {
       await setupPythonEnv(doc);
     }),
 
-    vscode.commands.registerCommand("inkwell.initProject", () => {
-      initProject();
+    vscode.commands.registerCommand("inkwell.initProject", async () => {
+      await initProject(async (root, template) => ({ ready: (await setup.run(root, template))?.status === "complete" }));
     }),
 
-    vscode.commands.registerCommand("inkwell.setupWorkspace", () => {
-      setupWorkspace();
+    vscode.commands.registerCommand("inkwell.setupWorkspace", async () => {
+      await setupWorkspace(async (root, template) => ({ ready: (await setup.run(root, template))?.status === "complete" }));
     }),
 
-    vscode.workspace.onDidSaveTextDocument((document) => {
+    vscode.workspace.onDidSaveTextDocument(async (document) => {
       const mode = vscode.workspace
         .getConfiguration("inkwell")
         .get<string>("autoCompile");
       if (mode === "onSave" && isCompilable(document)) {
-        runCompile(document);
+        await runCompile(document, false);
       }
     }),
 
     vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration("inkwell") || e.affectsConfiguration("terminal.integrated.env")) { invalidateDoctorCache(); invalidateCitationPandoc(); compileInputs.invalidate(); }
       if (e.affectsConfiguration("inkwell.autoCompile") ||
           e.affectsConfiguration("inkwell.autoCompileIntervalSeconds")) {
         setupAutoCompileTimer();
@@ -180,6 +242,10 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
+  templateAssetCache.clear();
+  compileCoordinator?.dispose();
+  compileInputs?.dispose();
+  compileRequests.clear();
   if (autoCompileTimer) {
     clearInterval(autoCompileTimer);
     autoCompileTimer = undefined;
@@ -200,7 +266,7 @@ function setupAutoCompileTimer(): void {
   autoCompileTimer = setInterval(() => {
     const editor = vscode.window.activeTextEditor;
     if (editor && isCompilable(editor.document)) {
-      runCompile(editor.document);
+      void runCompile(editor.document, false, true).catch(err => console.error("Inkwell auto-compile failed:", err));
     }
   }, seconds * 1000);
 }
@@ -211,62 +277,53 @@ function setupAutoCompileTimer(): void {
 // resets it.
 const lastFailureNotified = new Map<string, string>();
 
-async function runCompile(document: vscode.TextDocument): Promise<void> {
-  if (compileInFlight) {
-    queuedCompile = document;
-    return;
-  }
-
-  compileInFlight = true;
-  let current: vscode.TextDocument | undefined = document;
-
+async function runCompile(document: vscode.TextDocument, allowPrompt = true, interval = false): Promise<CompileResult | undefined> {
+  const key = document.uri.toString();
+  const request = (compileRequests.get(key) || 0) + 1;
+  compileRequests.set(key, request);
+  if (!await ensureAuthoringReady(document, allowPrompt)) return;
+  const text = document.getText(), version = document.version;
+  const snapshot = createDocumentSnapshot(document, text, version);
   try {
-    while (current) {
-      queuedCompile = undefined;
-      try {
-        const result = await compile(current);
-        diagnostics.report(current.uri, result.errors);
-        const key = current.uri.toString();
-        if (result.success && result.pdfPath) {
-          lastFailureNotified.delete(key);
-          vscode.window.setStatusBarMessage(
-            `Inkwell: PDF compiled (${result.duration.toFixed(1)}s)`,
-            5000
-          );
-        } else {
-          vscode.window.setStatusBarMessage(
-            `Inkwell: compilation failed (${result.errors.filter(e => e.severity === "error").length || 1} error(s))`,
-            5000
-          );
-          const failureKey = result.errors.find(e => e.severity === "error")?.message || "unknown";
-          if (lastFailureNotified.get(key) !== failureKey) {
-            lastFailureNotified.set(key, failureKey);
-            // Deliberately not awaited: the notification stays up until
-            // the user acts on it, and the queue must keep draining.
-            void reportCompileFailure(current, result);
-          }
-        }
-      } catch (err) {
-        console.error("Inkwell compile error:", err);
-      }
-      current = queuedCompile;
+    const signature = await compileInputs.fingerprint(snapshot);
+    if (compileRequests.get(key) !== request || document.isClosed || document.version !== version || document.getText() !== text) return;
+    const completed = await compileCoordinator.request({ key, version, signature, interval, value: { document: snapshot, original: document } });
+    return completed?.result;
+  } catch (err) {
+    getInkwellOutputChannel().appendLine(`Compilation could not proceed: ${String(err)}`);
+    if (allowPrompt) void vscode.window.showErrorMessage(`Inkwell: ${String(err)}`);
+  }
+}
+
+function reportCompileResult(document: vscode.TextDocument, result: CompileResult): void {
+  diagnostics.report(document.uri, result.errors);
+  const key = document.uri.toString();
+  if (result.success && result.pdfPath) {
+    lastFailureNotified.delete(key);
+    vscode.window.setStatusBarMessage(`Inkwell: PDF compiled (${result.duration.toFixed(1)}s)`, 5000);
+  } else {
+    vscode.window.setStatusBarMessage(`Inkwell: compilation failed (${result.errors.filter(e => e.severity === "error").length || 1} error(s))`, 5000);
+    const failureKey = result.errors.find(e => e.severity === "error")?.message || "unknown";
+    if (lastFailureNotified.get(key) !== failureKey) {
+      lastFailureNotified.set(key, failureKey);
+      void reportCompileFailure(document, result);
     }
-  } finally {
-    compileInFlight = false;
-    queuedCompile = undefined;
   }
 }
 
 async function runCodeBlocksWithProgress(
-  document: vscode.TextDocument,
+  prepared: PreparedRunRequest,
   previewProvider: InkwellPreviewProvider
 ): Promise<void> {
+  const { document, text, sourceVersion, selectedIndices } = prepared;
+  if (!vscode.workspace.isTrusted || document.isClosed || document.version !== sourceVersion || document.getText() !== text) {
+    throw new Error("The document changed before execution. Run the command again.");
+  }
   if (activeRunCancel) {
     activeRunCancel.cancel();
     activeRunCancel = undefined;
   }
 
-  const text = document.getText();
   const blocks = parseCodeBlocks(text);
 
   if (!blocks.length) {
@@ -278,25 +335,26 @@ async function runCodeBlocksWithProgress(
   const cancel = new RunCancellation();
   activeRunCancel = cancel;
 
-  previewProvider.sendRunStarted(blocks.length);
+  const snapshot = createDocumentSnapshot(document, text, sourceVersion);
+  const previewRequest = previewProvider.sendRunStarted(selectedIndices?.length ?? blocks.length, snapshot, selectedIndices);
 
   let results: Awaited<ReturnType<typeof runAllBlocks>> = [];
   let threw = false;
   try {
     results = await runAllBlocks(text, sourceFile, cancel, (p) => {
-      previewProvider.sendBlockProgress(p);
+      previewProvider.sendBlockProgress(p, previewRequest);
       if (p.warning) {
-        previewProvider.sendLogEntry("error", p.warning);
+        previewProvider.sendLogEntry("error", p.warning, undefined, previewRequest);
       }
       if (p.interpreter && p.status === "running") {
-        previewProvider.sendLogEntry("info", `Block ${p.index + 1}: using ${p.interpreter}`);
+        previewProvider.sendLogEntry("info", `Block ${p.index + 1}: using ${p.interpreter}`, undefined, previewRequest);
       }
-    });
+    }, selectedIndices);
   } catch (err) {
     threw = true;
-    previewProvider.sendLogEntry("error", "Run failed unexpectedly", String(err));
+    previewProvider.sendLogEntry("error", "Run failed unexpectedly", String(err), previewRequest);
   } finally {
-    activeRunCancel = undefined;
+    if (activeRunCancel === cancel) activeRunCancel = undefined;
     const failed = results.filter((r) => r.exitCode !== 0 && r.exitCode !== 130);
     const cancelled = results.filter((r) => r.exitCode === 130);
     const cached = results.filter((r) => r.cached);
@@ -307,24 +365,26 @@ async function runCodeBlocksWithProgress(
         "error",
         `Block ${r.block.index + 1} (${r.block.lang}) failed`,
         r.stderr,
+        previewRequest,
       );
     }
 
     if (threw) {
-      previewProvider.sendRunComplete("failed", ran, cached.length, cancelled.length, failed.length || 1);
+      previewProvider.sendRunComplete("failed", ran, cached.length, cancelled.length, failed.length || 1, previewRequest);
     } else if (cancel.cancelled) {
-      previewProvider.sendRunComplete("cancelled", ran, cached.length, cancelled.length);
+      previewProvider.sendRunComplete("cancelled", ran, cached.length, cancelled.length, 0, previewRequest);
     } else if (failed.length) {
-      previewProvider.sendRunComplete("failed", ran, cached.length, 0, failed.length);
+      previewProvider.sendRunComplete("failed", ran, cached.length, 0, failed.length, previewRequest);
     } else {
-      previewProvider.sendRunComplete("done", ran, cached.length);
+      previewProvider.sendRunComplete("done", ran, cached.length, 0, 0, previewRequest);
     }
 
-    previewProvider.notifyBlocksRan();
+    await previewProvider.notifyBlocksRan(snapshot, previewRequest);
   }
 }
 
 async function setupPythonEnv(document: vscode.TextDocument): Promise<void> {
+  if (!await readiness.ensure(document)) return;
   const docDir = path.dirname(document.uri.fsPath);
   const projectRoot = getInkwellProjectRoot(document.uri.fsPath);
 
@@ -366,42 +426,42 @@ async function setupPythonEnv(document: vscode.TextDocument): Promise<void> {
   const reqFile = [path.join(docDir, "requirements.txt"), path.join(projectRoot, "requirements.txt")].find((p) =>
     fs.existsSync(p)
   );
-  const hasReqs = Boolean(reqFile);
-
-  const terminal = vscode.window.createTerminal("Inkwell Python Env");
-  terminal.show();
-
-  const commands: string[] = [];
-
-  if (fs.existsSync(resolved)) {
-    commands.push(`echo "Venv already exists at ${resolved}"`);
-  } else {
-    commands.push(`python3 -m venv "${resolved}"`);
-  }
-
-  commands.push(`source "${resolved}/bin/activate"`);
-
-  if (hasReqs && reqFile) {
-    commands.push(`pip install -r "${reqFile}"`);
-  } else {
-    const installPick = await vscode.window.showInputBox({
+  let packages: string[] = [];
+  if (!reqFile) {
+    const input = await vscode.window.showInputBox({
       prompt: "Packages to install (space-separated, or leave empty)",
       placeHolder: "numpy matplotlib pandas polars scikit-learn seaborn",
     });
-    if (installPick?.trim()) {
-      commands.push(`pip install ${installPick.trim()}`);
-    }
+    packages = input?.trim().split(/\s+/).filter(Boolean) || [];
   }
-
-  commands.push(`python3 --version`);
-  commands.push(`echo "Venv ready at ${envPath}"`);
-  commands.push(`echo "Add to your frontmatter:  python-env: ${envPath}"`);
-
-  terminal.sendText(commands.join(" && "));
+  const cancellation = new RunCancellation();
+  const result = await vscode.window.withProgress({
+    location: vscode.ProgressLocation.Notification,
+    title: "Inkwell: Setting up Python environment",
+    cancellable: true,
+  }, async (_progress, token) => {
+    const subscription = token.onCancellationRequested(() => cancellation.cancel());
+    try {
+      return await setupPythonEnvironment({
+        projectDir: projectRoot, environmentDir: resolved,
+        requirementsFile: reqFile, packages, cancel: cancellation,
+      });
+    } finally { subscription.dispose(); }
+  });
+  const output = getInkwellOutputChannel();
+  output.appendLine(result.log);
+  if (result.success) {
+    await vscode.window.showInformationMessage(`Inkwell: Python ${result.pythonVersion} environment verified at ${resolved}.`);
+  } else {
+    output.show(true);
+    await vscode.window.showErrorMessage(`Inkwell: ${result.message} See the Inkwell output log for details.`);
+  }
 }
 
 async function activationCheck() {
-  const status = await checkToolchain();
+  const status = await checkToolchain({ cachedOnly: true });
+  // Cold activation performs no tool processes or prompts. A user action can request fresh health.
+  if (status.report.checks.some(check => check.id === "cached-health")) return;
   if (status.pandoc.installed && status.xelatex.installed) return;
 
   const missing: string[] = [];
@@ -415,8 +475,29 @@ async function activationCheck() {
   );
 
   if (choice === "Setup now") {
-    showToolchainStatus();
+    await showToolchainStatus();
   }
+}
+
+const healthPrompts = new Map<string, Promise<boolean>>();
+async function ensureAuthoringReady(document: vscode.TextDocument, allowPrompt = true): Promise<boolean> {
+  if (!await readiness.ensure(document, allowPrompt)) return false;
+  const root = getInkwellProjectRoot(document.uri.fsPath);
+  const pending = healthPrompts.get(root); if (pending) return pending;
+  const work = (async () => {
+    const report = await setup.checkLight(!allowPrompt, root);
+    if (report.checks.some(check => check.id === "cached-health")) return true;
+    const failed = report.checks.filter(check => check.required && check.status !== "ok" && check.id !== "workspace");
+    if (!failed.length) return true;
+    if (!allowPrompt) return false;
+    const output = getInkwellOutputChannel();
+    for (const check of failed) output.appendLine(`${check.id}: ${check.message}`);
+    const choice = await vscode.window.showWarningMessage("Inkwell needs a tool or packaged-file repair before continuing.", "Setup / Repair", "Show diagnostics");
+    if (choice === "Show diagnostics") output.show(true);
+    return choice === "Setup / Repair" && (await setup.run(root))?.status === "complete";
+  })();
+  healthPrompts.set(root, work);
+  try { return await work; } finally { if (healthPrompts.get(root) === work) healthPrompts.delete(root); }
 }
 
 function refreshProjectContextKey(): void {

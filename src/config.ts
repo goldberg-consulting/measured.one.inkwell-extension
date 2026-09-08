@@ -7,8 +7,16 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 import * as crypto from "crypto";
+import { DocumentConfig, resolveDocumentConfig } from "./document-config";
+import { ResolutionSnapshot, isPathWithin, resolutionCache } from "./resolution-cache";
+import { ResolvedReferences, resolveBibliographyConfiguration } from "./bibliography-service";
+export type { ResolvedReferences } from "./bibliography-service";
 
 export interface InkwellManifest {
+  [key: string]: unknown;
+  schemaVersion?: number;
+  defaults?: Record<string, unknown>;
+  managedFiles?: Record<string, unknown>;
   name?: string;
   template?: string;
   documentSettings?: {
@@ -26,27 +34,64 @@ export function saveManifestField(
 ): void {
   const manifestPath = path.join(projectRoot, ".inkwell", "manifest.json");
   let manifest: Record<string, unknown> = {};
-  try {
-    manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
-  } catch {}
+  if (fs.existsSync(manifestPath)) {
+    const raw = fs.readFileSync(manifestPath, "utf-8");
+    try {
+      manifest = JSON.parse(raw);
+      if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) throw new Error("Expected a JSON object");
+    } catch {
+      const backup = `${manifestPath}.malformed-${crypto.createHash("sha256").update(raw).digest("hex").slice(0, 12)}.bak`;
+      if (!fs.existsSync(backup)) fs.copyFileSync(manifestPath, backup, fs.constants.COPYFILE_EXCL);
+      throw new Error(`The project manifest is malformed. Original preserved; backup: ${backup}. Repair it before changing project settings.`);
+    }
+  }
   manifest[field] = value;
   fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
-  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf-8");
+  const temporary = `${manifestPath}.${crypto.randomUUID()}.tmp`;
+  try {
+    fs.writeFileSync(temporary, JSON.stringify(manifest, null, 2) + "\n", { flag: "wx" });
+    fs.renameSync(temporary, manifestPath);
+  } finally { fs.rmSync(temporary, { force: true }); }
 }
 
-export function findInkwellRoot(
-  documentUri: vscode.Uri
-): string | undefined {
-  let dir = path.dirname(documentUri.fsPath);
-  const root = path.parse(dir).root;
+/** Resolve absent descendants through their nearest existing physical ancestor. */
+function physicalLocation(directory: string, snapshot: ResolutionSnapshot): string | undefined {
+  let current = directory;
+  const missing: string[] = [];
+  while (true) {
+    const observed = snapshot.inspect(current, false);
+    if (observed.realPath) return path.join(observed.realPath, ...missing.reverse());
+    if (observed.signature !== "missing") return undefined;
+    const parent = path.dirname(current);
+    if (parent === current) return undefined;
+    missing.push(path.basename(current)); current = parent;
+  }
+}
 
+function hasInkwellMarker(directory: string, snapshot: ResolutionSnapshot): boolean {
+  const boundary = snapshot.inspect(directory, false);
+  const marker = snapshot.inspect(path.join(directory, ".inkwell"), false);
+  // The chosen project/workspace root may be an intentional filesystem alias.
+  // The marker itself must remain a real directory contained in that root.
+  return marker.directory && !!marker.realPath && !!boundary.realPath && isPathWithin(boundary.realPath, marker.realPath);
+}
+
+function nearestInkwellRoot(directory: string, snapshot: ResolutionSnapshot): string | undefined {
+  const source = physicalLocation(directory, snapshot);
+  let dir = directory;
+  const root = path.parse(dir).root;
   while (dir !== root) {
-    if (fs.existsSync(path.join(dir, ".inkwell"))) {
-      return dir;
-    }
+    const ancestor = snapshot.inspect(dir, false);
+    if (source && ancestor.realPath && isPathWithin(ancestor.realPath, source) &&
+        hasInkwellMarker(dir, snapshot)) return dir;
     dir = path.dirname(dir);
   }
   return undefined;
+}
+
+export function findInkwellRoot(documentUri: vscode.Uri): string | undefined {
+  const directory = path.resolve(path.dirname(documentUri.fsPath));
+  return resolutionCache.get(`nearest:${directory}`, snapshot => nearestInkwellRoot(directory, snapshot));
 }
 
 /**
@@ -58,18 +103,20 @@ export function findInkwellRoot(
  * uses the document's directory.
  */
 export function getInkwellProjectRoot(sourcePath: string): string {
-  const uri = vscode.Uri.file(sourcePath);
-  const normalized = path.normalize(sourcePath);
-  const folder = vscode.workspace.getWorkspaceFolder(uri);
-  if (folder) {
-    const wsRoot = folder.uri.fsPath;
-    const underWs =
-      normalized === wsRoot || normalized.startsWith(wsRoot + path.sep);
-    if (underWs && fs.existsSync(path.join(wsRoot, ".inkwell"))) {
-      return wsRoot;
+  resolutionCache.start();
+  const normalized = path.resolve(sourcePath), directory = path.dirname(normalized);
+  // Workspace assignment is cheap live state, and is part of the key. It never
+  // waits for a filesystem watcher to notice editor workspace changes.
+  const folder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(sourcePath));
+  const wsRoot = folder ? path.resolve(folder.uri.fsPath) : undefined;
+  return resolutionCache.get(`project:${JSON.stringify([directory, wsRoot])}`, snapshot => {
+    if (wsRoot && isPathWithin(wsRoot, normalized)) {
+      const source = physicalLocation(directory, snapshot), workspace = snapshot.inspect(wsRoot, false);
+      if (source && workspace.realPath && isPathWithin(workspace.realPath, source) &&
+          hasInkwellMarker(wsRoot, snapshot)) return wsRoot;
     }
-  }
-  return findInkwellRoot(uri) ?? path.dirname(normalized);
+    return nearestInkwellRoot(directory, snapshot) ?? directory;
+  });
 }
 
 /**
@@ -142,7 +189,7 @@ export function findBibFiles(projectRoot: string): string[] {
   ];
   for (const dir of bibDirs) {
     try {
-      for (const f of fs.readdirSync(dir)) {
+      for (const f of fs.readdirSync(dir).sort()) {
         if (f.endsWith(".bib")) {
           results.push(path.join(dir, f));
         }
@@ -187,10 +234,48 @@ export function findCslFile(
 
   for (const dir of cslDirs) {
     try {
-      for (const f of fs.readdirSync(dir)) {
+      for (const f of fs.readdirSync(dir).sort()) {
         if (f.endsWith(".csl")) return path.join(dir, f);
       }
     } catch {}
   }
   return undefined;
+}
+
+/** Read-only boundary shared by every document consumer. Rendering never writes a manifest. */
+export function getDocumentConfig(text: string, sourceFile: string): DocumentConfig {
+  const root = getInkwellProjectRoot(sourceFile);
+  const manifestPath = path.join(root, ".inkwell", "manifest.json");
+  let manifest: Record<string, unknown> = {};
+  let manifestError: string | undefined;
+  try {
+    if (fs.existsSync(manifestPath)) {
+      const parsed = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Expected a JSON object");
+      manifest = parsed;
+    }
+  } catch (error) { manifestError = `Cannot read project manifest: ${String(error)}. Run Setup / Repair to preserve a backup and resolve it.`; }
+  const defaultsPath = findDefaultsYaml(root);
+  let defaultsYaml: string | undefined;
+  try { if (defaultsPath) defaultsYaml = fs.readFileSync(defaultsPath, "utf8"); } catch (error) { manifestError = `Cannot read project defaults: ${String(error)}`; }
+  const settings = vscode.workspace.getConfiguration?.("inkwell", vscode.Uri.file(sourceFile));
+  const editorDefaults: Record<string, unknown> = { ...(settings?.get<Record<string, unknown>>("documentDefaults") || {}) };
+  const display = settings?.get<string>("defaultCodeDisplay");
+  const inspected = settings?.inspect?.<string>("defaultCodeDisplay");
+  const explicitlyConfigured = inspected
+    ? [inspected.globalValue, inspected.workspaceValue, inspected.workspaceFolderValue,
+      inspected.globalLanguageValue, inspected.workspaceLanguageValue, inspected.workspaceFolderLanguageValue].some(value => value !== undefined)
+    : display !== undefined && display !== "output";
+  if (explicitlyConfigured) editorDefaults.defaultCodeDisplay = display;
+  const config = resolveDocumentConfig({ text, sourcePath: sourceFile, manifest, manifestPath, defaultsYaml, defaultsPath, editorDefaults });
+  if (!manifestError) return config;
+  return { ...config, diagnostics: [...config.diagnostics, {
+    code: "manifest-invalid", severity: "error", message: manifestError,
+    sourcePath: manifestPath, line: 1, column: 1,
+  }] };
+}
+
+/** Compatibility boundary shared by preview and compiler. */
+export function getResolvedReferences(config: DocumentConfig, sourceFile: string): ResolvedReferences {
+  return resolveBibliographyConfiguration(config, sourceFile, getInkwellProjectRoot(sourceFile));
 }

@@ -1,173 +1,246 @@
 name: Compile demos
 
-# Regression compile of every shipped demo against a clean TinyTeX.
-# Catches the class of failures that only surface outside a Full MacTeX
-# install: templates that depend on babel-spanish, packages that ship
-# in mactex but not tinytex, cross-reference resolution that requires
-# two engine passes, etc.
-#
-# Runs on pull requests that touch a template, the requirements list,
-# or the compile pipeline, and on every push to main. Intentionally not
-# run on every PR to avoid a 10+ minute wait for unrelated changes.
-
+# The clean TinyTeX job installs the release artifact's exact requirements,
+# then runs its full Doctor and the actual compiler demo regressions.
 on:
   pull_request:
     paths:
       - "templates/**"
+      - "src/**"
+      - "tests/**"
+      - "csl/**"
+      - "filters/**"
+      - "package*.json"
+      - "scripts/**"
       - "requirements-latex.txt"
-      - "src/compiler.ts"
-      - "src/inject.ts"
-      - "scripts/compile-demo.sh"
-      - "scripts/compile-all-demos.sh"
-      - "examples/demo-*.md"
+      - "examples/**"
       - ".github/workflows/compile-demos.yml"
   push:
     branches: [main]
     paths:
       - "templates/**"
+      - "src/**"
+      - "tests/**"
+      - "csl/**"
+      - "filters/**"
+      - "package*.json"
+      - "scripts/**"
       - "requirements-latex.txt"
-      - "src/compiler.ts"
-      - "src/inject.ts"
-      - "scripts/compile-demo.sh"
-      - "scripts/compile-all-demos.sh"
-      - "examples/demo-*.md"
-  workflow_dispatch: {}
+      - "examples/**"
+      - ".github/workflows/compile-demos.yml"
+  workflow_dispatch:
+    inputs:
+      candidate_run_id:
+        description: Optional trusted Verify run whose exact VSIX should be reused
+        required: false
+        type: string
+      baseline-artifact:
+        description: Optional same-machine valid baseline artifact retained by that Verify run
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      candidate-artifact:
+        type: string
+        default: ''
+      release-commit:
+        type: string
+        default: ''
+      baseline-artifact:
+        type: string
+        default: ''
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   compile-all-demos:
     name: Compile every demo on TinyTeX
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release-commit || github.sha }}
 
-      - name: Install pandoc 3.x + pandoc-crossref
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install behavioral harness dependencies
+        run: npm ci
+
+      - name: Authenticate a separately dispatched candidate source
+        if: inputs.candidate_run_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+        run: node scripts/release-evidence.mjs verify-run --commit "$(git rev-parse HEAD)" --run-id "$CANDIDATE_RUN_ID" --workflow .github/workflows/verify.yml
+
+      - name: Download the already built candidate
+        if: inputs.candidate-artifact != '' || inputs.candidate_run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.candidate-artifact || 'inkwell-candidate' }}
+          path: candidate
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.candidate_run_id || github.run_id }}
+
+      - name: Build and verify the actual VSIX
+        env:
+          CANDIDATE_ARTIFACT: ${{ inputs.candidate-artifact || (inputs.candidate_run_id && 'inkwell-candidate') || '' }}
         run: |
-          # Ubuntu 22.04's apt pandoc is 2.17 — below our minimum of
-          # 3.0 — and changes pandoc's --template handling enough that
-          # our compile pipeline's output differs from what a user on
-          # macOS with Homebrew pandoc 3.x produces. Install a pinned
-          # pandoc 3.x direct from the upstream release tarball so the
-          # CI matches what we actually target.
+          set -euo pipefail
+          version="$(node -p 'require("./package.json").version')"
+          if [ -z "$CANDIDATE_ARTIFACT" ]; then
+            npm run package:vsix
+            mkdir candidate
+            mv "inkwell-$version.vsix" candidate/
+            node scripts/release-evidence.mjs init --vsix "candidate/inkwell-$version.vsix" --commit "$(git rev-parse HEAD)" --output candidate/candidate.json
+          fi
+          vsix="$GITHUB_WORKSPACE/candidate/inkwell-$version.vsix"
+          node scripts/verify-vsix.mjs "$vsix" --tag "v$version"
+          node scripts/release-evidence.mjs init --vsix "$vsix" --commit "$(git rev-parse HEAD)" --output candidate/rechecked.json
+          cmp candidate/candidate.json candidate/rechecked.json
+          artifact_dir="$RUNNER_TEMP/inkwell-demo-artifact"
+          mkdir -p "$artifact_dir"
+          unzip -q "$vsix" -d "$artifact_dir"
+          echo "ARTIFACT_ROOT=$artifact_dir/extension" >> "$GITHUB_ENV"
+          echo "VSIX=$vsix" >> "$GITHUB_ENV"
+
+      - name: Install pandoc 3.x and pandoc-crossref
+        run: |
           set -euo pipefail
           PANDOC_VERSION="3.9"
-          curl -sL "https://github.com/jgm/pandoc/releases/download/${PANDOC_VERSION}/pandoc-${PANDOC_VERSION}-1-amd64.deb" -o /tmp/pandoc.deb
-          sudo dpkg -i /tmp/pandoc.deb
-          pandoc --version | head -1
+          curl --fail --location --retry 3 "https://github.com/jgm/pandoc/releases/download/${PANDOC_VERSION}/pandoc-${PANDOC_VERSION}-1-amd64.deb" --output "$RUNNER_TEMP/pandoc.deb"
+          sudo dpkg -i "$RUNNER_TEMP/pandoc.deb"
+          pandoc --version
+          curl --fail --location --retry 3 https://api.github.com/repos/lierdakil/pandoc-crossref/releases/latest --output "$RUNNER_TEMP/crossref-release.json"
+          crossref_url="$(node -e 'const release=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const asset=release.assets.find(item=>item.name.endsWith("Linux-X64.tar.xz"));if(!asset)throw new Error("Required crossref release asset is missing");process.stdout.write(asset.browser_download_url)' "$RUNNER_TEMP/crossref-release.json")"
+          curl --fail --location --proto '=https' --retry 3 "$crossref_url" --output "$RUNNER_TEMP/pandoc-crossref.tar.xz"
+          mkdir -p "$RUNNER_TEMP/pandoc-crossref"
+          tar -xJf "$RUNNER_TEMP/pandoc-crossref.tar.xz" -C "$RUNNER_TEMP/pandoc-crossref"
+          sudo install -m 755 "$RUNNER_TEMP/pandoc-crossref/pandoc-crossref" /usr/local/bin/pandoc-crossref
+          pandoc-crossref --version
 
-          # pandoc-crossref latest release binary.
-          crossref_url="$(curl -sL https://api.github.com/repos/lierdakil/pandoc-crossref/releases/latest \
-            | grep 'browser_download_url.*Linux-X64.tar.xz' | head -1 | cut -d '"' -f 4 || true)"
-          if [[ -n "$crossref_url" ]]; then
-            curl -sL "$crossref_url" -o /tmp/pandoc-crossref.tar.xz
-            mkdir -p /tmp/pc
-            tar -xJf /tmp/pandoc-crossref.tar.xz -C /tmp/pc
-            sudo mv /tmp/pc/pandoc-crossref /usr/local/bin/pandoc-crossref
-            sudo chmod +x /usr/local/bin/pandoc-crossref
-            pandoc-crossref --version | head -1
-          else
-            echo "Could not resolve pandoc-crossref release; proceeding without it."
-          fi
-
-      - name: Install TinyTeX
+      - name: Install TinyTeX and system rendering dependencies
         run: |
-          curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh
+          set -euo pipefail
+          curl --fail --location --retry 3 "https://yihui.org/tinytex/install-bin-unix.sh" --output "$RUNNER_TEMP/install-tinytex.sh"
+          sh "$RUNNER_TEMP/install-tinytex.sh"
           echo "$HOME/.TinyTeX/bin/x86_64-linux" >> "$GITHUB_PATH"
+          sudo apt-get update
+          sudo apt-get install -y ghostscript python3-venv poppler-utils
 
       - name: Install required LaTeX packages
         run: |
+          set -euo pipefail
           export PATH="$HOME/.TinyTeX/bin/x86_64-linux:$PATH"
           tlmgr update --self
-          # Strip comments + blank lines from the requirements list and
-          # install in bulk. The `| xargs` pattern matches what the
-          # extension's toolchain setup does. `tlmgr install` tolerates
-          # a non-zero exit here: TinyTeX sometimes fails the final
-          # fmtutil-sys regeneration for luametatex/luajittex engines
-          # the minimal install does not ship, even though every
-          # package it downloaded is on disk. The kpsewhich spot-check
-          # below is what actually verifies the install succeeded.
-          sed 's/#.*//' requirements-latex.txt | awk 'NF' | xargs tlmgr install || true
-          texhash || mktexlsr || true
-          kpsewhich --version | head -1
-          # Sanity check: the packages introduced in v0.3.0 should be
-          # visible to kpsewhich after this step. The whole point of
-          # the CI regression is to catch the case where they are not.
-          missing=0
-          for probe in xstring.sty fix2col.sty svn-prov.sty english.ldf spanish.ldf loadhyph-es.tex; do
-            if kpsewhich "$probe" >/dev/null 2>&1; then
-              echo "OK   kpsewhich $probe"
-            else
-              echo "FAIL kpsewhich $probe (not in TinyTeX after tlmgr pass)"
-              missing=1
-            fi
-          done
-          if [[ "$missing" -ne 0 ]]; then
-            exit 1
-          fi
+          node - "$ARTIFACT_ROOT/requirements-latex.txt" "$RUNNER_TEMP/inkwell-tex-packages.txt" <<'NODE'
+          const fs = require('node:fs');
+          const names = [...new Set(fs.readFileSync(process.argv[2], 'utf8').split(/\r?\n/).map(line => line.replace(/#.*/, '').trim()).filter(Boolean))];
+          if (!names.length || names.some(name => !/^[a-z0-9][a-z0-9+.-]*$/.test(name))) throw new Error('Invalid or empty artifact TeX requirements');
+          fs.writeFileSync(process.argv[3], names.join('\n') + '\n');
+          NODE
+          mapfile -t packages < "$RUNNER_TEMP/inkwell-tex-packages.txt"
+          tlmgr install "${packages[@]}"
 
-      - name: Seed runtime-generated figures
+      - name: Install isolated demo Python environment
         run: |
-          # demo-tufte references .inkwell/figures/anscombe.pdf which
-          # is produced by a Python block in the demo. Under the
-          # extension, users run the block (Cmd+Alt+R) before
-          # compiling. In CI we skip the code-block runner and just
-          # generate the figures directly with matplotlib so the
-          # compile pipeline can be tested in isolation. Add new
-          # seed calls here when new demos introduce runtime-generated
-          # figures; alternatively, commit a placeholder under
-          # .inkwell/figures/ and exclude the file from .gitignore.
-          python3 -m pip install --quiet matplotlib numpy
-          mkdir -p .inkwell/figures
-          python3 - <<'PY'
-          import matplotlib
-          matplotlib.use("Agg")
-          import matplotlib.pyplot as plt
-          import numpy as np
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/inkwell-demo-python"
+          python="$RUNNER_TEMP/inkwell-demo-python/bin/python"
+          "$python" -m pip install --requirement "$ARTIFACT_ROOT/examples/requirements.txt" pypdf
+          "$python" -m pip check
+          echo "INKWELL_TEST_PYTHON=$python" >> "$GITHUB_ENV"
+          echo "INKWELL_PDF_PYTHON=$python" >> "$GITHUB_ENV"
 
-          # Anscombe's quartet. Minimal reproduction, not the demo's
-          # exact visual.
-          datasets = {
-              "I":  ([10,8,13,9,11,14,6,4,12,7,5], [8.04,6.95,7.58,8.81,8.33,9.96,7.24,4.26,10.84,4.82,5.68]),
-              "II": ([10,8,13,9,11,14,6,4,12,7,5], [9.14,8.14,8.74,8.77,9.26,8.10,6.13,3.10,9.13,7.26,4.74]),
-              "III":([10,8,13,9,11,14,6,4,12,7,5], [7.46,6.77,12.74,7.11,7.81,8.84,6.08,5.39,8.15,6.42,5.73]),
-              "IV": ([8,8,8,8,8,8,8,19,8,8,8],    [6.58,5.76,7.71,8.84,8.47,7.04,5.25,12.50,5.56,7.91,6.89]),
-          }
-          fig, axes = plt.subplots(2, 2, figsize=(6.5, 5.5))
-          for ax, (name, (x, y)) in zip(axes.flat, datasets.items()):
-              ax.scatter(x, y, s=22, alpha=0.8)
-              m, b = np.polyfit(x, y, 1)
-              xs = np.array(sorted(x))
-              ax.plot(xs, m*xs+b, linewidth=1)
-              ax.set_title(f"Dataset {name}")
-              ax.set_xlim(2, 20); ax.set_ylim(2, 14)
-          fig.tight_layout()
-          fig.savefig(".inkwell/figures/anscombe.pdf", bbox_inches="tight")
-          PY
-
-      - name: Compile every demo
+      - name: Install and verify isolated Mermaid renderer
         run: |
-          export PATH="$HOME/.TinyTeX/bin/x86_64-linux:$PATH"
-          scripts/compile-all-demos.sh
+          set -euo pipefail
+          mermaid_dir="$RUNNER_TEMP/inkwell-ci-mermaid"
+          mkdir -p "$mermaid_dir"
+          cp scripts/ci-tools/mermaid/package.json scripts/ci-tools/mermaid/package-lock.json "$mermaid_dir/"
+          export PUPPETEER_CACHE_DIR="$RUNNER_TEMP/inkwell-ci-mermaid-browser"
+          npm ci --prefix "$mermaid_dir" --no-audit --no-fund
+          echo "$mermaid_dir/node_modules/.bin" >> "$GITHUB_PATH"
+          echo "PUPPETEER_CACHE_DIR=$PUPPETEER_CACHE_DIR" >> "$GITHUB_ENV"
+          "$mermaid_dir/node_modules/.bin/mmdc" --version
+          printf 'flowchart LR\n  Input --> Verified\n' > "$mermaid_dir/smoke.mmd"
+          "$mermaid_dir/node_modules/.bin/mmdc" -i "$mermaid_dir/smoke.mmd" -o "$mermaid_dir/smoke.svg"
+          test -s "$mermaid_dir/smoke.svg"
 
-      - name: Upload PDFs on success
+      - name: Verify every artifact requirement and a fresh PDF smoke build
+        run: |
+          set -euo pipefail
+          mkdir -p benchmarks
+          node "$ARTIFACT_ROOT/out/doctor-cli.js" --extension-root "$ARTIFACT_ROOT" --full --json --require-tool ghostscript > benchmarks/doctor.json
+
+      - name: Compile every demo through the same packaged runtime twice
+        run: |
+          set -euo pipefail
+          npm run compile
+          node scripts/check-demos.cjs --vsix="$VSIX" --vsix-root="$ARTIFACT_ROOT" --warmups=1 --repetitions=5 --report=benchmarks/current.json
+          node scripts/check-demos.cjs --vsix="$VSIX" --vsix-root="$ARTIFACT_ROOT" --warmups=1 --repetitions=5 --report=benchmarks/confirmation.json
+          node scripts/release-evidence.mjs record --candidate candidate/candidate.json --gate demos --report benchmarks/current.json --report benchmarks/confirmation.json --report benchmarks/doctor.json --output evidence/demos.evidence.json
+
+      - name: Download a same-machine valid performance baseline
+        if: inputs.baseline-artifact != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.baseline-artifact }}
+          path: baseline
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.candidate_run_id || github.run_id }}
+
+      - name: Reject sustained benchmark regressions
+        if: inputs.baseline-artifact != ''
+        run: |
+          set -euo pipefail
+          node scripts/check-benchmark-regression.mjs --baseline=baseline/baseline.json --candidate=benchmarks/current.json --confirmation=benchmarks/confirmation.json --report=benchmarks/performance.json
+          node scripts/release-evidence.mjs record --candidate candidate/candidate.json --gate performance --report benchmarks/performance.json --report benchmarks/current.json --report benchmarks/confirmation.json --report baseline/baseline.json --output evidence/performance.evidence.json
+
+      - name: Explain the absent baseline gate
+        if: inputs.baseline-artifact == ''
+        run: echo 'Timing reports are retained; release remains blocked until a valid same-machine baseline passes the sustained comparison gate.' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run, edit, insert and compile in an actual packaged extension host
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/inkwell-editor"
+          curl --fail --location --proto '=https' --retry 3 https://update.code.visualstudio.com/latest/linux-x64/stable --output "$RUNNER_TEMP/editor.tar.gz"
+          tar -xzf "$RUNNER_TEMP/editor.tar.gz" -C "$RUNNER_TEMP/inkwell-editor"
+          xvfb-run -a node scripts/check-extension-host.cjs --vsix "$VSIX" --editor "$RUNNER_TEMP/inkwell-editor/VSCode-linux-x64/code" --mode full --samples 5 --warmups 1 --report benchmarks/run-to-pdf.json
+          node scripts/release-evidence.mjs record --candidate candidate/candidate.json --gate run-to-pdf --report benchmarks/run-to-pdf.json --output evidence/run-to-pdf.evidence.json
+          node scripts/release-evidence.mjs record --candidate candidate/candidate.json --gate warm-preview --report benchmarks/run-to-pdf.json --output evidence/warm-preview.evidence.json
+
+      - name: Upload verification reports on success
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: compiled-demos
-          path: examples/demo-*.pdf
-          if-no-files-found: warn
+          name: demo-validation-report
+          path: |
+            benchmarks/*.json
+            evidence/
+            candidate/candidate.json
+          if-no-files-found: error
 
-      - name: Upload engine logs on failure
+      - name: Upload diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: engine-logs
+          name: demo-diagnostics
           path: |
-            /tmp/inkwell-compile-*/*.log
-            /tmp/inkwell-compile-*/*.tex
+            benchmarks/*.json
+            /tmp/inkwell-demos-*/**/*.log
+            /tmp/inkwell-vscode/**/compile.log
+            /tmp/inkwell-vscode/**/*.tex
           if-no-files-found: warn

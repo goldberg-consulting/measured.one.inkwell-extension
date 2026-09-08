@@ -1,0 +1,12 @@
+{
+  "demo-default.md": ["Inkwell Default Template Demo", "Introduction"],
+  "demo-eth-report.md": ["Signal Decomposition", "Discussion"],
+  "demo-hipster-cv.md": ["Experience", "Education"],
+  "demo-ludus.md": ["Procedural Content Generation", "Conclusion"],
+  "demo-python-report.md": ["Reproducible Results", "Run-and-Insert"],
+  "demo-rho.md": ["Introduction", "Cross-References"],
+  "demo-rmxaa.md": ["Signal Decomposition", "Conclusion"],
+  "demo-tmsce.md": ["Fourier Partial Sums", "Conclusion"],
+  "demo-tufte-book-vdqi.md": ["A Tufte-Style Book", "A Reproducible Book Workflow"],
+  "demo-tufte.md": ["Principles of Analytical Display", "Mathematical Notation"]
+}

@@ -1,5 +1,175 @@
 # Changelog
 
+## Unreleased — 0.5 reliability work
+
+### Output safety
+
+- Failed Pandoc, TeX, bibliography, Python setup, and code-run processes no longer
+  report completion because an output file happens to exist. A failed PDF build
+  preserves the previous PDF; a successful build publishes through an atomic rename.
+- Preview updates carry document and source revisions. Switching documents clears
+  old content, and retained PDFs display their last successful revision and time
+  when provenance is available.
+- Executable blocks now store successful provenance in
+  `.inkwell/runs/<document-id>/<block-id>/history/<run-id>/run.json`, selected by an
+  atomic `current.json`. Source, interpreter, installed-package metadata, inputs,
+  lockfiles, upstream outputs, and artifact hashes determine whether output is current.
+- Existing ordinal `.inkwell/outputs/*/block_*` artifacts require one rerun and are
+  never treated as verified results. Scripts remain user-owned. Moving blocks to
+  different execution indices conservatively invalidates output because legacy
+  scripts can read `INKWELL_BLOCK_INDEX`; stable storage identities are preserved.
+- Clearing generated output invalidates active runs as well as stored results.
+  Failed attempts remain inspectable but cannot become current.
+- Python environment setup uses observed processes and fresh verification, and
+  unsafe project names are rejected before creating files.
+- The starter bibliography includes Fourier's 1822 book. Generated code-font
+  styling loads the LaTeX dependency required by line-wrapping options.
+
+### Verification
+
+- Behavioral tests use temporary projects and run in Linux/macOS CI. Demo checks
+  run the actual extension runner/compiler, reject unresolved references, and
+  verify expected text in the PDF. Machine-readable baseline reports are included.
+
+### Configuration and project upgrades
+
+- Preview, PDF compilation, citations, template selection, and runs now share a
+  typed YAML resolver. Scalar, flow-list, block-list, quoted, and CRLF forms follow
+  the same precedence. Diagnostics identify invalid values and template locks.
+  `inkwell.defaultCodeDisplay` now supplies the documented authoring default.
+- Manifest schema 1 / scaffold 4 stores project choices in `defaults.typography`, `tables`,
+  `references`, and `runs`, with hashes and ownership in `managedFiles`. Legacy
+  `settings` and `documentSettings` remain readable and migrate without losing
+  unknown fields. Rendering never rewrites document frontmatter or the manifest.
+- Migration preserves edited files, creates comparison proposals beside them,
+  and offers Compare files or Keep my files. Malformed manifests receive a backup
+  and stop setup. Interrupted migrations resume; successful repeated setup does
+  no additional writes. Built-in templates stay in the installed extension.
+- Inkwell actions share project readiness. Plain workspaces receive one setup
+  action and a persistent Don't ask here choice; background Markdown changes do
+  not opt in a workspace. New Project and Setup Workspace use the same migration.
+- Explicit bibliography lists replace discovery in both preview and PDF. Earlier
+  files win duplicate-key lookup, and every duplicate definition is diagnosed. Document-relative paths
+  and project/defaults-relative paths share one resolution rule. Missing files
+  now stop compilation with a located diagnostic instead of quietly dropping
+  sources.
+
+### Installation and first-run reliability (Phase 3)
+
+- The extension and headless JSON/text doctor share one structured health report.
+  Light checks verify assets and executable/editor versions; full checks add
+  cross-reference conversion, exact TeX files, safe ownership classification,
+  and an actual Inkwell PDF build. Health checks never install software, refresh
+  TeX indexes, access the network, or change TeX ownership. Activation requests
+  only cached light health.
+- Setup / Repair, the walkthrough, and explicit project setup use observed,
+  resumable stages with consent for system changes, fresh verification, scaffold
+  migration, and a smoke PDF. Failed processes and skipped required checks cannot
+  become successful completion.
+- The versioned release VSIX is the authoritative extension artifact. The macOS
+  bootstrap supports `auto`, `all`, `cursor`, and `code` editor selection,
+  including app-bundle CLIs. It verifies the exact version in each selected editor
+  and uses Homebrew Mermaid CLI instead of requiring a global npm installation.
+- Standalone setup reuses functioning TeX installations. The full Homebrew cask
+  depends directly on MacTeX and Node, and targets every detected supported editor. User TinyTeX
+  uses no sudo, normal system MacTeX ownership is preserved, and requirements come
+  from the installed artifact. Obsolete `fix2col` was removed: its fixes have been
+  in the LaTeX kernel since 2015 and no bundled template imports it.
+- Packaging now includes independent extension, doctor, installer, and smoke
+  compiler bundles with an asset hash manifest. Artifact verification checks the
+  actual VSIX contents and exact release tag. The separate Homebrew tap draft
+  uses supported installer/uninstaller scripts and mocked lifecycle tests.
+
+### Editable run scripts and verified current output (Phase 7)
+
+- Add editor commands and CodeLens actions to extract and open external run scripts, run a selected block or changed blocks, and inspect the current result. The existing Run Code Blocks command is preserved. Automatic stable IDs are saved in the fence before persistent execution; invalid or duplicate identities block execution with diagnostics.
+- Keep user-owned source in `.inkwell/scripts/` and generated attempts in `.inkwell/runs/<document-id>/<block-id>/history/`. Atomic `current.json` publication requires a complete, verified successful attempt. Failed, stale, superseded, or modified-during-publication output cannot become current; the previous success is preserved.
+- Fingerprint declared input files, lockfiles, interpreter identity, allowlisted environment settings, and upstream results. Refresh visible stale state when source scripts or dependencies change. Runs remain sequential with configurable time, input, artifact, log, and retention limits.
+- Treat canonical `.inkwell/scripts/` references as project-root paths while preserving document-first lookup for other existing relative scripts. Input globs consistently resolve from the project root. Explicit environment paths must stay inside the project; normal system discovery and project virtual environments remain supported. These containment and provenance corrections have regression coverage.
+- Preserve unverified legacy output on upgrade until the user clears it, but require a new successful run before injection. Deleted or malformed identity maps cannot revive older histories. Clearing generated output preserves user-owned scripts.
+- Sanitize raw HTML in preview while preserving safe generated math, table, and reference markup. Existing standalone HTML artifact presentation remains literal source.
+
+### Bibliography and canonical configuration (Phase 6)
+
+- Pandoc's citation AST now renders narrative, grouped, suppressed-author, locator,
+  and missing-key cases in preview and PDF. Reference placement and section targets
+  are shared, and fallback preview is explicitly labeled approximate.
+- Configure Bibliography creates or selects files and changes reference formatting
+  with one undoable unsaved edit. Core completion, hover, definition, missing-key,
+  duplicate, and Bibliography Doctor diagnostics use an asynchronous shared index.
+- Canonical frontmatter uses nested Inkwell kebab-case settings and preserves Pandoc
+  top-level keys. CST edits retain all untouched YAML bytes, including comments,
+  quoting, flow punctuation, CRLF, BOM, and document markers.
+- Legacy defaults migration copies all supported values without rewriting the source,
+  records completion transactionally, and retains native inline CSL metadata.
+- Reference spacing accepts physical lengths; hanging indent is bibliography-only.
+  Legacy aliases remain supported through at least 0.7.
+- Reinstalling the exact extension does not write it again. Newer versions produce
+  a partial installer result and stay untouched; cask removal freshly checks the
+  installed version before removing its own release.
+
+### Typography and viewer controls (Phase 4)
+
+- Draft and Print View have keyboard-accessible A−, A+, and Reset controls from
+  50% to 200%. Workspace/webview state remembers the preference; it never enters
+  frontmatter, project defaults, or generated TeX. PDF fit width, fit page, and
+  custom zoom are separate controls. `inkwell.preview.fontScale` sets the initial
+  viewer preference.
+- Configure Document Style offers an undoable frontmatter edit or an atomic
+  project-default update, preserving comments, unknown metadata, and user edits.
+  Template locks show their effective values. Body, heading, code, table, caption,
+  and reference typography use shared physical-point calculations and supported
+  PDF adapters. Document fonts are scoped to the article; controls and logs keep
+  the editor UI font.
+- Explicit font selection now uses its requested physical size instead of
+  inheriting Default's implicit `Scale=MatchLowercase`. Unsupported custom font
+  scaling is diagnosed. Documents without font overrides keep their TeX behavior.
+
+### Semantic body tables (Phase 5)
+
+- Default and ETH Report implement five distinct presets, table fonts, density,
+  colors, rules, padding, alignment, width, and caption placement in preview and
+  PDF. Styling applies only to body tables; template layout tables stay intact.
+  Rho, RMxAA, Ludus, and Hipster CV additionally support width and wrapping while
+  retaining their existing table bridges. Unsupported controls are diagnosed.
+- Preview uses real captions and accessible overflow wrappers. Caption placement
+  now defaults above to match Pandoc. Existing flat settings remain aliases;
+  canonical per-table attributes override document and project defaults.
+- Standards-compliant CSV and structured JSON ingestion preserve literal cell
+  values, including embedded newlines, quotes, pipes, and executable-looking text.
+  Invalid data stops PDF publication with an artifact diagnostic. Raw LaTeX
+  remains intact and has an explicit preview limitation instead of guessed cells.
+- Quoted fence attributes can contain braces, so caption/label variable bindings
+  survive parsing and resolve from successful run values without interpreting cells.
+
+### Offline preview and measured compilation (Phase 8)
+
+- Preview packages pinned math, diagram, highlighting, and PDF assets, loads
+  optional features on demand, and rejects obsolete results. PDF rendering keeps
+  at most six canvases and reuses file transfers across zoom and scroll changes.
+- Compile requests coalesce per document across the toolbar and editor commands.
+  Unchanged timed builds reuse a verified successful output. Fresh PDF builds
+  reuse verified TeX auxiliaries and immutable built-in template support files.
+- Compiler results report phase timings, cache hits, pass counts, and convergence
+  reasons. Frozen native editor documents use independent source snapshots.
+- The canonical `out/assets-manifest.json` requires every local vendor asset and
+  hash; `schemas/doctor.schema.json` defines versioned health reports. Doctor keeps
+  compatibility with the former singular manifest filename.
+
+### Release evidence (Phase 9)
+
+- CI shares one immutable candidate across package, behavioral, editor-host,
+  offline-browser, and demo checks. Actual packaged compiler and runner bytes
+  produce the demo reports. Repeated benchmarks require a valid baseline and a
+  confirming run before judging an individual regression.
+- Publication consumes the tested artifact and matching release-commit evidence.
+  Missing clean-install, upgrade, parity, or performance evidence blocks release.
+
+This is unreleased work toward 0.5. The final release artifact, tap checksum,
+architecture-specific installation checks, clean-machine install, and final
+performance evidence remain release gates. Mocked tests and artifact audits do not establish
+that a clean Mac installation has passed. See [installation and health checks](docs/installation.md).
+
 ## 0.4.0 (2026-09-04)
 
 Ports the template and pipeline fixes proven in a downstream report-writing project (catalog items P01–P10, G05, G09, G10 of its improvement handoff): the ETH XeLaTeX/typography overlay, the header-includes preamble collision, document-declared bibliographies, binding validation, and preview figure-label parsing.

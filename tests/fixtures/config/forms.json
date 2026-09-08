@@ -1,0 +1,9 @@
+[
+  {"name":"scalar","yaml":"bibliography: refs.bib\nfontsize: 11pt","bibliography":["refs.bib"]},
+  {"name":"block-list","yaml":"bibliography:\n  - refs.bib\n  - extra.bib","bibliography":["refs.bib","extra.bib"]},
+  {"name":"flow-list","yaml":"bibliography: [refs.bib, 'extra.bib']","bibliography":["refs.bib","extra.bib"]},
+  {"name":"quoted-hash","yaml":"title: 'A # title'\ninkwell:\n  heading-color: '#123456'","title":"A # title"},
+  {"name":"crlf","yaml":"bibliography:\r\n  - refs.bib\r\nfontsize: 12pt","bibliography":["refs.bib"]},
+  {"name":"invalid-values","yaml":"fontsize: enormous\ninkwell:\n  tables: nonexistent","invalid":true},
+  {"name":"precedence","yaml":"fontsize: 12pt\ninkwell:\n  code-display: both","project":{"fontsize":"11pt"},"editor":{"fontsize":"10pt"},"expectedFontsize":"12pt"}
+]

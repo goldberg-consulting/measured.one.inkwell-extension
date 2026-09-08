@@ -1,0 +1,21 @@
+{
+  "phase": 5,
+  "kind": "phase5-table-rich",
+  "environment": "macOS arm64; Pandoc 3.9; installed TinyTeX",
+  "measurements": [
+    {
+      "template": "default",
+      "images": 1,
+      "links": [
+        "https://example.com/table"
+      ]
+    },
+    {
+      "template": "eth-report",
+      "images": 1,
+      "links": [
+        "https://example.com/table"
+      ]
+    }
+  ]
+}

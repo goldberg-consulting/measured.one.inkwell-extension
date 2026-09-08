@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "timestamp": "2026-09-07T21:10:56.064Z",
+  "machine": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M5",
+    "node": "v25.2.1"
+  },
+  "phase": "Phase3 candidate; not a published release",
+  "artifact": {
+    "version": "0.5.0",
+    "sha256": "1311390477c09e7528fcea660c42af838434f3f5bcd217c398db332fbb08a164",
+    "assetCount": 112,
+    "actualVsixContractPassed": true,
+    "source": "Clean staging with committed demo examples; user document edits excluded"
+  },
+  "fullDoctor": {
+    "ready": true,
+    "status": "warning",
+    "distribution": "tinytex",
+    "missingPackages": [],
+    "actualPdfBuild": true,
+    "milliseconds": 1747,
+    "observedProbeProcesses": 128,
+    "warnings": [
+      {
+        "id": "editor:cursor",
+        "status": "warning",
+        "required": false
+      },
+      {
+        "id": "editor:code",
+        "status": "warning",
+        "required": false
+      },
+      {
+        "id": "workspace",
+        "status": "skipped",
+        "required": false
+      }
+    ]
+  },
+  "warmLightDoctor": {
+    "samples": 40,
+    "p95Ms": 6.178333000000066,
+    "medianMs": 5.373749999999973,
+    "processCount": 0,
+    "allCacheHits": true
+  },
+  "limitations": [
+    "Warm timing measures the doctor only; actual extension-host activation remains a release gate.",
+    "The real local toolchain was reused. No clean-machine MacTeX or BasicTeX installation was performed.",
+    "Actual user editors retain their prior extension; installer/editor matrices use isolated mocks.",
+    "Intel host, clean-machine release, unmodified Homebrew CI checks, and final release checksum remain pending."
+  ]
+}

@@ -1,128 +1,88 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-EXTENSION_ID="measure-one.inkwell"
-EDITOR_CLI="auto"
-TEX_DIST="mactex"
+# Bootstrap the authoritative release VSIX. All installation, exact-editor
+# verification and full health checks live in that versioned artifact.
+INKWELL_RELEASE_VERSION="0.5.0"
+INKWELL_EDITOR="auto"
+INKWELL_PROFILE="full"
+INKWELL_VSIX=""
+INKWELL_EXPECTED_SHA=""
+INKWELL_OUTPUT=""
+INKWELL_UNINSTALL=0
+INKWELL_ALLOW_DOWNGRADE=0
+INKWELL_EXPLICIT_CONSENT=0
 
+usage() {
+  echo "Usage: $0 [--editor=auto|all|cursor|code] [--version=X.Y.Z] [--vsix=/path/to/release.vsix] [--sha256=HASH] [--output-root=/path] [--allow-downgrade --yes]"
+}
 for arg in "$@"; do
   case "$arg" in
-    --editor=cursor) EDITOR_CLI="cursor" ;;
-    --editor=code) EDITOR_CLI="code" ;;
-    --editor=auto) EDITOR_CLI="auto" ;;
-    --basictex) TEX_DIST="basictex" ;;
-    *)
-      echo "Unknown argument: $arg"
-      echo "Usage: $0 [--editor=auto|cursor|code] [--basictex]"
-      exit 1
-      ;;
+    --editor=auto|--editor=all|--editor=cursor|--editor=code) INKWELL_EDITOR="${arg#*=}" ;;
+    --profile=full) INKWELL_PROFILE="full" ;;
+    --version=*) INKWELL_RELEASE_VERSION="${arg#*=}" ;;
+    --vsix=*) INKWELL_VSIX="${arg#*=}" ;;
+    --sha256=*) INKWELL_EXPECTED_SHA="${arg#*=}" ;;
+    --output-root=*) INKWELL_OUTPUT="${arg#*=}" ;;
+    --uninstall) INKWELL_UNINSTALL=1 ;;
+    --allow-downgrade) INKWELL_ALLOW_DOWNGRADE=1 ;;
+    --yes) INKWELL_EXPLICIT_CONSENT=1 ;;
+    --help|-h) usage; exit 0 ;;
+    *) echo "Unknown argument: $arg" >&2; usage >&2; exit 2 ;;
   esac
 done
-
-has_cmd() {
-  command -v "$1" >/dev/null 2>&1
-}
-
+if [[ "$INKWELL_ALLOW_DOWNGRADE" == 1 && ( "$INKWELL_EXPLICIT_CONSENT" != 1 || "$INKWELL_UNINSTALL" == 1 ) ]]; then
+  echo "Downgrading requires both --allow-downgrade and explicit --yes consent during standalone installation." >&2; exit 2
+fi
+if [[ ! "$INKWELL_RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]; then
+  echo "Invalid release version." >&2; exit 2
+fi
 if [[ "$(uname -s)" != "Darwin" ]]; then
-  echo "This installer is for macOS only."
-  echo "For Linux setup, follow README instructions."
-  exit 1
+  echo "This installer is for macOS. Use the headless doctor or Setup / Repair in your editor on other platforms." >&2; exit 1
 fi
-
-if ! has_cmd brew; then
-  echo "Homebrew is required. Install it first from https://brew.sh"
-  exit 1
+INKWELL_BREW="$(command -v brew || true)"
+if [[ -z "$INKWELL_BREW" ]]; then
+  for candidate in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+    if [[ -x "$candidate" ]]; then INKWELL_BREW="$candidate"; break; fi
+  done
 fi
-
-if ! has_cmd npm; then
-  echo "npm is required for Mermaid CLI. Install Node.js first."
-  exit 1
+if [[ -z "$INKWELL_BREW" ]]; then
+  echo "Homebrew is required. Install it from https://brew.sh, then repeat this command." >&2; exit 1
 fi
-
-if [[ "$EDITOR_CLI" == "auto" ]]; then
-  if has_cmd cursor; then
-    EDITOR_CLI="cursor"
-  elif has_cmd code; then
-    EDITOR_CLI="code"
-  else
-    EDITOR_CLI=""
+INKWELL_NODE="$(command -v node || true)"
+if [[ -z "$INKWELL_NODE" ]]; then
+  "$INKWELL_BREW" install node
+  INKWELL_BREW_PREFIX="$("$INKWELL_BREW" --prefix)"
+  INKWELL_NODE="$INKWELL_BREW_PREFIX/bin/node"
+fi
+if [[ ! -x "$INKWELL_NODE" ]]; then echo "Node runtime installation could not be verified." >&2; exit 1; fi
+"$INKWELL_NODE" --version >/dev/null
+INKWELL_TEMP="$(mktemp -d "${TMPDIR:-/tmp}/inkwell-install.XXXXXX")"
+trap 'rm -rf "$INKWELL_TEMP"' EXIT
+if [[ -z "$INKWELL_VSIX" ]]; then
+  INKWELL_BASE="https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/download/v$INKWELL_RELEASE_VERSION"
+  INKWELL_VSIX="$INKWELL_TEMP/inkwell-$INKWELL_RELEASE_VERSION.vsix"
+  curl --fail --location --proto '=https' --tlsv1.2 "$INKWELL_BASE/inkwell-$INKWELL_RELEASE_VERSION.vsix" --output "$INKWELL_VSIX"
+  if [[ -z "$INKWELL_EXPECTED_SHA" ]]; then
+    curl --fail --location --proto '=https' --tlsv1.2 "$INKWELL_BASE/SHA256SUMS" --output "$INKWELL_TEMP/SHA256SUMS"
+    INKWELL_EXPECTED_SHA="$(awk -v name="inkwell-$INKWELL_RELEASE_VERSION.vsix" '$2 == name {print $1}' "$INKWELL_TEMP/SHA256SUMS")"
   fi
+  if [[ ! "$INKWELL_EXPECTED_SHA" =~ ^[a-fA-F0-9]{64}$ ]]; then echo "The release checksum does not identify this VSIX." >&2; exit 1; fi
 fi
-
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-BREWFILE="$REPO_ROOT/Brewfile"
-
-if [[ -f "$BREWFILE" ]] && [[ "$TEX_DIST" == "mactex" ]]; then
-  echo "Installing toolchain and extension via brew bundle..."
-  brew bundle --file="$BREWFILE"
-else
-  echo "Installing toolchain with Homebrew..."
-  brew install pandoc pandoc-crossref
-  if [[ "$TEX_DIST" == "basictex" ]]; then
-    brew install --cask basictex
-  else
-    brew install --cask mactex
-  fi
-
-  if [[ -n "$EDITOR_CLI" ]]; then
-    echo "Installing extension from marketplace with $EDITOR_CLI..."
-    "$EDITOR_CLI" --install-extension "$EXTENSION_ID" --force
-  else
-    echo "Could not find cursor or code CLI."
-    echo "Install extension manually from the extension marketplace:"
-    echo "  $EXTENSION_ID"
-  fi
+if [[ ! -f "$INKWELL_VSIX" ]]; then echo "The release VSIX does not exist: $INKWELL_VSIX" >&2; exit 1; fi
+INKWELL_VSIX="$(cd "$(dirname "$INKWELL_VSIX")" && pwd)/$(basename "$INKWELL_VSIX")"
+if [[ -n "$INKWELL_EXPECTED_SHA" ]]; then
+  if [[ ! "$INKWELL_EXPECTED_SHA" =~ ^[a-fA-F0-9]{64}$ ]]; then echo "Release checksum is missing or malformed." >&2; exit 1; fi
+  INKWELL_ACTUAL_SHA="$(shasum -a 256 "$INKWELL_VSIX" | awk '{print $1}')"
+  if [[ "$INKWELL_ACTUAL_SHA" != "$INKWELL_EXPECTED_SHA" ]]; then echo "Release VSIX checksum verification failed." >&2; exit 1; fi
 fi
-
-echo "Installing Mermaid CLI..."
-npm install -g @mermaid-js/mermaid-cli
-
-export PATH="/Library/TeX/texbin:$HOME/Library/TinyTeX/bin/universal-darwin:$PATH"
-
-REQ_FILE=""
-if [[ -f "./requirements-latex.txt" ]]; then
-  REQ_FILE="./requirements-latex.txt"
-elif [[ -f "$(cd "$(dirname "$0")/.." && pwd)/requirements-latex.txt" ]]; then
-  REQ_FILE="$(cd "$(dirname "$0")/.." && pwd)/requirements-latex.txt"
+unzip -q "$INKWELL_VSIX" -d "$INKWELL_TEMP/payload"
+INKWELL_ARTIFACT="$INKWELL_TEMP/payload/extension"
+if [[ ! -f "$INKWELL_ARTIFACT/out/install-cli.js" ]]; then
+  echo "This VSIX does not contain the verified Inkwell installer. Download a 0.5 release artifact." >&2; exit 1
 fi
-
-if has_cmd tlmgr && [[ -n "$REQ_FILE" ]]; then
-  echo "Installing LaTeX requirements from $REQ_FILE..."
-  tlmgr update --self
-  sed 's/#.*//' "$REQ_FILE" | awk 'NF' | xargs tlmgr install
-  texhash || mktexlsr
-else
-  echo "Skipping tlmgr package pass (tlmgr or requirements file not found)."
-fi
-
-# Ownership check. A curl | sudo sh bootstrap of TinyTeX (or an aborted
-# BasicTeX install that left an intermediate root-owned state) leaves
-# the TeX tree owned by root. Subsequent tlmgr installs succeed as
-# root but the ls-R index update fails silently when the user later
-# tries to compile, producing the "File 'xstring.sty' not found" class
-# of errors even though the file sits right there on disk. Detect that
-# state now and offer a one-line remediation before the user ever
-# hits it from the extension.
-if has_cmd kpsewhich; then
-  TEX_ROOT="$(kpsewhich -var-value TEXMFROOT 2>/dev/null || true)"
-  if [[ -n "$TEX_ROOT" && -d "$TEX_ROOT" ]]; then
-    TEX_OWNER="$(stat -f '%Su' "$TEX_ROOT" 2>/dev/null || true)"
-    if [[ -n "$TEX_OWNER" && "$TEX_OWNER" != "$USER" ]]; then
-      echo ""
-      echo "WARNING: TEXMFROOT ($TEX_ROOT) is owned by '$TEX_OWNER' but you are '$USER'."
-      echo "This breaks 'tlmgr install' silently: packages install but never register in the file index."
-      echo "Run this to fix:"
-      echo "    sudo chown -R \"$USER\" \"$TEX_ROOT\" && \"$TEX_ROOT/bin/universal-darwin/texhash\""
-      echo ""
-    fi
-  fi
-fi
-
-echo ""
-echo "Inkwell setup complete."
-echo "Next steps:"
-echo "1) Reload Cursor/VS Code."
-echo "2) Open Command Palette and run: Inkwell: Check / Install Toolchain"
-echo "3) Open a markdown file and test shortcuts:"
-echo "   Cmd+Shift+V (preview), Cmd+Shift+R (compile), Cmd+Alt+R (run code blocks)"
+INKWELL_ARGS=("--artifact-root=$INKWELL_ARTIFACT" "--vsix=$INKWELL_VSIX" "--version=$INKWELL_RELEASE_VERSION" "--editor=$INKWELL_EDITOR" "--profile=$INKWELL_PROFILE" "--yes")
+if [[ -n "$INKWELL_OUTPUT" ]]; then INKWELL_ARGS+=("--output-root=$INKWELL_OUTPUT"); fi
+if [[ "$INKWELL_UNINSTALL" == 1 ]]; then INKWELL_ARGS+=("--uninstall"); fi
+if [[ "$INKWELL_ALLOW_DOWNGRADE" == 1 ]]; then INKWELL_ARGS+=("--allow-downgrade"); fi
+"$INKWELL_NODE" "$INKWELL_ARTIFACT/out/install-cli.js" "${INKWELL_ARGS[@]}"

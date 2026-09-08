@@ -11,8 +11,10 @@ import * as os from "os";
 import * as crypto from "crypto";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { findBibFiles, findCslFile, findDefaultsYaml, getInkwellProjectRoot } from "./config";
-import { splitFrontmatter, extractIndentedBlock } from "./frontmatter";
+import { performance } from "perf_hooks";
+import { findDefaultsYaml, getDocumentConfig, getResolvedReferences, getInkwellProjectRoot } from "./config";
+import { DocumentConfig, Metadata, parseDocumentFrontmatter, stripResolvedConfigFields } from "./document-config";
+import { stringify as stringifyYaml } from "yaml";
 import { InkwellDiagnostics, CompileError } from "./diagnostics";
 import { getTemplateForDocument, copySupportingFiles, PdfEngine, ResolvedTemplate, collectAllFeatures } from "./templates";
 import { prepareForCompilation } from "./inject";
@@ -20,6 +22,14 @@ import { generatePreambleText, injectPreambleIntoTemplate, writePreambleFile } f
 import { buildTexInvocationPath, texBinSearchDirs } from "./shell-env";
 import { tlmgrPackageForFile } from "./toolchain";
 import { getInkwellOutputChannel } from "./inkwell-output";
+import { executeRunProcess } from "./run-process";
+import { publishPdf, validatePdf } from "./pdf-publication";
+import { hasTypographyOverride } from "./style-model";
+import { tablePdfOptions } from "./table-model";
+import { bibliographyMetadata, bibliographyService } from "./bibliography-service";
+import { texConvergenceCache, TexConvergenceRun } from "./tex-convergence";
+import { templateAssetCache } from "./template-assets";
+import { createDocumentSnapshot } from "./document-snapshot";
 
 const exec = promisify(execFile);
 
@@ -40,7 +50,7 @@ const PANDOC_EXTENSIONS = [
   "smart",
 ].join("+");
 
-const TEX_ENV = {
+const TEX_ENV: NodeJS.ProcessEnv = {
   ...process.env,
   PATH: buildTexInvocationPath(),
 };
@@ -49,7 +59,11 @@ const TEX_ENV = {
 // (both the tsc tree and the esbuild bundle), so these resolve to the
 // extension's top-level filters/ and csl/ directories.
 const SECTION_BIBS_FILTER = path.join(__dirname, "..", "filters", "section-bibliographies.lua");
-const DEFAULT_NUMERIC_CSL = path.join(__dirname, "..", "csl", "inkwell-numeric.csl");
+const BODY_TYPOGRAPHY_FILTER = path.join(__dirname, "..", "filters", "body-typography.lua");
+const TABLE_DATA_FILTER = path.join(__dirname, "..", "filters", "table-data.lua");
+const SEMANTIC_TABLES_FILTER = path.join(__dirname, "..", "filters", "semantic-tables.lua");
+const REFERENCE_PREPARE_FILTER = path.join(__dirname, "..", "filters", "reference-prepare.lua");
+const REFERENCE_RENDER_FILTER = path.join(__dirname, "..", "filters", "reference-render.lua");
 
 function safeReadFile(file: string): string {
   try {
@@ -59,12 +73,62 @@ function safeReadFile(file: string): string {
   }
 }
 
-export interface CompileResult {
+interface CompileDetails {
   success: boolean;
   pdfPath: string | undefined;
   errors: CompileError[];
   log: string;
   duration: number;
+}
+
+export type CompilePhase = "preflight" | "pandoc" | "tex" | "bibliography" | "validation" | "publication" | "complete";
+export type CompilePhaseTimings = Record<Exclude<CompilePhase, "complete"> | "total", number>;
+
+function emptyPhaseTimings(): CompilePhaseTimings {
+  return { preflight: 0, pandoc: 0, tex: 0, bibliography: 0, validation: 0, publication: 0, total: 0 };
+}
+
+export interface LastSuccessfulOutput {
+  pdfPath: string;
+  sourceVersion: number;
+  sourceHash: string;
+  publishedAt: string;
+  pdfHash: string;
+}
+
+export interface CompileResult extends CompileDetails {
+  sourceVersion: number;
+  sourceHash: string;
+  phase: CompilePhase;
+  exitCode: number | null;
+  signal?: string;
+  message: string;
+  logPath?: string;
+  lastSuccessfulOutput?: LastSuccessfulOutput;
+  phaseTimingsMs: CompilePhaseTimings;
+  cacheHits: { texAuxiliary: boolean; templateAssets: boolean };
+  texPasses: number;
+  passReasons: string[];
+}
+
+interface CompileAttempt {
+  sourceFile: string;
+  sourceText: string;
+  sourceVersion: number;
+  sourceHash: string;
+  cacheDir: string;
+  pdfOutput: string;
+  phase: CompilePhase;
+  exitCode: number | null;
+  signal?: string;
+  failure?: string;
+  processLog: string[];
+  lastSuccessfulOutput?: LastSuccessfulOutput;
+  phaseTimingsMs: CompilePhaseTimings;
+  cacheHits: { texAuxiliary: boolean; templateAssets: boolean };
+  texPasses: number;
+  passReasons: string[];
+  releaseTemplateAssets?: () => void;
 }
 
 export type CompileMode = "pandoc" | "xelatex";
@@ -88,24 +152,107 @@ function getCacheDir(sourceFile: string): string {
   return dir;
 }
 
-const TEX_ARTIFACT_EXTS = new Set([
-  ".pdf", ".aux", ".log", ".toc", ".lof", ".lot", ".out",
-  ".idx", ".ind", ".ilg", ".bbl", ".blg", ".bcf", ".run.xml",
-  ".nav", ".snm", ".fls", ".fdb_latexmk", ".synctex.gz",
-]);
-
 export function purgeAllCacheDirs(): void {
+  texConvergenceCache.clear();
+  templateAssetCache.clear();
   const root = path.join(os.tmpdir(), "inkwell-vscode");
   try {
     fs.rmSync(root, { recursive: true, force: true });
   } catch {}
 }
 
-function purgeCompileArtifacts(cacheDir: string, baseName: string): void {
-  for (const ext of TEX_ARTIFACT_EXTS) {
-    const file = path.join(cacheDir, `${baseName}${ext}`);
-    try { fs.unlinkSync(file); } catch {}
+function successMetadataPath(sourceFile: string, pdfPath: string): string {
+  const key = crypto.createHash("sha256").update(path.resolve(pdfPath)).digest("hex").slice(0, 16);
+  return path.join(getCacheDir(sourceFile), `success-${key}.json`);
+}
+
+/** Metadata is only trusted while it still describes the public PDF bytes. */
+export function readLastSuccessfulOutput(sourceFile: string, pdfPath?: string): LastSuccessfulOutput | undefined {
+  const target = pdfPath || path.join(path.dirname(sourceFile), `${path.basename(sourceFile, path.extname(sourceFile))}.pdf`);
+  try {
+    const value = JSON.parse(fs.readFileSync(successMetadataPath(sourceFile, target), "utf8"));
+    if (value.pdfPath !== target || typeof value.sourceVersion !== "number" || typeof value.sourceHash !== "string" ||
+        typeof value.publishedAt !== "string" || !Number.isFinite(Date.parse(value.publishedAt))) return undefined;
+    return value.pdfHash === crypto.createHash("sha256").update(fs.readFileSync(target)).digest("hex") ? value : undefined;
+  } catch {
+    return undefined;
   }
+}
+
+async function runCompileProcess(
+  attempt: CompileAttempt,
+  phase: "pandoc" | "tex" | "bibliography",
+  command: string,
+  args: string[],
+  options: { cwd: string; timeout: number; env: NodeJS.ProcessEnv }
+): Promise<{ stdout: string; stderr: string } | undefined> {
+  attempt.phase = phase;
+  const started = performance.now();
+  if (phase === "tex") attempt.texPasses++;
+  attempt.processLog.push(`[inkwell] ${phase}: ${command} ${args.join(" ")}`);
+  try {
+    const result = await executeRunProcess(command, args, { cwd: options.cwd, env: options.env, timeoutMs: options.timeout });
+    attempt.exitCode = result.signal || result.timedOut || result.cancelled || result.maxBufferExceeded ? null : result.exitCode;
+    attempt.signal = result.signal || undefined;
+    attempt.processLog.push(result.stdout, result.stderr);
+    if (result.exitCode !== 0 || result.signal || result.timedOut || result.cancelled || result.maxBufferExceeded) {
+      attempt.failure = `${phase} failed${attempt.signal ? ` (${attempt.signal})` : ` (exit ${result.exitCode})`}: ${result.error || result.stderr || "Process did not exit cleanly"}`;
+      attempt.processLog.push(attempt.failure);
+      return undefined;
+    }
+    return result;
+  } catch (err: any) {
+    attempt.exitCode = typeof err.code === "number" ? err.code : null;
+    attempt.signal = typeof err.signal === "string" ? err.signal : undefined;
+    attempt.failure = `${phase} failed${attempt.signal ? ` (${attempt.signal})` : attempt.exitCode !== null ? ` (exit ${attempt.exitCode})` : ""}: ${err.message || String(err)}`;
+    attempt.processLog.push(String(err.stdout || ""), String(err.stderr || ""), attempt.failure);
+    return undefined;
+  } finally {
+    attempt.phaseTimingsMs[phase] += performance.now() - started;
+  }
+}
+
+function publishCompileOutput(attempt: CompileAttempt, stagedPdf: string): boolean {
+  if (attempt.failure) return false;
+  attempt.phase = "validation";
+  let phaseStarted = performance.now();
+  let metadata: LastSuccessfulOutput;
+  try {
+    validatePdf(stagedPdf);
+    metadata = {
+      pdfPath: attempt.pdfOutput,
+      sourceVersion: attempt.sourceVersion,
+      sourceHash: attempt.sourceHash,
+      publishedAt: new Date().toISOString(),
+      pdfHash: crypto.createHash("sha256").update(fs.readFileSync(stagedPdf)).digest("hex"),
+    };
+    attempt.phaseTimingsMs.validation += performance.now() - phaseStarted;
+    attempt.phase = "publication";
+    phaseStarted = performance.now();
+    publishPdf(stagedPdf, attempt.pdfOutput);
+  } catch (err: any) {
+    attempt.phaseTimingsMs[attempt.phase as "validation" | "publication"] += performance.now() - phaseStarted;
+    attempt.failure = `${attempt.phase} failed: ${err.message || String(err)}`;
+    attempt.processLog.push(attempt.failure);
+    return false;
+  }
+  attempt.lastSuccessfulOutput = metadata;
+  let temporary: string | undefined;
+  try {
+    const metadataFile = successMetadataPath(attempt.sourceFile, attempt.pdfOutput);
+    temporary = `${metadataFile}.${crypto.randomUUID()}.tmp`;
+    fs.writeFileSync(temporary, JSON.stringify(metadata), { flag: "wx" });
+    fs.renameSync(temporary, metadataFile);
+  } catch (err: any) {
+    // The PDF has already been published successfully. A metadata failure must
+    // not claim that compilation failed after changing the public document.
+    attempt.processLog.push(`[inkwell] Could not persist output metadata: ${err.message || String(err)}`);
+  } finally {
+    if (temporary) { try { fs.unlinkSync(temporary); } catch {} }
+  }
+  attempt.phaseTimingsMs.publication += performance.now() - phaseStarted;
+  attempt.phase = "complete";
+  return true;
 }
 
 const binaryCache = new Map<string, { result: string | undefined; ts: number }>();
@@ -148,32 +295,90 @@ async function findBinary(name: string): Promise<string | undefined> {
 //   3. preview.handleCompile does the same for the webview compile button.
 // They are not redundant: the lock here only dedupes identical keys, while
 // the caller-side queues serialize distinct documents.
-const compileLocks = new Map<string, Promise<CompileResult>>();
+const compileLocks = new Map<string, { signature: string; promise: Promise<CompileResult> }>();
 
 export function compile(
   document: vscode.TextDocument,
   outputPath?: string
 ): Promise<CompileResult> {
-  const key = `${document.uri.fsPath}::${outputPath || ""}`;
+  const sourceText = document.getText();
+  const sourceVersion = document.version;
+  const sourceFile = document.uri.fsPath;
+  const pdfOutput = path.resolve(outputPath || path.join(path.dirname(sourceFile), `${path.basename(sourceFile, path.extname(sourceFile))}.pdf`));
+  const key = pdfOutput;
+  const signature = crypto.createHash("sha256").update(JSON.stringify([sourceFile, sourceVersion, sourceText])).digest("hex");
   const existing = compileLocks.get(key);
-  if (existing) return existing;
-
-  const run = (async () => {
-    const mode = detectMode(document);
-    return mode === "xelatex"
-      ? compileTeX(document, outputPath)
-      : compilePandoc(document, outputPath);
+  if (existing?.signature === signature) return existing.promise;
+  // All consumers in this attempt see the same document revision, including
+  // template resolution after asynchronous binary discovery.
+  const snapshot = createDocumentSnapshot(document, sourceText, sourceVersion);
+  const run = (async (): Promise<CompileResult> => {
+    // Different revisions targeting one public file serialize, retaining their
+    // captured source. Unrelated documents can compile independently.
+    if (existing) await existing.promise.catch(() => undefined);
+    const start = Date.now();
+    const measuredStart = performance.now();
+    const sourceHash = crypto.createHash("sha256").update(sourceText).digest("hex");
+    let attempt: CompileAttempt | undefined;
+    let details: CompileDetails;
+    try {
+      attempt = {
+        sourceFile, sourceText, sourceVersion, sourceHash, pdfOutput,
+        cacheDir: fs.mkdtempSync(path.join(getCacheDir(sourceFile), "attempt-")),
+        phase: "preflight", exitCode: null, processLog: [],
+        phaseTimingsMs: emptyPhaseTimings(), cacheHits: { texAuxiliary: false, templateAssets: false }, texPasses: 0, passReasons: [],
+        lastSuccessfulOutput: readLastSuccessfulOutput(sourceFile, pdfOutput),
+      };
+      details = detectMode(snapshot) === "xelatex"
+        ? await compileTeX(snapshot, attempt)
+        : await compilePandoc(snapshot, attempt);
+    } catch (err: any) {
+      const message = `${attempt?.phase || "preflight"} failed: ${err.message || String(err)}`;
+      if (attempt) attempt.failure = message;
+      details = { success: false, pdfPath: undefined, errors: [{ line: undefined, message, severity: "error" }], log: message, duration: (Date.now() - start) / 1000 };
+    } finally {
+      attempt?.releaseTemplateAssets?.();
+    }
+    const message = details.success ? "PDF compiled successfully." : attempt?.failure || details.errors.find((error) => error.severity === "error")?.message || "Compilation failed.";
+    if (!details.success && !details.errors.some((error) => error.severity === "error")) {
+      details.errors.push({ line: undefined, message, severity: "error" });
+    }
+    let logPath: string | undefined;
+    if (attempt) {
+      const baseName = path.basename(sourceFile, path.extname(sourceFile));
+      const fullLog = [...attempt.processLog, details.log, safeReadFile(path.join(attempt.cacheDir, `${baseName}.log`))].join("\n");
+      try {
+        logPath = path.join(attempt.cacheDir, "compile.log");
+        fs.writeFileSync(logPath, fullLog, "utf8");
+      } catch { logPath = undefined; }
+      details.log = fullLog + (logPath ? `\n[inkwell] full compile log: ${logPath}` : "");
+    }
+    const phaseTimingsMs = attempt?.phaseTimingsMs || emptyPhaseTimings();
+    phaseTimingsMs.total = performance.now() - measuredStart;
+    // Planning includes configuration, staging, dependency hashing, and logs.
+    // Process and publication clocks are measured directly and never overlap.
+    phaseTimingsMs.preflight = Math.max(0, phaseTimingsMs.total - phaseTimingsMs.pandoc - phaseTimingsMs.tex -
+      phaseTimingsMs.bibliography - phaseTimingsMs.validation - phaseTimingsMs.publication);
+    return {
+      ...details, sourceVersion, sourceHash, message, logPath,
+      phaseTimingsMs, cacheHits: attempt?.cacheHits || { texAuxiliary: false, templateAssets: false },
+      texPasses: attempt?.texPasses || 0, passReasons: attempt?.passReasons || [],
+      phase: attempt?.phase || "preflight", exitCode: attempt?.exitCode ?? null,
+      signal: attempt?.signal, lastSuccessfulOutput: attempt?.lastSuccessfulOutput,
+    };
   })();
 
-  compileLocks.set(key, run);
-  run.finally(() => compileLocks.delete(key));
+  compileLocks.set(key, { signature, promise: run });
+  // Avoid an ignored rejecting promise from finally when callers handle run.
+  const release = () => { if (compileLocks.get(key)?.promise === run) compileLocks.delete(key); };
+  void run.then(release, release);
   return run;
 }
 
 async function compileTeX(
   document: vscode.TextDocument,
-  outputPath?: string
-): Promise<CompileResult> {
+  attempt: CompileAttempt
+): Promise<CompileDetails> {
   const start = Date.now();
   const sourceFile = document.uri.fsPath;
   const sourceDir = path.dirname(sourceFile);
@@ -190,10 +395,7 @@ async function compileTeX(
     };
   }
 
-  const cacheDir = getCacheDir(sourceFile);
-  const pdfOutput = outputPath || path.join(sourceDir, `${baseName}.pdf`);
-  purgeCompileArtifacts(cacheDir, baseName);
-  try { fs.unlinkSync(pdfOutput); } catch {}
+  const { cacheDir, pdfOutput } = attempt;
 
   const tmpSource = path.join(cacheDir, path.basename(sourceFile));
   fs.writeFileSync(tmpSource, document.getText(), "utf-8");
@@ -201,97 +403,106 @@ async function compileTeX(
   const projectRoot = getInkwellProjectRoot(sourceFile);
   copySiblingFiles(sourceDir, projectRoot, cacheDir);
   const template = getTemplateForDocument(document);
-  copySupportingFiles(template, cacheDir);
+  const support = copySupportingFiles(template, cacheDir, [sourceDir, projectRoot, path.join(sourceDir, ".inkwell"), path.join(projectRoot, ".inkwell")]);
+  const supportDir = support?.directory || cacheDir;
+  attempt.releaseTemplateAssets = support?.release;
+  attempt.cacheHits.templateAssets = support?.cacheHit || false;
+  // A sibling PDF may be a resource, but cannot masquerade as this attempt's
+  // output if the process exits without generating a new document.
+  fs.rmSync(path.join(cacheDir, `${baseName}.pdf`), { force: true });
 
   const args = [
     "-interaction=nonstopmode",
     "-halt-on-error",
+    "-recorder",
     `-output-directory=${cacheDir}`,
     tmpSource,
   ];
 
   const texEnv = {
     ...TEX_ENV,
-    TEXINPUTS: [cacheDir, template.dir, sourceDir, ""].join(":"),
+    TEXINPUTS: [cacheDir, supportDir, template.dir, sourceDir, ""].join(":"),
+    BIBINPUTS: [cacheDir, supportDir, template.dir, sourceDir, TEX_ENV.BIBINPUTS || "", ""].join(":"),
+    BSTINPUTS: [cacheDir, supportDir, template.dir, sourceDir, TEX_ENV.BSTINPUTS || "", ""].join(":"),
   };
 
   let stderr = "";
   let stdout = "";
+  const hasBib = /\\(?:bibliography|addbibresource)\s*\{/.test(document.getText());
+  const convergence = hasBib ? undefined : await texConvergenceCache.prepare({
+    directory: cacheDir, sourceDirectory: sourceDir, sourceFile,
+    sourceHash: attempt.sourceHash, texFile: tmpSource, jobName: baseName,
+    engine: xelatex, engineArgs: args, environment: texEnv,
+    templateIdentity: JSON.stringify([template.id, template.dir, template.manifest]),
+  });
+  attempt.cacheHits.texAuxiliary = convergence?.restored || false;
+  attempt.passReasons.push(hasBib ? "raw-bibliography-required" : convergence?.restored ? "verify-restored-auxiliaries" : "cold-or-invalidated-auxiliaries");
 
-  // Two passes required: the first resolves cross-references and TOC
-  // entries; the second incorporates them into the final PDF.
+  // Cold attempts use two passes. Verified auxiliary state may converge after
+  // one fresh pass; that decision never reuses a previously generated PDF.
   for (let pass = 0; pass < 2; pass++) {
-    try {
-      const result = await exec(xelatex, args, {
+    if (pass === 1) attempt.passReasons.push("second-standard-pass-required");
+    const result = await runCompileProcess(attempt, "tex", xelatex, args, {
         cwd: sourceDir,
         timeout: 120_000,
         env: texEnv,
-      });
-      stdout = result.stdout;
-      stderr = result.stderr;
-    } catch (err: any) {
-      if (err.stdout) stdout = err.stdout;
-      if (err.stderr) stderr = err.stderr;
-      if (pass === 0) break;
+    });
+    if (!result) break;
+    stdout += result.stdout;
+    stderr += result.stderr;
+    if (pass === 0 && convergence && await convergence.canFinishAfterFirstPass(
+      result.stdout + "\n" + result.stderr + "\n" + safeReadFile(path.join(cacheDir, `${baseName}.log`))
+    )) {
+      attempt.processLog.push("[inkwell] TeX auxiliary state converged after one fresh pass.");
+      attempt.passReasons.push("verified-auxiliary-convergence");
+      break;
     }
   }
 
   // Bibliography requires an extra pass: xelatex -> biber/bibtex -> xelatex.
-  const hasBib = document.getText().includes("\\bibliography{") ||
-    document.getText().includes("\\addbibresource{");
-  if (hasBib) {
+  if (hasBib && !attempt.failure) {
     const biber = await findBinary("biber");
     const bibtex = await findBinary("bibtex");
     const bibTool = biber || bibtex;
     if (bibTool) {
-      try {
-        await exec(bibTool, [path.join(cacheDir, baseName)], {
+      await runCompileProcess(attempt, "bibliography", bibTool, [path.join(cacheDir, baseName)], {
           cwd: cacheDir,
           timeout: 30_000,
           env: texEnv,
-        });
-      } catch (err: any) {
-        if (err.stderr) stderr += "\n" + err.stderr;
-      }
+      });
       // Two passes after the bib tool: the first pulls in the .bbl, the
       // second resolves the now-defined \cite labels and page references.
-      for (let pass = 0; pass < 2; pass++) {
-        try {
-          const result = await exec(xelatex, args, {
-            cwd: sourceDir,
-            timeout: 120_000,
-            env: texEnv,
-          });
-          stdout = result.stdout;
-          stderr += "\n" + result.stderr;
-        } catch (err: any) {
-          if (err.stderr) stderr += "\n" + err.stderr;
-          if (err.stdout) stdout = err.stdout;
-        }
+      for (let pass = 0; pass < 2 && !attempt.failure; pass++) {
+        attempt.passReasons.push("post-bibliography-pass-required");
+        const result = await runCompileProcess(attempt, "tex", xelatex, args, {
+          cwd: sourceDir,
+          timeout: 120_000,
+          env: texEnv,
+        });
+        if (!result) break;
+        stdout += result.stdout;
+        stderr += "\n" + result.stderr;
       }
     }
   }
 
   const tmpOutput = path.join(cacheDir, `${baseName}.pdf`);
-  const pdfExists = fs.existsSync(tmpOutput);
-
-  if (pdfExists) {
-    fs.copyFileSync(tmpOutput, pdfOutput);
-  }
+  const published = publishCompileOutput(attempt, tmpOutput);
 
   const logFile = path.join(cacheDir, `${baseName}.log`);
   let logContent = "";
   try {
     logContent = fs.readFileSync(logFile, "utf-8");
   } catch {}
+  if (published) await convergence?.rememberPublished(logContent);
 
   const combined = stderr + "\n" + stdout + "\n" + logContent;
-  const errors = parseErrors(stderr + "\n" + logContent, stdout);
+  const errors = parseErrors(attempt.processLog.join("\n") + "\n" + logContent, stdout);
   const duration = (Date.now() - start) / 1000;
 
   return {
-    success: pdfExists,
-    pdfPath: pdfExists ? pdfOutput : undefined,
+    success: published,
+    pdfPath: published ? pdfOutput : undefined,
     errors,
     log: combined,
     duration,
@@ -385,14 +596,55 @@ function checkTemplateFeatures(
   return { warnings, logLines };
 }
 
+function canonicalMetadata(value: unknown): string {
+  const canonical = (item: unknown): unknown => Array.isArray(item) ? item.map(canonical)
+    : item !== null && typeof item === "object" ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)).map(([key, entry]) => [key, canonical(entry)])) : item;
+  return JSON.stringify(canonical(value));
+}
+
+/** Only the staged source changes; unknown metadata and header-includes stay intact. */
+export function serializeDocumentForPandoc(markdown: string, config: DocumentConfig): string {
+  if (canonicalMetadata(config.compatibility) === canonicalMetadata(config.documentMetadata)) return markdown;
+  return `---\n${stringifyYaml(config.compatibility, { lineWidth: 0 })}---\n${config.body}`;
+}
+
+/** Raw Pandoc variables must not override values already resolved by Inkwell. */
+export function sanitizePandocDefaults(text: string, sourcePath?: string): Metadata {
+  const parsed = parseDocumentFrontmatter(`---\n${text}\n---\n`, "<defaults.yaml>");
+  if (parsed.diagnostics.some(diagnostic => diagnostic.severity === "error")) throw new Error("Cannot prepare malformed Pandoc defaults.");
+  const defaults = stripResolvedConfigFields(parsed.metadata);
+  for (const section of ["metadata", "variables"]) {
+    const value = parsed.metadata[section];
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+      const remaining = stripResolvedConfigFields(value as Metadata);
+      if (Object.keys(remaining).length) defaults[section] = remaining;
+      else delete defaults[section];
+    }
+  }
+  // The effective file lives in staging; retain Pandoc's original ${.} path context.
+  if (sourcePath) {
+    const base = path.dirname(sourcePath);
+    const rebase = (value: unknown): unknown => typeof value === "string" ? value.replaceAll("${.}", base)
+      : Array.isArray(value) ? value.map(rebase)
+      : value !== null && typeof value === "object" ? Object.fromEntries(Object.entries(value).map(([key, item]) => [key, rebase(item)])) : value;
+    for (const key of ["filters", "lua-filter", "filter", "input-files", "output-file", "metadata-file", "metadata-files", "include-in-header", "include-before-body", "include-after-body", "resource-path", "data-dir", "reference-doc", "syntax-definitions", "epub-cover-image", "epub-metadata", "epub-fonts", "highlight-style"]) {
+      if (Object.hasOwn(defaults, key)) defaults[key] = rebase(defaults[key]);
+    }
+  }
+  // Citation mode belongs to the resolved document scope and selected filter.
+  delete defaults.citeproc;
+  return defaults;
+}
+
 async function compilePandoc(
   document: vscode.TextDocument,
-  outputPath?: string
-): Promise<CompileResult> {
+  attempt: CompileAttempt
+): Promise<CompileDetails> {
   const start = Date.now();
   const sourceFile = document.uri.fsPath;
   const sourceDir = path.dirname(sourceFile);
   const baseName = path.basename(sourceFile, path.extname(sourceFile));
+  const projectRoot = getInkwellProjectRoot(sourceFile);
 
   const pandoc = await findBinary("pandoc");
   if (!pandoc) {
@@ -407,16 +659,16 @@ async function compilePandoc(
     };
   }
 
-  const cacheDir = getCacheDir(sourceFile);
-  const pdfOutput = outputPath || path.join(sourceDir, `${baseName}.pdf`);
-  purgeCompileArtifacts(cacheDir, baseName);
-  try { fs.unlinkSync(pdfOutput); } catch {}
+  const { cacheDir, pdfOutput } = attempt;
 
   const template = getTemplateForDocument(document);
   const templateName = path.basename(template.pandocTemplate);
   const templateDst = path.join(cacheDir, templateName);
   fs.copyFileSync(template.pandocTemplate, templateDst);
-  copySupportingFiles(template, cacheDir);
+  const support = copySupportingFiles(template, cacheDir, [sourceDir, projectRoot, path.join(sourceDir, ".inkwell"), path.join(projectRoot, ".inkwell")]);
+  const supportDir = support?.directory || cacheDir;
+  attempt.releaseTemplateAssets = support?.release;
+  attempt.cacheHits.templateAssets = support?.cacheHit || false;
 
   // The manifest engine is a hard requirement, never a preference.
   // pdflatex-only templates (tufte, rho, rmxaa, tmsce, kth-letter,
@@ -444,7 +696,38 @@ async function compilePandoc(
   const rawText = document.getText();
   const featureCheck = checkTemplateFeatures(rawText, template, document.uri);
   const pipelineWarnings: CompileError[] = [];
-  const { injected, unresolvedVars } = prepareForCompilation(rawText, sourceFile);
+  const originalConfig = getDocumentConfig(rawText, sourceFile);
+  const invalid = originalConfig.diagnostics.filter(diagnostic => diagnostic.severity === "error");
+  if (invalid.length) return { success: false, pdfPath: undefined,
+    errors: invalid.map(diagnostic => ({ line: diagnostic.line, message: diagnostic.message, severity: diagnostic.severity })),
+    log: invalid.map(diagnostic => diagnostic.message).join("\n"), duration: (Date.now() - start) / 1000 };
+  const { injected, unresolvedVars, tableDiagnostics = [] } = prepareForCompilation(rawText, sourceFile);
+  const tableMessage = (diagnostic: (typeof tableDiagnostics)[number]): string =>
+    `${diagnostic.source}${diagnostic.line ? `:${diagnostic.line}${diagnostic.column ? `:${diagnostic.column}` : ""}` : ""}: ${diagnostic.message}`;
+  if (tableDiagnostics.length) return {
+    success: false, pdfPath: undefined,
+    // Parser coordinates refer to the artifact, not the source Markdown file.
+    errors: tableDiagnostics.map(diagnostic => ({ line: undefined, message: tableMessage(diagnostic), severity: diagnostic.severity })),
+    log: tableDiagnostics.map(tableMessage).join("\n"), duration: (Date.now() - start) / 1000,
+  };
+  // Bindings may occur in metadata too, so resolve their injected values before planning Pandoc.
+  const documentConfig = getDocumentConfig(injected, sourceFile);
+  const references = await bibliographyService.snapshot(getResolvedReferences(documentConfig, sourceFile));
+  const configDiagnostics = [...documentConfig.diagnostics, ...references.diagnostics,
+    ...documentConfig.deferredBindings.map(binding => ({
+      sourcePath: binding.sourcePath, line: binding.line, column: binding.column,
+      code: "unresolved-config-binding", severity: "error" as const,
+      message: `Setting "${binding.metadataKey}" still contains ${binding.tokens.join(", ")} after evaluating run results. Run the code blocks that export these values or correct the binding names.`,
+    })),
+  ];
+  for (const diagnostic of configDiagnostics) pipelineWarnings.push({
+    line: diagnostic.sourcePath === sourceFile ? diagnostic.line : undefined, message: diagnostic.sourcePath === sourceFile ? diagnostic.message : `${diagnostic.sourcePath}:${diagnostic.line}: ${diagnostic.message}`, severity: diagnostic.severity,
+  });
+  if (configDiagnostics.some(diagnostic => diagnostic.severity === "error")) return {
+    success: false, pdfPath: undefined, errors: pipelineWarnings,
+    log: configDiagnostics.map(diagnostic => diagnostic.message).join("\n"), duration: (Date.now() - start) / 1000,
+  };
+  const effectiveSource = serializeDocumentForPandoc(injected, documentConfig);
   for (const key of unresolvedVars) {
     const token = `{{${key}}}`;
     const idx = rawText.indexOf(token);
@@ -456,7 +739,9 @@ async function compilePandoc(
   }
 
   const tmpSource = path.join(cacheDir, path.basename(sourceFile));
-  fs.writeFileSync(tmpSource, injected, "utf-8");
+  const sourceExt = path.extname(sourceFile).toLowerCase();
+  const markdownInput = sourceExt !== ".rst" && sourceExt !== ".org";
+  fs.writeFileSync(tmpSource, markdownInput ? effectiveSource : injected, "utf-8");
 
   // Two-stage compile:
   //   1. pandoc  ->  .tex  (runs the template, pandoc-crossref, citeproc)
@@ -475,8 +760,7 @@ async function compilePandoc(
   else if (ext === ".org") fromFormat = "org";
   else if (ext === ".txt") fromFormat = `markdown+${PANDOC_EXTENSIONS}`;
 
-  const projectRoot = getInkwellProjectRoot(sourceFile);
-  const resourcePath = [cacheDir, template.dir, sourceDir, projectRoot].join(":");
+  const resourcePath = [cacheDir, supportDir, template.dir, sourceDir, projectRoot].join(":");
 
   const pandocArgs = [
     tmpSource,
@@ -494,12 +778,18 @@ async function compilePandoc(
     "numbersections=true",
   ];
 
+  if (!markdownInput && Object.keys(documentConfig.compatibility).length) {
+    const metadataFile = path.join(cacheDir, "document-metadata.json");
+    fs.writeFileSync(metadataFile, JSON.stringify(documentConfig.compatibility), "utf8");
+    pandocArgs.push("--metadata-file", metadataFile);
+  }
+
   // `top-level-division` is a Pandoc *option*, not a template variable, so
   // a frontmatter `top-level-division: chapter` is silently ignored unless
   // forwarded as a CLI flag. Book/report templates (tufte-book-vdqi) need
   // it for `#` headings to become \chapter instead of \section.
-  const division = extractTopLevelDivision(rawText);
-  if (division) {
+  const division = documentConfig.compatibility["top-level-division"];
+  if (typeof division === "string" && ["chapter", "part", "section"].includes(division)) {
     pandocArgs.push(`--top-level-division=${division}`);
   }
 
@@ -509,7 +799,7 @@ async function compilePandoc(
   // so the old -H path silently dropped user preamble commands (fonts,
   // spacing, citation overrides) whenever any inkwell: style key was
   // set. See preamble.ts for the merge contract.
-  const preambleText = generatePreambleText(rawText);
+  const preambleText = generatePreambleText(effectiveSource, documentConfig);
   let preambleMode = "none";
   if (preambleText) {
     const templateText = fs.readFileSync(templateDst, "utf-8");
@@ -518,7 +808,7 @@ async function compilePandoc(
       fs.writeFileSync(templateDst, injection.text, "utf-8");
       preambleMode = "merged into template copy";
     } else {
-      const preambleFile = writePreambleFile(rawText, cacheDir);
+      const preambleFile = writePreambleFile(effectiveSource, cacheDir, documentConfig);
       if (preambleFile) {
         pandocArgs.push("-H", preambleFile);
         preambleMode = "-H fallback (no header-includes marker in template; document header-includes will be overridden)";
@@ -526,11 +816,31 @@ async function compilePandoc(
     }
   }
 
+  // Generated CSV/JSON output becomes a native Table before crossref assigns
+  // labels. The semantic pass follows citation rendering so rich table cells
+  // retain both cross-references and ordinary bibliography citations.
+  const tableOptions = tablePdfOptions(documentConfig);
+  const invalidTables = tableOptions.diagnostics.filter(diagnostic => diagnostic.severity === "error");
+  if (invalidTables.length) return {
+    success: false, pdfPath: undefined,
+    errors: invalidTables.map(diagnostic => ({ line: diagnostic.line, message: diagnostic.message, severity: diagnostic.severity })),
+    log: invalidTables.map(diagnostic => diagnostic.message).join("\n"), duration: (Date.now() - start) / 1000,
+  };
+  const tableMetadataFile = path.join(cacheDir, "table-options.json");
+  fs.writeFileSync(tableMetadataFile, JSON.stringify({
+    ...bibliographyMetadata(references),
+    "inkwell-table-options": `hex:${Buffer.from(JSON.stringify(tableOptions), "utf8").toString("hex")}`,
+  }), "utf8");
+  pandocArgs.push("--metadata-file", tableMetadataFile, "--lua-filter", TABLE_DATA_FILTER);
+
   // Filter order matters: pandoc-crossref must consume @fig:/@tbl:/@sec:
   // citations before citation rendering sees them.
   const crossref = await findBinary("pandoc-crossref");
   if (crossref) {
     pandocArgs.push("--filter", crossref);
+  }
+  if (hasTypographyOverride(documentConfig, "tableSize") && !tableOptions.enabled) {
+    pandocArgs.push("--lua-filter", BODY_TYPOGRAPHY_FILTER, "--metadata", "inkwell-body-table-typography=true");
   }
 
   // Citation rendering. `bibliography-scope: section` swaps --citeproc
@@ -538,7 +848,7 @@ async function compilePandoc(
   // section (configurable via `section-bibs-level`) so each chapter or
   // section carries its own reference list. Passing both would render
   // every citation and bibliography twice.
-  const bibScope = extractBibliographyScope(rawText);
+  const bibScope = references.scope;
   let citationMode = "document (--citeproc)";
   if (bibScope === "section" && fs.existsSync(SECTION_BIBS_FILTER)) {
     pandocArgs.push("--lua-filter", SECTION_BIBS_FILTER);
@@ -551,77 +861,27 @@ async function compilePandoc(
         severity: "warning",
       });
     }
-    pandocArgs.push("--citeproc");
+    pandocArgs.push("--lua-filter", REFERENCE_PREPARE_FILTER, "--citeproc");
   }
+  pandocArgs.push("--lua-filter", REFERENCE_RENDER_FILTER, "--lua-filter", SEMANTIC_TABLES_FILTER);
 
-  // Explicit --bibliography flags override the document's own
-  // `bibliography:` metadata (pandoc: command line beats document), so
-  // discovery alone silently broke any document that declared its own
-  // file outside the scanned locations — citations stopped resolving
-  // without an error. Forward the declared files as flags too, ahead of
-  // the discovered ones, and warn when a declared file does not exist.
-  const declaredBibs = extractDocumentBibliographies(rawText);
-  const resolvedDeclared: string[] = [];
-  for (const declared of declaredBibs) {
-    const candidates = path.isAbsolute(declared)
-      ? [path.normalize(declared)]
-      : [path.resolve(sourceDir, declared), path.resolve(projectRoot, declared)];
-    const hit = candidates.find((c) => fs.existsSync(c));
-    if (hit) {
-      resolvedDeclared.push(hit);
-    } else {
-      const idx = rawText.indexOf(declared);
-      pipelineWarnings.push({
-        line: idx >= 0 ? rawText.slice(0, idx).split("\n").length : undefined,
-        message: `Declared bibliography not found: ${declared} (checked the document directory and the project root). Its citations will not resolve.`,
-        severity: "warning",
-      });
-    }
-  }
-  const bibFiles = [...new Set([...resolvedDeclared, ...findBibFiles(projectRoot)])];
-  for (const bib of bibFiles) {
-    pandocArgs.push("--bibliography", bib);
-  }
+  // Preview and PDF consume the same ordered, resolved reference set.
+  const bibFiles = [...references.bibliography].reverse();
+  for (const bib of bibFiles) pandocArgs.push("--bibliography", bib);
   const defaults = findDefaultsYaml(projectRoot);
   if (defaults) {
-    pandocArgs.push("--defaults", defaults);
-  }
-
-  // Citation style. Priority: frontmatter `csl:` > defaults.yaml `csl:` >
-  // the bundled numeric style ([1,2,3] with a numbered reference list).
-  // Without the bundled default, pandoc falls back to Chicago author-date.
-  let cslMode = "bundled numeric default";
-  const declaredCsl = extractDeclaredCsl(rawText);
-  if (declaredCsl) {
-    const resolvedCsl =
-      findCslFile(projectRoot, declaredCsl) ??
-      [path.resolve(sourceDir, declaredCsl)].find((c) => fs.existsSync(c));
-    if (resolvedCsl) {
-      pandocArgs.push("--csl", resolvedCsl);
-      cslMode = resolvedCsl;
-    } else {
-      // Could be a pandoc data-dir style name; only a path-looking value
-      // that resolves nowhere is worth a warning. Passing no flag lets
-      // pandoc try the metadata value itself.
-      cslMode = `declared "${declaredCsl}" (not found by Inkwell; left to pandoc)`;
-      if (declaredCsl.endsWith(".csl")) {
-        const idx = rawText.indexOf(declaredCsl);
-        pipelineWarnings.push({
-          line: idx >= 0 ? rawText.slice(0, idx).split("\n").length : undefined,
-          message: `Declared csl file not found: ${declaredCsl} (checked .inkwell/csl/, csl/, the project root, references/, and the document directory).`,
-          severity: "warning",
-        });
-      }
+    const effectiveDefaults = sanitizePandocDefaults(fs.readFileSync(defaults, "utf8"), defaults);
+    if (Object.keys(effectiveDefaults).length) {
+      const defaultsFile = path.join(cacheDir, "pandoc-defaults.yaml");
+      fs.writeFileSync(defaultsFile, stringifyYaml(effectiveDefaults, { lineWidth: 0 }), "utf8");
+      pandocArgs.push("--defaults", defaultsFile);
     }
-  } else if (defaults && /^csl:/m.test(safeReadFile(defaults))) {
-    cslMode = "from defaults.yaml";
-  } else if (fs.existsSync(DEFAULT_NUMERIC_CSL)) {
-    pandocArgs.push("--csl", DEFAULT_NUMERIC_CSL);
-  } else {
-    cslMode = "pandoc default (bundled numeric style missing)";
   }
+  const cslMode = references.csl || "pandoc default (bundled numeric style missing)";
+  if (references.csl) pandocArgs.push("--csl", references.csl);
 
   copySiblingFiles(sourceDir, projectRoot, cacheDir);
+  fs.rmSync(tmpOutput, { force: true });
 
   let stderr = "";
   let stdout = "";
@@ -630,10 +890,12 @@ async function compilePandoc(
   // files that live in the cache dir, the template's own directory (for
   // subdirectory-structured classes like rmaa-rho-class/), or beside
   // the source document. The trailing colon preserves default TeX paths.
-  const texInputs = [cacheDir, template.dir, sourceDir, projectRoot, ""].join(":");
+  const texInputs = [cacheDir, supportDir, template.dir, sourceDir, projectRoot, ""].join(":");
   const texEnv = {
     ...TEX_ENV,
     TEXINPUTS: texInputs,
+    BIBINPUTS: [cacheDir, supportDir, template.dir, sourceDir, projectRoot, TEX_ENV.BIBINPUTS || "", ""].join(":"),
+    BSTINPUTS: [cacheDir, supportDir, template.dir, sourceDir, projectRoot, TEX_ENV.BSTINPUTS || "", ""].join(":"),
   };
 
   const clsExpected = path.join(template.dir, "rmaa-rho-class", "rmaa-rho.cls");
@@ -658,49 +920,57 @@ async function compilePandoc(
   ].join("\n");
 
   // Stage 1: pandoc -> .tex
-  try {
-    const result = await exec(pandoc, pandocArgs, {
+  const pandocResult = await runCompileProcess(attempt, "pandoc", pandoc, pandocArgs, {
       cwd: sourceDir,
       timeout: 60_000,
       env: texEnv,
-    });
-    stdout += result.stdout;
-    stderr += result.stderr;
-  } catch (err: any) {
-    if (err.stderr) stderr += err.stderr;
-    if (err.stdout) stdout += err.stdout;
+  });
+  if (pandocResult) {
+    stdout += pandocResult.stdout;
+    stderr += pandocResult.stderr;
   }
 
   const texExists = fs.existsSync(tmpTex);
   let logContent = "";
+  let convergence: TexConvergenceRun | undefined;
 
   // Stage 2: engine -> .pdf, run twice to resolve cross-references.
-  // Skip if pandoc failed to produce the .tex.
-  if (texExists) {
+  // A failed Pandoc callback is authoritative even if it left a TeX file.
+  if (texExists && !attempt.failure) {
     const engineArgs = [
       "-interaction=nonstopmode",
       "-halt-on-error",
+      "-recorder",
       `-output-directory=${cacheDir}`,
       tmpTex,
     ];
+    const hasBib = /\\(?:bibliography|addbibresource)\s*\{/.test(fs.readFileSync(tmpTex, "utf8"));
+    if (!hasBib) convergence = await texConvergenceCache.prepare({
+      directory: cacheDir, sourceDirectory: sourceDir, sourceFile,
+      sourceHash: attempt.sourceHash, texFile: tmpTex, jobName: baseName,
+      engine, engineArgs, environment: texEnv,
+      templateIdentity: JSON.stringify([template.id, template.dir, template.manifest]),
+    });
+    attempt.cacheHits.texAuxiliary = convergence?.restored || false;
+    attempt.passReasons.push(hasBib ? "raw-bibliography-required" : convergence?.restored ? "verify-restored-auxiliaries" : "cold-or-invalidated-auxiliaries");
 
     for (let pass = 0; pass < 2; pass++) {
+      if (pass === 1) attempt.passReasons.push("second-standard-pass-required");
       stdout += `\n[inkwell] ${engine} pass ${pass + 1}: ${engine} ${engineArgs.join(" ")}\n`;
-      try {
-        const result = await exec(engine, engineArgs, {
+      const result = await runCompileProcess(attempt, "tex", engine, engineArgs, {
           cwd: sourceDir,
           timeout: 90_000,
           env: texEnv,
-        });
-        stdout += result.stdout;
-        stderr += result.stderr;
-      } catch (err: any) {
-        if (err.stdout) stdout += err.stdout;
-        if (err.stderr) stderr += err.stderr;
-        // First-pass failures are expected (undefined refs, missing
-        // aux entries). Continue to pass 2 in that case; it typically
-        // resolves. Only a pass-2 failure is a real compile error.
-        if (pass === 0) continue;
+      });
+      if (!result) break;
+      stdout += result.stdout;
+      stderr += result.stderr;
+      if (pass === 0 && convergence && await convergence.canFinishAfterFirstPass(
+        result.stdout + "\n" + result.stderr + "\n" + safeReadFile(path.join(cacheDir, `${baseName}.log`))
+      )) {
+        attempt.processLog.push("[inkwell] TeX auxiliary state converged after one fresh pass.");
+        attempt.passReasons.push("verified-auxiliary-convergence");
+        break;
       }
     }
 
@@ -711,42 +981,33 @@ async function compilePandoc(
     // raw LaTeX \cite commands still gets served: we detect the
     // macro in the generated .tex and run biber/bibtex + one more
     // engine pass in that case.
-    try {
-      const texContent = fs.readFileSync(tmpTex, "utf-8");
-      const hasBib = /\\(bibliography|addbibresource)\{/.test(texContent);
+    if (!attempt.failure) {
       if (hasBib) {
         const biber = await findBinary("biber");
         const bibtex = await findBinary("bibtex");
         const bibTool = biber || bibtex;
         if (bibTool) {
-          try {
-            await exec(bibTool, [path.join(cacheDir, baseName)], {
-              cwd: cacheDir,
-              timeout: 30_000,
-              env: texEnv,
-            });
-          } catch (err: any) {
-            if (err.stderr) stderr += "\n" + err.stderr;
-          }
+          await runCompileProcess(attempt, "bibliography", bibTool, [path.join(cacheDir, baseName)], {
+            cwd: cacheDir,
+            timeout: 30_000,
+            env: texEnv,
+          });
           // Two passes after the bib tool so the .bbl is pulled in and the
           // resulting \cite / page references resolve in the same compile.
-          for (let pass = 0; pass < 2; pass++) {
-            try {
-              const r = await exec(engine, engineArgs, {
-                cwd: sourceDir,
-                timeout: 90_000,
-                env: texEnv,
-              });
-              stdout += r.stdout;
-              stderr += r.stderr;
-            } catch (err: any) {
-              if (err.stderr) stderr += err.stderr;
-              if (err.stdout) stdout += err.stdout;
-            }
+          for (let pass = 0; pass < 2 && !attempt.failure; pass++) {
+            attempt.passReasons.push("post-bibliography-pass-required");
+            const r = await runCompileProcess(attempt, "tex", engine, engineArgs, {
+              cwd: sourceDir,
+              timeout: 90_000,
+              env: texEnv,
+            });
+            if (!r) break;
+            stdout += r.stdout;
+            stderr += r.stderr;
           }
         }
       }
-    } catch {}
+    }
 
     const logFile = path.join(cacheDir, `${baseName}.log`);
     try {
@@ -754,22 +1015,20 @@ async function compilePandoc(
     } catch {}
   }
 
-  const pdfExists = fs.existsSync(tmpOutput);
-  if (pdfExists) {
-    fs.copyFileSync(tmpOutput, pdfOutput);
-  }
+  const published = publishCompileOutput(attempt, tmpOutput);
+  if (published) await convergence?.rememberPublished(logContent);
 
   const errors = [
     ...featureCheck.warnings,
     ...pipelineWarnings,
-    ...parseErrors(stderr + "\n" + logContent, stdout, { generatedTex: true }),
+    ...parseErrors(attempt.processLog.join("\n") + "\n" + logContent, stdout, { generatedTex: true }),
   ];
   const duration = (Date.now() - start) / 1000;
 
   const logFile = path.join(cacheDir, `${baseName}.log`);
   return {
-    success: pdfExists,
-    pdfPath: pdfExists ? pdfOutput : undefined,
+    success: published,
+    pdfPath: published ? pdfOutput : undefined,
     errors,
     log: diagnosticLog +
       `\n[inkwell] full engine log: ${logFile}` +
@@ -777,60 +1036,6 @@ async function compilePandoc(
       (logContent ? "\n\n--- engine log (excerpt) ---\n" + extractEngineLogExcerpt(logContent) : ""),
     duration,
   };
-}
-
-/**
- * Frontmatter `bibliography:` — a scalar path or a list of paths. Exported
- * to the pipeline as explicit --bibliography flags because pandoc lets
- * command-line flags beat document metadata: without forwarding, the
- * discovery flags would override the document's own declaration.
- */
-function extractDocumentBibliographies(text: string): string[] {
-  const fm = splitFrontmatter(text);
-  if (!fm) return [];
-
-  const scalar = fm.fm.match(/^bibliography:[ \t]*["']?([^"'\n#]+?)["']?[ \t]*(?:#.*)?$/m);
-  if (scalar) return [scalar[1].trim()];
-
-  const block = extractIndentedBlock(fm.fm, "bibliography");
-  if (!block) return [];
-  const out: string[] = [];
-  for (const line of block.split("\n")) {
-    const m = line.match(/^[ \t]*-[ \t]*["']?([^"'\n#]+?)["']?[ \t]*$/);
-    if (m) out.push(m[1].trim());
-  }
-  return out;
-}
-
-/**
- * Frontmatter `bibliography-scope: document|section`. `section` swaps
- * --citeproc for the bundled per-section Lua filter; anything else (or
- * absence) keeps the single document-level bibliography.
- */
-function extractBibliographyScope(text: string): "section" | undefined {
-  const fm = splitFrontmatter(text);
-  if (!fm) return undefined;
-  const m = fm.fm.match(/^bibliography-scope:\s*['"]?(document|section)['"]?\s*(?:#.*)?$/m);
-  return m && m[1] === "section" ? "section" : undefined;
-}
-
-/** Frontmatter `csl:` scalar (a path or a pandoc data-dir style name). */
-function extractDeclaredCsl(text: string): string | undefined {
-  const fm = splitFrontmatter(text);
-  if (!fm) return undefined;
-  const m = fm.fm.match(/^csl:[ \t]*["']?([^"'\n#]+?)["']?[ \t]*(?:#.*)?$/m);
-  return m ? m[1].trim() : undefined;
-}
-
-/**
- * Frontmatter `top-level-division: chapter|part|section`, validated so a
- * typo can't inject an arbitrary CLI argument into the pandoc invocation.
- */
-function extractTopLevelDivision(text: string): string | undefined {
-  const fm = splitFrontmatter(text);
-  if (!fm) return undefined;
-  const m = fm.fm.match(/^top-level-division:\s*['"]?(chapter|part|section)['"]?\s*(?:#.*)?$/m);
-  return m ? m[1] : undefined;
 }
 
 /**

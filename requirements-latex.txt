@@ -89,11 +89,10 @@ svn-prov
 # Required by the default pandoc --template flow (the LaTeX that
 # pandoc emits for our markdown uses \xs@string operations on TinyTeX
 # minimal installs that otherwise report "File `xstring.sty' not
-# found"). fix2col is a defensive dependency for twocolumn templates
-# (rho, rmxaa) whose class files pull it in through the extarticle
-# chain; on minimal TinyTeX installs it is not present by default.
+# found").
 xstring
-fix2col
+# fix2col is obsolete: its fixes have been in the LaTeX kernel since 2015.
+# No bundled template imports it. https://ctan.org/pkg/fix2col?lang=en
 
 # bundles (provide multiple .sty files each)
 # amsfonts -> amssymb.sty, amsfonts.sty

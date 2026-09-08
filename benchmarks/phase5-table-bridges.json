@@ -1,0 +1,23 @@
+{
+  "phase": 5,
+  "kind": "phase5-table-bridges",
+  "environment": "macOS arm64; Pandoc 3.9; installed TinyTeX",
+  "measurements": [
+    {
+      "template": "rho",
+      "pages": 2
+    },
+    {
+      "template": "rmxaa",
+      "pages": 1
+    },
+    {
+      "template": "ludus",
+      "pages": 1
+    },
+    {
+      "template": "hipster-cv",
+      "pages": 1
+    }
+  ]
+}

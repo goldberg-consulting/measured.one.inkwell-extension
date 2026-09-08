@@ -9,6 +9,7 @@ examples/*.pdf
 # Tracked under root .inkwell/: manifest.json, scripts/, references/, figures/.gitkeep
 # Everything else under .inkwell/ is generated at runtime
 .inkwell/outputs/
+.inkwell/runs/
 .inkwell/compiled/
 .inkwell/mermaid/
 .inkwell/figures/*.pdf
@@ -31,3 +32,7 @@ __pycache__/
 venv/
 .venv/
 .inkwell/compiled.*
+
+# Rebuilt deterministically from pinned preview dependencies
+media/preview-client.js
+media/vendor/

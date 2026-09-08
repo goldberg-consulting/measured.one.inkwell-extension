@@ -1,386 +1,14 @@
-// Project scaffold. Creates the .inkwell/ directory structure, a starter
-// markdown document with sensible frontmatter defaults, an optional
-// Python venv, and a .gitignore that excludes build artifacts.
-
+// Workspace commands delegate all scaffold writes to the shared migration service.
 import * as vscode from "vscode";
 import * as path from "path";
-import * as fs from "fs";
 import { selectTemplateCommand } from "./templates";
-
-const SCAFFOLD_VERSION = 3;
-
-interface ScaffoldOptions {
-  name: string;
-  dir: string;
-  template?: string;
-  pythonEnv: boolean;
-}
-
-const DEFAULT_FRONTMATTER = `---
-title: "Untitled"
-author: ""
-date: "\\\\today"
-geometry: "margin=1in"
-linestretch: 1.4
-bibliography: .inkwell/references/refs.bib
-link-citations: true
-inkwell:
-  code-bg: "#f5f5f5"
-  code-border: true
-  code-rounded: true
-  code-font-size: small
-  tables: booktabs
-  hanging-indent: true
-  code-display: output
----
-
-`;
-
-const DEFAULT_REQUIREMENTS =
-  "numpy\nmatplotlib\npandas\npolars\nscikit-learn\numap-learn\nseaborn\n";
-
-const GITIGNORE = `.inkwell/outputs/
-.inkwell/compiled/
-.inkwell/mermaid/
-*.aux
-*.log
-*.out
-*.fls
-*.fdb_latexmk
-*.synctex.gz
-__pycache__/
-*.pyc
-venv/
-.venv/
-`;
-
-const STARTER_BIB = `@article{knuth1984,
-  author  = {Knuth, Donald E.},
-  title   = {Literate Programming},
-  journal = {The Computer Journal},
-  volume  = {27},
-  number  = {2},
-  pages   = {97--111},
-  year    = {1984},
-  doi     = {10.1093/comjnl/27.2.97}
-}
-
-@software{macfarlane2023,
-  author  = {MacFarlane, John},
-  title   = {Pandoc: A Universal Document Converter},
-  year    = {2023},
-  url     = {https://pandoc.org}
-}
-
-@article{harris2020,
-  author  = {Harris, Charles R. and others},
-  title   = {Array programming with {NumPy}},
-  journal = {Nature},
-  volume  = {585},
-  pages   = {357--362},
-  year    = {2020},
-  doi     = {10.1038/s41586-020-2649-2}
-}
-
-@article{hunter2007,
-  author  = {Hunter, John D.},
-  title   = {Matplotlib: A {2D} graphics environment},
-  journal = {Computing in Science \\& Engineering},
-  volume  = {9},
-  number  = {3},
-  pages   = {90--95},
-  year    = {2007},
-  doi     = {10.1109/MCSE.2007.55}
-}
-`;
-
-const SINE_PLOT_PY = `import os
-import numpy as np
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-
-x = np.linspace(0, 4 * np.pi, 500)
-fig, ax = plt.subplots(figsize=(6, 3))
-for n in [1, 3, 5, 9]:
-    y = sum(np.sin((2*k-1)*x) / (2*k-1) for k in range(1, n+1)) * 4 / np.pi
-    ax.plot(x, y, label=f"$n={n}$", linewidth=1.2)
-ax.axhline(1, color="black", linestyle="--", linewidth=0.5, alpha=0.4)
-ax.axhline(-1, color="black", linestyle="--", linewidth=0.5, alpha=0.4)
-ax.set_xlabel("$x$")
-ax.set_ylabel("$f_n(x)$")
-ax.set_title("Fourier Partial Sums of a Square Wave")
-ax.legend(fontsize=8)
-ax.grid(alpha=0.2)
-fig.tight_layout()
-
-out = os.environ.get("INKWELL_OUTPUT_DIR", ".")
-fig.savefig(os.path.join(out, "sine_plot.png"), dpi=200, bbox_inches="tight")
-plt.close(fig)
-print("Fourier partial sums generated.")
-`;
-
-const SCATTER_PY = `import os
-import numpy as np
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-
-rng = np.random.default_rng(42)
-x = rng.normal(0, 1, 150)
-y = 0.7 * x + rng.normal(0, 0.35, 150)
-
-fig, ax = plt.subplots(figsize=(5, 3.5))
-ax.scatter(x, y, s=14, alpha=0.6, color="#4A90D9")
-m, b = np.polyfit(x, y, 1)
-xs = np.sort(x)
-ax.plot(xs, m * xs + b, color="#E74C3C", linewidth=1.5,
-        label=f"$y = {m:.2f}x {'+' if b >= 0 else ''}{b:.2f}$")
-ax.set_xlabel("$x$")
-ax.set_ylabel("$y$")
-ax.legend()
-ax.grid(alpha=0.2)
-fig.tight_layout()
-
-out = os.environ.get("INKWELL_OUTPUT_DIR", ".")
-fig.savefig(os.path.join(out, "scatter.png"), dpi=200, bbox_inches="tight")
-plt.close(fig)
-
-r = np.corrcoef(x, y)[0, 1]
-print(f"n = {len(x)}, r = {r:.3f}, slope = {m:.3f}")
-`;
-
-const CONVERGENCE_TABLE_PY = `import os
-import csv
-import numpy as np
-
-x_jump = np.pi / 2
-true_val = 1.0
-
-rows = []
-for n in [1, 3, 5, 9, 25, 50]:
-    partial = sum(np.sin((2*k-1)*x_jump) / (2*k-1) for k in range(1, n+1)) * 4 / np.pi
-    error = abs(partial - true_val)
-    overshoot_x = np.linspace(0, np.pi, 5000)
-    overshoot_y = sum(np.sin((2*k-1)*overshoot_x) / (2*k-1) for k in range(1, n+1)) * 4 / np.pi
-    peak = np.max(overshoot_y)
-    rows.append([n, f"{partial:.4f}", f"{error:.4f}", f"{peak:.4f}"])
-
-out = os.environ.get("INKWELL_OUTPUT_DIR", ".")
-with open(os.path.join(out, "convergence.csv"), "w", newline="") as f:
-    w = csv.writer(f)
-    w.writerow(["Terms (n)", "Value at x=pi/2", "Abs. Error", "Peak Overshoot"])
-    w.writerows(rows)
-
-print("Convergence table generated.")
-`;
-
-const TEMPLATE_FRONTMATTER: Record<string, string> = {
-  ludus: `template: ludus
-classoption:
-  - red                               # theme: red, blue, green, orange
-  - fullpaper                         # type: fullpaper, shortpaper
-ludus-authors:
-  - name: "Author One"
-    superscript: "1"
-  - name: "Author Two"
-    superscript: "2"
-ludus-affiliations:
-  - superscript: "1"
-    text: "Department, University, Country"
-  - superscript: "2"
-    text: "Department, University, Country"
-corresponding-email: "author@university.edu"
-shorttitle: "Short Title"
-shortauthor: "Author & Author"
-journalname: "Journal Name"
-journalsubtitle: "Subtitle"
-publicationyear: ${new Date().getFullYear()}
-articledoi: "10.0000/example"
-acknowledgments: |
-  The authors thank the reviewers.
-`,
-  rho: `template: rho
-rho-authors:
-  - name: "Author One"
-    superscript: "1,*"
-  - name: "Author Two"
-    superscript: "2"
-rho-affiliations:
-  - superscript: "1"
-    text: "Department, University, Country"
-  - superscript: "2"
-    text: "Department, University, Country"
-  - superscript: "*"
-    text: "These authors contributed equally"
-journalname: "Journal Name"
-leadauthor: "Author et al."
-footinfo: "Creative Commons CC BY 4.0"
-smalltitle: "Short Title"
-institution: "University Name"
-theday: "${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}"
-corres: "Corresponding author information."
-email: "author@university.edu"
-doi: "https://doi.org/10.0000/example"
-received: ""
-accepted: ""
-`,
-  rmxaa: `template: rmxaa
-classoption: [9pt, twoside]
-rmxaa-authors:
-  - name: "Author One"
-    affiliations: "1"
-  - name: "Author Two"
-    affiliations: "2"
-rmxaa-affiliations:
-  - id: "1"
-    text: "Department, University, Country"
-  - id: "2"
-    text: "Department, University, Country"
-leadauthor: "Author et al."
-smalltitle: "Short Title"
-corresponding-author: "Author One"
-corresponding-email: "author@university.edu"
-resumen: |
-  Spanish abstract here.
-vol: 1
-pages: "1--10"
-yearofpub: ${new Date().getFullYear()}
-received: ""
-accepted: ""
-`,
-  tmsce: `template: tmsce
-tmsce-authors:
-  - name: "Author One"
-    superscript: "1"
-  - name: "Author Two"
-    superscript: "2"
-tmsce-affiliations:
-  - superscript: "1"
-    text: "Department, University, Country"
-  - superscript: "2"
-    text: "Department, University, Country"
-corresponding-email: "author@university.edu"
-journalname: "Transactions on Mathematical Sciences and Computational Engineering"
-doi: "10.0000/tmsce.${new Date().getFullYear()}.001"
-vol: 1
-issue: 1
-yearofpub: ${new Date().getFullYear()}
-pagerange: "1--10"
-received: ""
-revised: ""
-accepted: ""
-`,
-  tufte: `template: tufte
-classoption:
-  - justified
-  - a4paper
-`,
-  "tufte-book-vdqi": `template: tufte-book-vdqi
-subtitle: "With a VDQI Title and Contents Page"
-edition: "First edition"
-publisher: "Publisher Name"
-top-level-division: chapter
-classoption:
-  - justified
-toc: true
-# lof: true                # enable once the book has figures
-copyright: true
-copyright-holder: "Copyright Holder"
-license: "Licensed for private circulation."
-dedication: |
-  Dedicated to readers who appreciate evidence and quiet pages.
-epigraphs:
-  - text: "Above all else show the data."
-    author: "Edward R. Tufte"
-`,
-  "eth-report": `template: eth-report
-papertype: "Working Paper"
-headingstitle: "Short Title"
-eth-authors:
-  - name: "Author One"
-    department: "Department"
-    institution: "ETH Zürich"
-    address: "CH-8093 Zurich"
-    email: "author@ethz.ch"
-  - name: "Author Two"
-    department: "Department"
-    institution: "ETH Zürich"
-reportdate: "${new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}"
-reportnumber: ""
-keywords: "keyword1, keyword2"
-suggestedcitation: ""
-toc: true
-lot: true
-lof: true
-
-# The IVT class defaults to 12pt, its own A4 margins, and one-half
-# spacing. Uncomment to override (see guide.md, ETH Report section):
-# fontsize: 11pt
-# linestretch: 1.08
-# geometry: margin=1in
-# mainfont: "Charter"
-`,
-  "kth-letter": `template: kth-letter
-name: "Sender Name"
-email: "sender@kth.se"
-web: "www.kth.se"
-telephone: "+46 8 790 60 00"
-dnr: ""
-recipient:
-  - "Recipient Name"
-  - "Department"
-  - "Address"
-  - "Country"
-opening: "Dear Dr. Name,"
-closing: "Kind regards,"
-`,
-  "hipster-cv": `template: hipster-cv
-classoption:
-  - lighthipster                     # darkhipster, pastel, allblack, grey, verylight, withoutsidebar
-first-name: "First"
-last-name: "Last"
-tagline: "Job Title"
-# header-contact: "+1 555 010 2030; City, Country"   # optional line under the tagline
-# photo: "headshot.jpeg"             # optional round portrait in the sidebar
-sidebar:
-  - title: "About me"
-    text: |
-      Two or three sentences about who you are and what you do.
-  - title: "Areas of specialization"
-    text: "Skill One • Skill Two • Skill Three"
-languages:
-  - name: English
-    note: native
-  - name: French
-    level: B1
-    filled: 2
-    empty: 2
-contact:
-  - icon: At
-    text: you
-    url: "mailto:you@example.com"
-  - icon: Github
-    text: github
-    url: "https://github.com/you"
-footer:
-  name: "First Last"
-  location: "City, Country"
-  phone: "+1 555 010 2030"
-  email: "you@example.com"
-`,
-};
-
-const MANIFEST_TEMPLATE = (template?: string) =>
-  JSON.stringify(
-    {
-      scaffoldVersion: SCAFFOLD_VERSION,
-      template: template || "inkwell",
-      settings: {},
-    },
-    null,
-    2
-  ) + "\n";
+import { setupPythonEnvironment } from "./python-setup";
+import { getInkwellOutputChannel } from "./inkwell-output";
+import { ProjectReadiness } from "./project-readiness";
+import { ensureProjectReadyWithUI } from "./project-readiness-ui";
+import { createScaffoldDocument, validateProjectName } from "./scaffold-migrations";
+import { DEFAULT_FRONTMATTER, TEMPLATE_FRONTMATTER } from "./scaffold-assets";
+export { validateProjectName } from "./scaffold-migrations";
 
 async function pickWorkspaceRoot(
   openLabel: string
@@ -410,223 +38,38 @@ async function pickWorkspaceRoot(
   return picked?.[0]?.fsPath;
 }
 
-function copyMissingDirectory(src: string, dest: string): void {
-  if (!fs.existsSync(src)) return;
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.cpSync(src, dest, {
-    recursive: true,
-    force: false,
-    errorOnExist: false,
+async function prepareScaffold(root: string, template?: string): Promise<ProjectReadiness> {
+  const result = await ensureProjectReadyWithUI({
+    root, template, trusted: vscode.workspace.isTrusted !== false,
+    explicitSetup: true, assetRoot: path.join(__dirname, ".."),
   });
+  return result;
 }
 
-function seedProjectTemplates(projectRoot: string): string[] {
-  const bundledTemplatesDir = path.join(__dirname, "..", "templates");
-  const projectTemplatesDir = path.join(projectRoot, ".inkwell", "templates");
-  const copied: string[] = [];
+export type ScaffoldPreparation = (root: string, template?: string) => Promise<Pick<ProjectReadiness, "ready"> & Partial<ProjectReadiness>>;
 
-  if (!fs.existsSync(bundledTemplatesDir)) return copied;
-  fs.mkdirSync(projectTemplatesDir, { recursive: true });
-
-  for (const entry of fs.readdirSync(bundledTemplatesDir, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    if (entry.name.startsWith(".")) continue;
-
-    const src = path.join(bundledTemplatesDir, entry.name);
-    const dest = path.join(projectTemplatesDir, entry.name);
-    if (!fs.existsSync(dest)) {
-      copyMissingDirectory(src, dest);
-      copied.push(entry.name);
-    }
-  }
-
-  return copied;
-}
-
-export async function initProject(): Promise<void> {
-  const baseDir = await pickWorkspaceRoot("Select project folder");
-  if (!baseDir) return;
-
+export async function initProject(prepare: ScaffoldPreparation = prepareScaffold): Promise<void> {
+  const root = await pickWorkspaceRoot("Select project folder");
+  if (!root) return;
   const name = await vscode.window.showInputBox({
     prompt: "Project name (used for the main document filename)",
-    value: path.basename(baseDir),
-    validateInput: (v) => (v.trim() ? null : "Name is required"),
+    value: path.basename(root), validateInput: validateProjectName,
   });
   if (!name) return;
-
-  const templateId = await selectTemplateCommand();
-
-  const envChoice = await vscode.window.showQuickPick(
-    [
-      { label: "Yes", detail: "Create a Python venv and requirements.txt" },
-      { label: "No", detail: "Skip Python setup" },
-    ],
-    { placeHolder: "Set up a Python virtual environment?" }
-  );
-
-  const options: ScaffoldOptions = {
-    name: name.trim(),
-    dir: baseDir,
-    template: templateId,
-    pythonEnv: envChoice?.label === "Yes",
-  };
-
-  createStructure(options);
-
-  if (options.pythonEnv) {
-    const terminal = vscode.window.createTerminal("Inkwell Setup");
-    terminal.show();
-    const venvPath = path.join(options.dir, "venv");
-    const reqPath = path.join(options.dir, "requirements.txt");
-    terminal.sendText(
-      `python3 -m venv "${venvPath}" && source "${venvPath}/bin/activate" && pip install -r "${reqPath}" && python3 --version`
-    );
-  }
-
-  const docPath = path.join(options.dir, `${options.name}.md`);
-  const doc = await vscode.workspace.openTextDocument(docPath);
-  await vscode.window.showTextDocument(doc);
-
-  vscode.window.showInformationMessage(`Inkwell project "${options.name}" initialized.`);
-}
-
-export async function setupWorkspace(): Promise<void> {
-  const baseDir = await pickWorkspaceRoot("Select workspace root");
-  if (!baseDir) return;
-
-  const report: string[] = [];
-  const inkwellDir = path.join(baseDir, ".inkwell");
-
-  const dirs = ensureDirs(baseDir);
-  if (dirs.length) report.push(`created: ${dirs.join(", ")}`);
-
-  const manifestPath = path.join(inkwellDir, "manifest.json");
-  if (!fs.existsSync(manifestPath)) {
-    fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
-    fs.writeFileSync(manifestPath, MANIFEST_TEMPLATE("inkwell"), "utf-8");
-    report.push("created .inkwell/manifest.json");
-  }
-
-  const mf = updateManifest(baseDir);
-  if (mf.length) report.push(`manifest: ${mf.join("; ")}`);
-
-  const copyTemplates = await vscode.window.showQuickPick(
-    [
-      { label: "Yes", detail: "Copy built-in template folders into .inkwell/templates" },
-      { label: "No", detail: "Keep templates built-in (extension/global only)" },
-    ],
-    {
-      placeHolder: "Seed this workspace with bundled Inkwell templates?",
-    }
-  );
-
-  if (copyTemplates?.label === "Yes") {
-    const copiedTemplates = seedProjectTemplates(baseDir);
-    if (copiedTemplates.length) {
-      report.push(`copied templates: ${copiedTemplates.join(", ")}`);
-    } else {
-      report.push("template folders already present");
-    }
-  }
-
-  const gi = updateGitignore(baseDir);
-  if (gi.length) report.push(`updated .gitignore (${gi.length} entries)`);
-  if (copyGuide(baseDir)) report.push("updated .inkwell/guide.md");
-  if (copyAgent(baseDir)) report.push("updated .cursor/agents/inkwell-guide.md");
-
-  const seedFiles = ensureStarterFiles(baseDir);
-  if (seedFiles.length) {
-    report.push(`added starter files: ${seedFiles.join(", ")}`);
-  }
-
-  const demos = copyDemoFiles(baseDir);
-  if (demos.length) {
-    report.push(`copied examples: ${demos.length} files`);
-  }
-
-  const missingBundled = missingBundledContent();
-  if (missingBundled.length) {
-    vscode.window.showWarningMessage(
-      `Inkwell: this installation is missing bundled content (${missingBundled.join(", ")}). ` +
-      "Examples and the guide were not copied. Reinstall from a full VSIX or the marketplace to get them."
-    );
-  }
-
-  const envChoice = await vscode.window.showQuickPick(
-    [
-      { label: "Yes", detail: "Create a Python venv and requirements.txt" },
-      { label: "No", detail: "Skip Python setup" },
-    ],
-    { placeHolder: "Set up a Python virtual environment?" }
-  );
-
-  if (envChoice?.label === "Yes") {
-    const reqPath = path.join(baseDir, "requirements.txt");
-    if (!fs.existsSync(reqPath)) {
-      fs.writeFileSync(reqPath, DEFAULT_REQUIREMENTS);
-      report.push("created requirements.txt");
-    }
-    const terminal = vscode.window.createTerminal("Inkwell Setup");
-    terminal.show();
-    const venvPath = path.join(baseDir, "venv");
-    terminal.sendText(
-      `python3 -m venv "${venvPath}" && source "${venvPath}/bin/activate" && pip install -r "${reqPath}" && python3 --version`
-    );
-    report.push("creating venv (installing in terminal)");
-  }
-
-  if (report.length) {
-    vscode.window.showInformationMessage(
-      `Workspace setup complete: ${report.join("; ")}.`
-    );
-  } else {
-    vscode.window.showInformationMessage(
-      "Workspace is already up to date."
-    );
-  }
-}
-
-function createStructure(opts: ScaffoldOptions): void {
-  const dirs = [
-    ".inkwell",
-    ".inkwell/outputs",
-    ".inkwell/compiled",
-    ".inkwell/scripts",
-    ".inkwell/figures",
-    ".inkwell/references",
-  ];
-
-  for (const d of dirs) {
-    fs.mkdirSync(path.join(opts.dir, d), { recursive: true });
-  }
-
-  const manifest = path.join(opts.dir, ".inkwell", "manifest.json");
-  if (!fs.existsSync(manifest)) {
-    fs.writeFileSync(manifest, MANIFEST_TEMPLATE(opts.template));
-  }
-
-  const docPath = path.join(opts.dir, `${opts.name}.md`);
-  if (!fs.existsSync(docPath)) {
-    let frontmatter = DEFAULT_FRONTMATTER.replace(
-      '"Untitled"',
-      `"${opts.name}"`
-    );
-    const templateStub = opts.template && TEMPLATE_FRONTMATTER[opts.template];
-    if (templateStub) {
-      frontmatter = frontmatter.replace("---\n\n", `${templateStub}---\n\n`);
-    } else if (opts.template) {
-      frontmatter = frontmatter.replace(
-        "---\n\n",
-        `template: ${opts.template}\n---\n\n`
-      );
-    }
-    if (opts.pythonEnv) {
-      frontmatter = frontmatter.replace(
-        "  code-display: output",
-        "  code-display: output\n  python-env: ./venv"
-      );
-    }
-    const body = `# Introduction
+  const invalid = validateProjectName(name);
+  if (invalid) { await vscode.window.showErrorMessage(invalid); return; }
+  const template = await selectTemplateCommand();
+  if (!(await prepare(root, template)).ready) return;
+  const python = await vscode.window.showQuickPick([
+    { label: "Yes", detail: "Create a Python venv and install requirements.txt" },
+    { label: "No", detail: "Skip Python setup" },
+  ], { placeHolder: "Set up a Python virtual environment?" });
+  let frontmatter = DEFAULT_FRONTMATTER.replace('"Untitled"', JSON.stringify(name.trim()));
+  const templateStub = template && TEMPLATE_FRONTMATTER[template];
+  if (templateStub) frontmatter = frontmatter.replace("---\n\n", `${templateStub}---\n\n`);
+  else if (template) frontmatter = frontmatter.replace("---\n\n", `template: ${JSON.stringify(template)}\n---\n\n`);
+  if (python?.label === "Yes") frontmatter = frontmatter.replace("  code-display: output", "  code-display: output\n  python-env: ./venv");
+  const body = `# Introduction
 
 Write your content here. Cite sources with [@knuth1984] and use inline math like $x^2$.
 
@@ -640,174 +83,43 @@ Write your content here. Cite sources with [@knuth1984] and use inline math like
 
 ## References
 `;
-    fs.writeFileSync(docPath, frontmatter + body);
-  }
-
-  const gitignore = path.join(opts.dir, ".gitignore");
-  if (!fs.existsSync(gitignore)) {
-    fs.writeFileSync(gitignore, GITIGNORE);
-  }
-
-  if (opts.pythonEnv) {
-    const reqPath = path.join(opts.dir, "requirements.txt");
-    if (!fs.existsSync(reqPath)) {
-      fs.writeFileSync(reqPath, DEFAULT_REQUIREMENTS);
-    }
-  }
-
-  ensureStarterFiles(opts.dir);
-
-  copyDemoFiles(opts.dir);
-  copyGuide(opts.dir);
-  copyAgent(opts.dir);
+  const documentPath = createScaffoldDocument(root, name.trim(), frontmatter + body);
+  if (python?.label === "Yes" && !await setupScaffoldPython(root)) return;
+  const document = await vscode.workspace.openTextDocument(documentPath);
+  await vscode.window.showTextDocument(document);
+  await vscode.commands.executeCommand("setContext", "inkwell.projectCreated", true);
+  await vscode.window.showInformationMessage(`Inkwell project "${name.trim()}" initialized.`);
 }
 
-// ── Update Project ─────────────────────────────────────────────────
-
-const GITIGNORE_LINES = GITIGNORE.split("\n").map((l) => l.trim()).filter(Boolean);
-
-const REQUIRED_DIRS = [
-  ".inkwell",
-  ".inkwell/outputs",
-  ".inkwell/compiled",
-  ".inkwell/scripts",
-  ".inkwell/figures",
-  ".inkwell/references",
-  ".inkwell/examples",
-];
-
-const STARTER_FILES: Array<{ rel: string; content: string }> = [
-  { rel: ".inkwell/scripts/sine_plot.py", content: SINE_PLOT_PY },
-  { rel: ".inkwell/scripts/scatter.py", content: SCATTER_PY },
-  { rel: ".inkwell/scripts/convergence_table.py", content: CONVERGENCE_TABLE_PY },
-  { rel: ".inkwell/references/refs.bib", content: STARTER_BIB },
-  { rel: ".inkwell/figures/.gitkeep", content: "" },
-];
-
-/**
- * Names of content that should ship with every Inkwell install but is
- * absent from this one (e.g. a VSIX built with an over-aggressive
- * .vscodeignore). Used to warn instead of silently skipping copies.
- */
-function missingBundledContent(): string[] {
-  const missing: string[] = [];
-  if (!fs.existsSync(path.join(__dirname, "..", "guide.md"))) missing.push("guide.md");
-  if (!fs.existsSync(path.join(__dirname, "..", "examples"))) missing.push("examples/");
-  return missing;
+export async function setupWorkspace(prepare: ScaffoldPreparation = prepareScaffold): Promise<void> {
+  const root = await pickWorkspaceRoot("Select workspace root");
+  if (!root) return;
+  const readiness = await prepare(root);
+  if (!readiness.ready) return;
+  const python = await vscode.window.showQuickPick([
+    { label: "Yes", detail: "Create a Python venv and install requirements.txt" },
+    { label: "No", detail: "Skip Python setup" },
+  ], { placeHolder: "Set up a Python virtual environment?" });
+  if (python?.label === "Yes" && !await setupScaffoldPython(root)) return;
+  await vscode.window.showInformationMessage(readiness.migration?.status === "up-to-date" || readiness.cached
+    ? "Workspace is already up to date."
+    : "Workspace setup complete.");
 }
 
-function copyGuide(projectRoot: string): boolean {
-  const src = path.join(__dirname, "..", "guide.md");
-  const dest = path.join(projectRoot, ".inkwell", "guide.md");
-  if (!fs.existsSync(src)) return false;
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.copyFileSync(src, dest);
-  return true;
-}
-
-function copyAgent(projectRoot: string): boolean {
-  const src = path.join(__dirname, "..", ".cursor", "agents", "inkwell-guide.md");
-  const dest = path.join(projectRoot, ".cursor", "agents", "inkwell-guide.md");
-  if (!fs.existsSync(src)) return false;
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.copyFileSync(src, dest);
-  return true;
-}
-
-function copyDemoFiles(projectRoot: string): string[] {
-  const extensionExamples = path.join(__dirname, "..", "examples");
-  const destDir = path.join(projectRoot, ".inkwell", "examples");
-  const copied: string[] = [];
-
-  if (!fs.existsSync(extensionExamples)) return copied;
-
-  fs.mkdirSync(destDir, { recursive: true });
-  for (const entry of fs.readdirSync(extensionExamples)) {
-    if (!entry.endsWith(".md")) continue;
-    const src = path.join(extensionExamples, entry);
-    const dest = path.join(destDir, entry);
-    if (!fs.existsSync(dest)) {
-      fs.copyFileSync(src, dest);
-      copied.push(`.inkwell/examples/${entry}`);
-    }
+async function setupScaffoldPython(projectDir: string): Promise<boolean> {
+  const result = await vscode.window.withProgress({
+    location: vscode.ProgressLocation.Notification,
+    title: "Setting up the Python environment",
+  }, () => setupPythonEnvironment({
+    projectDir,
+    environmentDir: path.join(projectDir, "venv"),
+    requirementsFile: path.join(projectDir, "requirements.txt"),
+  }));
+  const output = getInkwellOutputChannel();
+  output.appendLine(result.log);
+  if (!result.success) {
+    output.show(true);
+    await vscode.window.showErrorMessage(`Project files are available, but Python setup did not complete: ${result.message}`);
   }
-  return copied;
-}
-
-function updateGitignore(projectRoot: string): string[] {
-  const gi = path.join(projectRoot, ".gitignore");
-  let existing = "";
-  try {
-    existing = fs.readFileSync(gi, "utf-8");
-  } catch {}
-
-  const existingSet = new Set(
-    existing.split("\n").map((l) => l.trim()).filter(Boolean)
-  );
-  const added: string[] = [];
-  for (const line of GITIGNORE_LINES) {
-    if (!existingSet.has(line)) {
-      added.push(line);
-    }
-  }
-
-  if (added.length) {
-    const suffix = (existing.endsWith("\n") ? "" : "\n") + added.join("\n") + "\n";
-    fs.writeFileSync(gi, existing + suffix, "utf-8");
-  }
-  return added;
-}
-
-function updateManifest(projectRoot: string): string[] {
-  const mp = path.join(projectRoot, ".inkwell", "manifest.json");
-  let manifest: Record<string, unknown> = {};
-  try {
-    manifest = JSON.parse(fs.readFileSync(mp, "utf-8"));
-  } catch {}
-
-  const changes: string[] = [];
-
-  if (!manifest.template) {
-    manifest.template = "inkwell";
-    changes.push("added default template");
-  }
-  if (!manifest.settings) {
-    manifest.settings = {};
-    changes.push("added settings block");
-  }
-
-  const prev = (manifest.scaffoldVersion as number) || 0;
-  if (prev < SCAFFOLD_VERSION) {
-    manifest.scaffoldVersion = SCAFFOLD_VERSION;
-    changes.push(`scaffoldVersion ${prev} -> ${SCAFFOLD_VERSION}`);
-  }
-
-  fs.mkdirSync(path.dirname(mp), { recursive: true });
-  fs.writeFileSync(mp, JSON.stringify(manifest, null, 2) + "\n", "utf-8");
-  return changes;
-}
-
-function ensureDirs(projectRoot: string): string[] {
-  const created: string[] = [];
-  for (const d of REQUIRED_DIRS) {
-    const full = path.join(projectRoot, d);
-    if (!fs.existsSync(full)) {
-      fs.mkdirSync(full, { recursive: true });
-      created.push(d);
-    }
-  }
-  return created;
-}
-
-function ensureStarterFiles(projectRoot: string): string[] {
-  const created: string[] = [];
-  for (const { rel, content } of STARTER_FILES) {
-    const full = path.join(projectRoot, rel);
-    if (!fs.existsSync(full)) {
-      fs.mkdirSync(path.dirname(full), { recursive: true });
-      fs.writeFileSync(full, content, "utf-8");
-      created.push(rel);
-    }
-  }
-  return created;
+  return result.success;
 }

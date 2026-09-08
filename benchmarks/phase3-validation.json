@@ -1,0 +1,887 @@
+{
+  "schemaVersion": 1,
+  "timestamp": "2026-09-07T20:50:48.099Z",
+  "baseline": false,
+  "corpusSource": "HEAD examples (preserve local edits)",
+  "implementation": "working tree",
+  "machine": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M5",
+    "node": "v25.2.1"
+  },
+  "repetitions": 1,
+  "corpus": [
+    {
+      "name": "demo-default.md",
+      "sha256": "7aa51cc2793a647058f80d9bbd418535e8df8d027a25ef0f9ceb8ae6c0007124"
+    },
+    {
+      "name": "demo-eth-report.md",
+      "sha256": "e585666e7dc8bf4c5994a9c6f28c78b2b01dbec8b365c69cdf8357d72e3d011d"
+    },
+    {
+      "name": "demo-hipster-cv.md",
+      "sha256": "2a896c6c27191d28fb5dbd5203160b71e589613f1cf7701b08178be7b98eb2d7"
+    },
+    {
+      "name": "demo-ludus.md",
+      "sha256": "4052374f5d317dcc6aaf82547b19fd0d968ecf36778fcb98ef25abd92e586bb9"
+    },
+    {
+      "name": "demo-python-report.md",
+      "sha256": "641e45dbe7588c3a5033f3e084e1dc42944caae52d5a26205b1328b607bcad8f"
+    },
+    {
+      "name": "demo-rho.md",
+      "sha256": "ca22d7ae0aade5556e0abe286b0e3e3da8e782782c13713549281a75e69bf99d"
+    },
+    {
+      "name": "demo-rmxaa.md",
+      "sha256": "6f6583da512ccc117d8c5d67d6306e3bd3ba5dcfae1266998c55ff0560e7ecce"
+    },
+    {
+      "name": "demo-tmsce.md",
+      "sha256": "198cc7ecd2dc408991b5aa48b657f9848e0164c40726091363a38dd23031b646"
+    },
+    {
+      "name": "demo-tufte-book-vdqi.md",
+      "sha256": "4d8f6dde6e653d57c80d0e0f963711a64c91086a10c695bd1c41873c9fa851e1"
+    },
+    {
+      "name": "demo-tufte.md",
+      "sha256": "6322263b1041c5e85cf5953aa91947b3c6191c5a54ba2db170cc265530d6b857"
+    }
+  ],
+  "phases": {
+    "activationModuleLoadMs": 30.346708000000945,
+    "citationscoldMs": 295.16741699999875,
+    "citationscoldEngine": "pandoc",
+    "citationswarmMs": 0.7830410000005941,
+    "citationswarmEngine": "pandoc",
+    "previewRenderMs": 4.88591599999927,
+    "codeProcessMs": 46.374666999998226
+  },
+  "demos": [
+    {
+      "name": "demo-default.md",
+      "repetition": 0,
+      "success": true,
+      "totalMs": 1083.4678329999988,
+      "runMs": 514.8370830000003,
+      "runProcesses": [
+        {
+          "binary": "python3",
+          "milliseconds": 382.5322500000002,
+          "exitCode": 0
+        },
+        {
+          "binary": "python3",
+          "milliseconds": 49.582000000000335,
+          "exitCode": 0
+        }
+      ],
+      "runFailures": [],
+      "compilePlanningMs": 25.35437599999932,
+      "texPasses": [
+        {
+          "binary": "xelatex",
+          "argv": [
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "-output-directory=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/6259266de742070a/attempt-PJnvrC",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/6259266de742070a/attempt-PJnvrC/demo-default.tex"
+          ],
+          "milliseconds": 482.57937499999935,
+          "exitCode": 0,
+          "signal": null
+        },
+        {
+          "binary": "xelatex",
+          "argv": [
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "-output-directory=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/6259266de742070a/attempt-PJnvrC",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/6259266de742070a/attempt-PJnvrC/demo-default.tex"
+          ],
+          "milliseconds": 470.46099999999933,
+          "exitCode": 0,
+          "signal": null
+        }
+      ],
+      "pandoc": [
+        {
+          "binary": "pandoc",
+          "argv": [
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/6259266de742070a/attempt-PJnvrC/demo-default.md",
+            "-o",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/6259266de742070a/attempt-PJnvrC/demo-default.tex",
+            "--standalone",
+            "--template=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/6259266de742070a/attempt-PJnvrC/inkwell.latex",
+            "--from=markdown+raw_tex+raw_attribute+tex_math_dollars+citations+footnotes+yaml_metadata_block+implicit_figures+link_attributes+fenced_divs+bracketed_spans+pipe_tables+smart",
+            "--resource-path=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/6259266de742070a/attempt-PJnvrC:/Users/elisgoldberg/measured.one.inkwell-extension/templates:<workspace>/project:<workspace>/project",
+            "-V",
+            "graphics=true",
+            "-V",
+            "colorlinks=true",
+            "-V",
+            "numbersections=true",
+            "--filter",
+            "/opt/homebrew/bin/pandoc-crossref",
+            "--citeproc",
+            "--bibliography",
+            "<workspace>/project/.inkwell/references/refs.bib",
+            "--csl",
+            "/Users/elisgoldberg/measured.one.inkwell-extension/csl/inkwell-numeric.csl"
+          ],
+          "milliseconds": 102.58166600000004,
+          "exitCode": 0,
+          "signal": null
+        }
+      ],
+      "unresolved": [],
+      "expectedText": true,
+      "pdfBytes": 157232,
+      "pdfSha256": "1db69cd6bbc3850117754f9f9ac7cf83a0cc6426117de5d3a4ef9a3b01cfedb9",
+      "pdfPayloadBytes": 209644,
+      "pdfTransferMs": 0.4568749999998545,
+      "pages": 4
+    },
+    {
+      "name": "demo-eth-report.md",
+      "repetition": 0,
+      "success": true,
+      "totalMs": 2785.5239170000004,
+      "runMs": 727.069125,
+      "runProcesses": [
+        {
+          "binary": "python3",
+          "milliseconds": 348.43362499999967,
+          "exitCode": 0
+        },
+        {
+          "binary": "python3",
+          "milliseconds": 349.89837500000067,
+          "exitCode": 0
+        }
+      ],
+      "runFailures": [],
+      "compilePlanningMs": 22.231125000002066,
+      "texPasses": [
+        {
+          "binary": "xelatex",
+          "argv": [
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "-output-directory=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/fd745740dd1b2b9d/attempt-zd78di",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/fd745740dd1b2b9d/attempt-zd78di/demo-eth-report.tex"
+          ],
+          "milliseconds": 1352.0426669999997,
+          "exitCode": 0,
+          "signal": null
+        },
+        {
+          "binary": "xelatex",
+          "argv": [
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "-output-directory=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/fd745740dd1b2b9d/attempt-zd78di",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/fd745740dd1b2b9d/attempt-zd78di/demo-eth-report.tex"
+          ],
+          "milliseconds": 1332.8931249999987,
+          "exitCode": 0,
+          "signal": null
+        }
+      ],
+      "pandoc": [
+        {
+          "binary": "pandoc",
+          "argv": [
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/fd745740dd1b2b9d/attempt-zd78di/demo-eth-report.md",
+            "-o",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/fd745740dd1b2b9d/attempt-zd78di/demo-eth-report.tex",
+            "--standalone",
+            "--template=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/fd745740dd1b2b9d/attempt-zd78di/eth-report.latex",
+            "--from=markdown+raw_tex+raw_attribute+tex_math_dollars+citations+footnotes+yaml_metadata_block+implicit_figures+link_attributes+fenced_divs+bracketed_spans+pipe_tables+smart",
+            "--resource-path=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/fd745740dd1b2b9d/attempt-zd78di:/Users/elisgoldberg/measured.one.inkwell-extension/templates/eth-report:<workspace>/project:<workspace>/project",
+            "-V",
+            "graphics=true",
+            "-V",
+            "colorlinks=true",
+            "-V",
+            "numbersections=true",
+            "--filter",
+            "/opt/homebrew/bin/pandoc-crossref",
+            "--citeproc",
+            "--bibliography",
+            "<workspace>/project/.inkwell/references/refs.bib",
+            "--csl",
+            "/Users/elisgoldberg/measured.one.inkwell-extension/csl/inkwell-numeric.csl"
+          ],
+          "milliseconds": 78.35699999999997,
+          "exitCode": 0,
+          "signal": null
+        }
+      ],
+      "unresolved": [],
+      "expectedText": true,
+      "pdfBytes": 221781,
+      "pdfSha256": "102b7cb81a199cb948999fcf9a581fc1a3e336fddb7b5bb3fc09b933ef75a0dd",
+      "pdfPayloadBytes": 295708,
+      "pdfTransferMs": 0.28741699999955017,
+      "pages": 6
+    },
+    {
+      "name": "demo-hipster-cv.md",
+      "repetition": 0,
+      "success": true,
+      "totalMs": 1057.804209,
+      "runMs": 3.491667000000234,
+      "runProcesses": [],
+      "runFailures": [],
+      "compilePlanningMs": 10.989626000000499,
+      "texPasses": [
+        {
+          "binary": "pdflatex",
+          "argv": [
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "-output-directory=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/56e7220e79a5e69f/attempt-dylJo9",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/56e7220e79a5e69f/attempt-dylJo9/demo-hipster-cv.tex"
+          ],
+          "milliseconds": 510.28700000000026,
+          "exitCode": 0,
+          "signal": null
+        },
+        {
+          "binary": "pdflatex",
+          "argv": [
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "-output-directory=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/56e7220e79a5e69f/attempt-dylJo9",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/56e7220e79a5e69f/attempt-dylJo9/demo-hipster-cv.tex"
+          ],
+          "milliseconds": 469.0714169999992,
+          "exitCode": 0,
+          "signal": null
+        }
+      ],
+      "pandoc": [
+        {
+          "binary": "pandoc",
+          "argv": [
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/56e7220e79a5e69f/attempt-dylJo9/demo-hipster-cv.md",
+            "-o",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/56e7220e79a5e69f/attempt-dylJo9/demo-hipster-cv.tex",
+            "--standalone",
+            "--template=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/56e7220e79a5e69f/attempt-dylJo9/hipster-cv.latex",
+            "--from=markdown+raw_tex+raw_attribute+tex_math_dollars+citations+footnotes+yaml_metadata_block+implicit_figures+link_attributes+fenced_divs+bracketed_spans+pipe_tables+smart",
+            "--resource-path=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/56e7220e79a5e69f/attempt-dylJo9:/Users/elisgoldberg/measured.one.inkwell-extension/templates/hipster-cv:<workspace>/project:<workspace>/project",
+            "-V",
+            "graphics=true",
+            "-V",
+            "colorlinks=true",
+            "-V",
+            "numbersections=true",
+            "--filter",
+            "/opt/homebrew/bin/pandoc-crossref",
+            "--citeproc",
+            "--bibliography",
+            "<workspace>/project/.inkwell/references/refs.bib",
+            "--csl",
+            "/Users/elisgoldberg/measured.one.inkwell-extension/csl/inkwell-numeric.csl"
+          ],
+          "milliseconds": 65.77658299999894,
+          "exitCode": 0,
+          "signal": null
+        }
+      ],
+      "unresolved": [],
+      "expectedText": true,
+      "pdfBytes": 302549,
+      "pdfSha256": "739b202f6ae55aa3fbd0b1cb8d9f0df546ab97c5e121af457fcfc955d8e70ba9",
+      "pdfPayloadBytes": 403400,
+      "pdfTransferMs": 0.6397500000002765,
+      "pages": 1
+    },
+    {
+      "name": "demo-ludus.md",
+      "repetition": 0,
+      "success": true,
+      "totalMs": 1272.465709,
+      "runMs": 781.3872080000001,
+      "runProcesses": [
+        {
+          "binary": "python3",
+          "milliseconds": 347.75595799999974,
+          "exitCode": 0
+        },
+        {
+          "binary": "python3",
+          "milliseconds": 342.152458999999,
+          "exitCode": 0
+        },
+        {
+          "binary": "python3",
+          "milliseconds": 49.73820899999919,
+          "exitCode": 0
+        }
+      ],
+      "runFailures": [],
+      "compilePlanningMs": 57.90287399999943,
+      "texPasses": [
+        {
+          "binary": "xelatex",
+          "argv": [
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "-output-directory=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/c5ea927103412e8f/attempt-Q74J8u",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/c5ea927103412e8f/attempt-Q74J8u/demo-ludus.tex"
+          ],
+          "milliseconds": 575.4282090000015,
+          "exitCode": 0,
+          "signal": null
+        },
+        {
+          "binary": "xelatex",
+          "argv": [
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "-output-directory=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/c5ea927103412e8f/attempt-Q74J8u",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/c5ea927103412e8f/attempt-Q74J8u/demo-ludus.tex"
+          ],
+          "milliseconds": 562.2971670000006,
+          "exitCode": 0,
+          "signal": null
+        }
+      ],
+      "pandoc": [
+        {
+          "binary": "pandoc",
+          "argv": [
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/c5ea927103412e8f/attempt-Q74J8u/demo-ludus.md",
+            "-o",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/c5ea927103412e8f/attempt-Q74J8u/demo-ludus.tex",
+            "--standalone",
+            "--template=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/c5ea927103412e8f/attempt-Q74J8u/ludus.latex",
+            "--from=markdown+raw_tex+raw_attribute+tex_math_dollars+citations+footnotes+yaml_metadata_block+implicit_figures+link_attributes+fenced_divs+bracketed_spans+pipe_tables+smart",
+            "--resource-path=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/c5ea927103412e8f/attempt-Q74J8u:/Users/elisgoldberg/measured.one.inkwell-extension/templates/ludus:<workspace>/project:<workspace>/project",
+            "-V",
+            "graphics=true",
+            "-V",
+            "colorlinks=true",
+            "-V",
+            "numbersections=true",
+            "--filter",
+            "/opt/homebrew/bin/pandoc-crossref",
+            "--citeproc",
+            "--bibliography",
+            "<workspace>/project/.inkwell/references/refs.bib",
+            "--csl",
+            "/Users/elisgoldberg/measured.one.inkwell-extension/csl/inkwell-numeric.csl"
+          ],
+          "milliseconds": 76.83745899999849,
+          "exitCode": 0,
+          "signal": null
+        }
+      ],
+      "unresolved": [],
+      "expectedText": true,
+      "pdfBytes": 220781,
+      "pdfSha256": "7dbc51162f10461b0196c5013a7bee0baeca9a9d560d0f0cf252451d61b89121",
+      "pdfPayloadBytes": 294376,
+      "pdfTransferMs": 0.27074999999967986,
+      "pages": 2
+    },
+    {
+      "name": "demo-python-report.md",
+      "repetition": 0,
+      "success": true,
+      "totalMs": 1131.089082999999,
+      "runMs": 437.69366699999955,
+      "runProcesses": [
+        {
+          "binary": "python3",
+          "milliseconds": 283.242083000001,
+          "exitCode": 0
+        },
+        {
+          "binary": "python3",
+          "milliseconds": 56.853665999999066,
+          "exitCode": 0
+        },
+        {
+          "binary": "python3",
+          "milliseconds": 58.620999999999185,
+          "exitCode": 0
+        }
+      ],
+      "runFailures": [],
+      "compilePlanningMs": 36.924416000001656,
+      "texPasses": [
+        {
+          "binary": "xelatex",
+          "argv": [
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "-output-directory=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/4e85aac03ea45f86/attempt-Z8cyaI",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/4e85aac03ea45f86/attempt-Z8cyaI/demo-python-report.tex"
+          ],
+          "milliseconds": 494.22637499999837,
+          "exitCode": 0,
+          "signal": null
+        },
+        {
+          "binary": "xelatex",
+          "argv": [
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "-output-directory=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/4e85aac03ea45f86/attempt-Z8cyaI",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/4e85aac03ea45f86/attempt-Z8cyaI/demo-python-report.tex"
+          ],
+          "milliseconds": 499.2207920000001,
+          "exitCode": 0,
+          "signal": null
+        }
+      ],
+      "pandoc": [
+        {
+          "binary": "pandoc",
+          "argv": [
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/4e85aac03ea45f86/attempt-Z8cyaI/demo-python-report.md",
+            "-o",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/4e85aac03ea45f86/attempt-Z8cyaI/demo-python-report.tex",
+            "--standalone",
+            "--template=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/4e85aac03ea45f86/attempt-Z8cyaI/inkwell.latex",
+            "--from=markdown+raw_tex+raw_attribute+tex_math_dollars+citations+footnotes+yaml_metadata_block+implicit_figures+link_attributes+fenced_divs+bracketed_spans+pipe_tables+smart",
+            "--resource-path=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/4e85aac03ea45f86/attempt-Z8cyaI:/Users/elisgoldberg/measured.one.inkwell-extension/templates:<workspace>/project:<workspace>/project",
+            "-V",
+            "graphics=true",
+            "-V",
+            "colorlinks=true",
+            "-V",
+            "numbersections=true",
+            "--filter",
+            "/opt/homebrew/bin/pandoc-crossref",
+            "--citeproc",
+            "--bibliography",
+            "<workspace>/project/.inkwell/references/refs.bib",
+            "--csl",
+            "/Users/elisgoldberg/measured.one.inkwell-extension/csl/inkwell-numeric.csl"
+          ],
+          "milliseconds": 100.71749999999884,
+          "exitCode": 0,
+          "signal": null
+        }
+      ],
+      "unresolved": [],
+      "expectedText": true,
+      "pdfBytes": 116396,
+      "pdfSha256": "7d210787e08c8163bbe2d2864758520635f1a9001e3c0dd36c994400777c08d4",
+      "pdfPayloadBytes": 155196,
+      "pdfTransferMs": 0.243624999999156,
+      "pages": 5
+    },
+    {
+      "name": "demo-rho.md",
+      "repetition": 0,
+      "success": true,
+      "totalMs": 2011.4832920000008,
+      "runMs": 3.397000000000844,
+      "runProcesses": [],
+      "runFailures": [],
+      "compilePlanningMs": 15.010833000000275,
+      "texPasses": [
+        {
+          "binary": "pdflatex",
+          "argv": [
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "-output-directory=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/28509511c14cd49f/attempt-eiV7Hi",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/28509511c14cd49f/attempt-eiV7Hi/demo-rho.tex"
+          ],
+          "milliseconds": 989.9137090000004,
+          "exitCode": 0,
+          "signal": null
+        },
+        {
+          "binary": "pdflatex",
+          "argv": [
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "-output-directory=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/28509511c14cd49f/attempt-eiV7Hi",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/28509511c14cd49f/attempt-eiV7Hi/demo-rho.tex"
+          ],
+          "milliseconds": 928.8771250000027,
+          "exitCode": 0,
+          "signal": null
+        }
+      ],
+      "pandoc": [
+        {
+          "binary": "pandoc",
+          "argv": [
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/28509511c14cd49f/attempt-eiV7Hi/demo-rho.md",
+            "-o",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/28509511c14cd49f/attempt-eiV7Hi/demo-rho.tex",
+            "--standalone",
+            "--template=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/28509511c14cd49f/attempt-eiV7Hi/rho.latex",
+            "--from=markdown+raw_tex+raw_attribute+tex_math_dollars+citations+footnotes+yaml_metadata_block+implicit_figures+link_attributes+fenced_divs+bracketed_spans+pipe_tables+smart",
+            "--resource-path=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/28509511c14cd49f/attempt-eiV7Hi:/Users/elisgoldberg/measured.one.inkwell-extension/templates/rho:<workspace>/project:<workspace>/project",
+            "-V",
+            "graphics=true",
+            "-V",
+            "colorlinks=true",
+            "-V",
+            "numbersections=true",
+            "--filter",
+            "/opt/homebrew/bin/pandoc-crossref",
+            "--citeproc",
+            "--bibliography",
+            "<workspace>/project/.inkwell/references/refs.bib",
+            "--csl",
+            "/Users/elisgoldberg/measured.one.inkwell-extension/csl/inkwell-numeric.csl"
+          ],
+          "milliseconds": 77.68162499999744,
+          "exitCode": 0,
+          "signal": null
+        }
+      ],
+      "unresolved": [],
+      "expectedText": true,
+      "pdfBytes": 711949,
+      "pdfSha256": "c96ac2ad5f7075abb0a023c4cd31fcbf89b807b518042975fa65e342023fd7a3",
+      "pdfPayloadBytes": 949268,
+      "pdfTransferMs": 0.5215830000015558,
+      "pages": 2
+    },
+    {
+      "name": "demo-rmxaa.md",
+      "repetition": 0,
+      "success": true,
+      "totalMs": 2603.590874999998,
+      "runMs": 708.403875,
+      "runProcesses": [
+        {
+          "binary": "python3",
+          "milliseconds": 346.1012499999997,
+          "exitCode": 0
+        },
+        {
+          "binary": "python3",
+          "milliseconds": 332.8537499999984,
+          "exitCode": 0
+        }
+      ],
+      "runFailures": [],
+      "compilePlanningMs": 30.725666999998793,
+      "texPasses": [
+        {
+          "binary": "pdflatex",
+          "argv": [
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "-output-directory=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/2651c2d1aec202dd/attempt-VYVz2O",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/2651c2d1aec202dd/attempt-VYVz2O/demo-rmxaa.tex"
+          ],
+          "milliseconds": 1256.968582999998,
+          "exitCode": 0,
+          "signal": null
+        },
+        {
+          "binary": "pdflatex",
+          "argv": [
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "-output-directory=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/2651c2d1aec202dd/attempt-VYVz2O",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/2651c2d1aec202dd/attempt-VYVz2O/demo-rmxaa.tex"
+          ],
+          "milliseconds": 1250.7941250000003,
+          "exitCode": 0,
+          "signal": null
+        }
+      ],
+      "pandoc": [
+        {
+          "binary": "pandoc",
+          "argv": [
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/2651c2d1aec202dd/attempt-VYVz2O/demo-rmxaa.md",
+            "-o",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/2651c2d1aec202dd/attempt-VYVz2O/demo-rmxaa.tex",
+            "--standalone",
+            "--template=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/2651c2d1aec202dd/attempt-VYVz2O/rmxaa.latex",
+            "--from=markdown+raw_tex+raw_attribute+tex_math_dollars+citations+footnotes+yaml_metadata_block+implicit_figures+link_attributes+fenced_divs+bracketed_spans+pipe_tables+smart",
+            "--resource-path=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/2651c2d1aec202dd/attempt-VYVz2O:/Users/elisgoldberg/measured.one.inkwell-extension/templates/rmxaa:<workspace>/project:<workspace>/project",
+            "-V",
+            "graphics=true",
+            "-V",
+            "colorlinks=true",
+            "-V",
+            "numbersections=true",
+            "--filter",
+            "/opt/homebrew/bin/pandoc-crossref",
+            "--citeproc",
+            "--bibliography",
+            "<workspace>/project/.inkwell/references/refs.bib",
+            "--csl",
+            "/Users/elisgoldberg/measured.one.inkwell-extension/csl/inkwell-numeric.csl"
+          ],
+          "milliseconds": 65.10250000000087,
+          "exitCode": 0,
+          "signal": null
+        }
+      ],
+      "unresolved": [],
+      "expectedText": true,
+      "pdfBytes": 970657,
+      "pdfSha256": "3ca0063b6cc729a8fe7e491d570ed8a19ca431a5373f11db081d77806bfbce74",
+      "pdfPayloadBytes": 1294212,
+      "pdfTransferMs": 0.5777080000007118,
+      "pages": 2
+    },
+    {
+      "name": "demo-tmsce.md",
+      "repetition": 0,
+      "success": true,
+      "totalMs": 782.562750000001,
+      "runMs": 724.5669589999998,
+      "runProcesses": [
+        {
+          "binary": "python3",
+          "milliseconds": 352.9259170000005,
+          "exitCode": 0
+        },
+        {
+          "binary": "python3",
+          "milliseconds": 342.7671670000018,
+          "exitCode": 0
+        }
+      ],
+      "runFailures": [],
+      "compilePlanningMs": 21.259249999999156,
+      "texPasses": [
+        {
+          "binary": "pdflatex",
+          "argv": [
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "-output-directory=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/bea1b5cf6d9b3dc8/attempt-n6YrN4",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/bea1b5cf6d9b3dc8/attempt-n6YrN4/demo-tmsce.tex"
+          ],
+          "milliseconds": 352.8660000000018,
+          "exitCode": 0,
+          "signal": null
+        },
+        {
+          "binary": "pdflatex",
+          "argv": [
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "-output-directory=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/bea1b5cf6d9b3dc8/attempt-n6YrN4",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/bea1b5cf6d9b3dc8/attempt-n6YrN4/demo-tmsce.tex"
+          ],
+          "milliseconds": 344.21966699999757,
+          "exitCode": 0,
+          "signal": null
+        }
+      ],
+      "pandoc": [
+        {
+          "binary": "pandoc",
+          "argv": [
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/bea1b5cf6d9b3dc8/attempt-n6YrN4/demo-tmsce.md",
+            "-o",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/bea1b5cf6d9b3dc8/attempt-n6YrN4/demo-tmsce.tex",
+            "--standalone",
+            "--template=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/bea1b5cf6d9b3dc8/attempt-n6YrN4/tmsce.latex",
+            "--from=markdown+raw_tex+raw_attribute+tex_math_dollars+citations+footnotes+yaml_metadata_block+implicit_figures+link_attributes+fenced_divs+bracketed_spans+pipe_tables+smart",
+            "--resource-path=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/bea1b5cf6d9b3dc8/attempt-n6YrN4:/Users/elisgoldberg/measured.one.inkwell-extension/templates/tmsce:<workspace>/project:<workspace>/project",
+            "-V",
+            "graphics=true",
+            "-V",
+            "colorlinks=true",
+            "-V",
+            "numbersections=true",
+            "--filter",
+            "/opt/homebrew/bin/pandoc-crossref",
+            "--citeproc",
+            "--bibliography",
+            "<workspace>/project/.inkwell/references/refs.bib",
+            "--csl",
+            "/Users/elisgoldberg/measured.one.inkwell-extension/csl/inkwell-numeric.csl"
+          ],
+          "milliseconds": 64.21783300000243,
+          "exitCode": 0,
+          "signal": null
+        }
+      ],
+      "unresolved": [],
+      "expectedText": true,
+      "pdfBytes": 309269,
+      "pdfSha256": "c2b56238aba353545d3749e31690cecd6fa0eb6f303bcfbcd2cbfaa202286b2d",
+      "pdfPayloadBytes": 412360,
+      "pdfTransferMs": 0.3102919999982987,
+      "pages": 3
+    },
+    {
+      "name": "demo-tufte-book-vdqi.md",
+      "repetition": 0,
+      "success": true,
+      "totalMs": 717.2343340000007,
+      "runMs": 3.0805829999990237,
+      "runProcesses": [],
+      "runFailures": [],
+      "compilePlanningMs": 11.440667999999278,
+      "texPasses": [
+        {
+          "binary": "pdflatex",
+          "argv": [
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "-output-directory=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/035c864e7ee8b9e9/attempt-RR1fG0",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/035c864e7ee8b9e9/attempt-RR1fG0/demo-tufte-book-vdqi.tex"
+          ],
+          "milliseconds": 301.25687500000276,
+          "exitCode": 0,
+          "signal": null
+        },
+        {
+          "binary": "pdflatex",
+          "argv": [
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "-output-directory=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/035c864e7ee8b9e9/attempt-RR1fG0",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/035c864e7ee8b9e9/attempt-RR1fG0/demo-tufte-book-vdqi.tex"
+          ],
+          "milliseconds": 302.48920799999905,
+          "exitCode": 0,
+          "signal": null
+        }
+      ],
+      "pandoc": [
+        {
+          "binary": "pandoc",
+          "argv": [
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/035c864e7ee8b9e9/attempt-RR1fG0/demo-tufte-book-vdqi.md",
+            "-o",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/035c864e7ee8b9e9/attempt-RR1fG0/demo-tufte-book-vdqi.tex",
+            "--standalone",
+            "--template=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/035c864e7ee8b9e9/attempt-RR1fG0/tufte-book-vdqi.latex",
+            "--from=markdown+raw_tex+raw_attribute+tex_math_dollars+citations+footnotes+yaml_metadata_block+implicit_figures+link_attributes+fenced_divs+bracketed_spans+pipe_tables+smart",
+            "--resource-path=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/035c864e7ee8b9e9/attempt-RR1fG0:/Users/elisgoldberg/measured.one.inkwell-extension/templates/tufte-book-vdqi:<workspace>/project:<workspace>/project",
+            "-V",
+            "graphics=true",
+            "-V",
+            "colorlinks=true",
+            "-V",
+            "numbersections=true",
+            "--top-level-division=chapter",
+            "--filter",
+            "/opt/homebrew/bin/pandoc-crossref",
+            "--lua-filter",
+            "/Users/elisgoldberg/measured.one.inkwell-extension/filters/section-bibliographies.lua",
+            "--bibliography",
+            "<workspace>/project/.inkwell/references/refs.bib",
+            "--csl",
+            "/Users/elisgoldberg/measured.one.inkwell-extension/csl/inkwell-numeric.csl"
+          ],
+          "milliseconds": 102.04758299999958,
+          "exitCode": 0,
+          "signal": null
+        }
+      ],
+      "unresolved": [],
+      "expectedText": true,
+      "pdfBytes": 133114,
+      "pdfSha256": "eff8a5f582cbfc1974ead26925a16fd9242231b8114e9641b6e207b47378a8c7",
+      "pdfPayloadBytes": 177488,
+      "pdfTransferMs": 0.3560840000027383,
+      "pages": 29
+    },
+    {
+      "name": "demo-tufte.md",
+      "repetition": 0,
+      "success": true,
+      "totalMs": 735.5456659999982,
+      "runMs": 491.8212910000002,
+      "runProcesses": [
+        {
+          "binary": "python3",
+          "milliseconds": 475.294167,
+          "exitCode": 0
+        }
+      ],
+      "runFailures": [],
+      "compilePlanningMs": 16.199416999996174,
+      "texPasses": [
+        {
+          "binary": "pdflatex",
+          "argv": [
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "-output-directory=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/a10ae6820a6a4d8e/attempt-1yDhrs",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/a10ae6820a6a4d8e/attempt-1yDhrs/demo-tufte.tex"
+          ],
+          "milliseconds": 329.7210410000007,
+          "exitCode": 0,
+          "signal": null
+        },
+        {
+          "binary": "pdflatex",
+          "argv": [
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "-output-directory=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/a10ae6820a6a4d8e/attempt-1yDhrs",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/a10ae6820a6a4d8e/attempt-1yDhrs/demo-tufte.tex"
+          ],
+          "milliseconds": 312.0385830000014,
+          "exitCode": 0,
+          "signal": null
+        }
+      ],
+      "pandoc": [
+        {
+          "binary": "pandoc",
+          "argv": [
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/a10ae6820a6a4d8e/attempt-1yDhrs/demo-tufte.md",
+            "-o",
+            "/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/a10ae6820a6a4d8e/attempt-1yDhrs/demo-tufte.tex",
+            "--standalone",
+            "--template=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/a10ae6820a6a4d8e/attempt-1yDhrs/tufte.latex",
+            "--from=markdown+raw_tex+raw_attribute+tex_math_dollars+citations+footnotes+yaml_metadata_block+implicit_figures+link_attributes+fenced_divs+bracketed_spans+pipe_tables+smart",
+            "--resource-path=/var/folders/6m/tb7xtwds7mq1mww_r3wc87h40000gn/T/inkwell-vscode/a10ae6820a6a4d8e/attempt-1yDhrs:/Users/elisgoldberg/measured.one.inkwell-extension/templates/tufte:<workspace>/project:<workspace>/project",
+            "-V",
+            "graphics=true",
+            "-V",
+            "colorlinks=true",
+            "-V",
+            "numbersections=true",
+            "--filter",
+            "/opt/homebrew/bin/pandoc-crossref",
+            "--citeproc",
+            "--bibliography",
+            "<workspace>/project/.inkwell/references/refs.bib",
+            "--csl",
+            "/Users/elisgoldberg/measured.one.inkwell-extension/csl/inkwell-numeric.csl"
+          ],
+          "milliseconds": 77.58662499999991,
+          "exitCode": 0,
+          "signal": null
+        }
+      ],
+      "unresolved": [],
+      "expectedText": true,
+      "pdfBytes": 126367,
+      "pdfSha256": "5e91b149468280d8596752481416084acb9bf851602a320d59eac4b24c4be484",
+      "pdfPayloadBytes": 168492,
+      "pdfTransferMs": 0.5160839999989548,
+      "pages": 3
+    }
+  ],
+  "limitations": [
+    "Activation is module-load time only; a real extension-host activation budget remains a release gate.",
+    "PDF transfer measures the existing asynchronous read/base64 payload cost, not browser page painting.",
+    "Compile planning is compiler wall time less observed child-process wall time; includes staging and publication."
+  ],
+  "success": true
+}

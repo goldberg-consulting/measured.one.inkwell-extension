@@ -228,7 +228,8 @@ echo "[compile-demo] pandoc argv:"
 printf '  %q' pandoc "${PANDOC_ARGS[@]}"
 echo
 
-if ! pandoc "${PANDOC_ARGS[@]}"; then
+if ! pandoc "${PANDOC_ARGS[@]}" 2>"$WORK/pandoc.log"; then
+  cat "$WORK/pandoc.log" >&2
   echo "[compile-demo] pandoc failed" >&2
   exit 1
 fi
@@ -248,21 +249,24 @@ ENGINE_ARGS=(
 )
 
 echo "[compile-demo] $ENGINE pass 1"
-"$ENGINE" "${ENGINE_ARGS[@]}" || true
+"$ENGINE" "${ENGINE_ARGS[@]}"
 echo "[compile-demo] $ENGINE pass 2"
-"$ENGINE" "${ENGINE_ARGS[@]}" || true
+"$ENGINE" "${ENGINE_ARGS[@]}"
 
 # Raw \cite path: run biber/bibtex if the generated .tex uses them.
 if grep -qE '\\(bibliography|addbibresource)\{' "$WORK/$SRC_STEM.tex"; then
   if command -v biber >/dev/null 2>&1; then
     echo "[compile-demo] biber"
-    (cd "$WORK" && biber "$SRC_STEM") || true
+    (cd "$WORK" && biber "$SRC_STEM")
   elif command -v bibtex >/dev/null 2>&1; then
     echo "[compile-demo] bibtex"
-    (cd "$WORK" && bibtex "$SRC_STEM") || true
+    (cd "$WORK" && bibtex "$SRC_STEM")
+  else
+    echo "[compile-demo] required bibliography processor is unavailable" >&2
+    exit 2
   fi
   echo "[compile-demo] $ENGINE pass 3 (post-bib)"
-  "$ENGINE" "${ENGINE_ARGS[@]}" || true
+  "$ENGINE" "${ENGINE_ARGS[@]}"
 fi
 
 if [[ ! -f "$WORK/$SRC_STEM.pdf" ]]; then
@@ -272,5 +276,9 @@ if [[ ! -f "$WORK/$SRC_STEM.pdf" ]]; then
 fi
 
 OUT_PDF="$SRC_DIR/$SRC_STEM.pdf"
-cp "$WORK/$SRC_STEM.pdf" "$OUT_PDF"
+node "$REPO_ROOT/scripts/demo-policy.mjs" "$SRC_BASE" "$WORK/pandoc.log" "$WORK/$SRC_STEM.log"
+node - "$WORK/$SRC_STEM.pdf" "$OUT_PDF" "$REPO_ROOT" <<'JS'
+const [source, target, root] = process.argv.slice(2);
+require(root + '/out/pdf-publication.js').publishPdf(source, target);
+JS
 echo "[compile-demo] OK: $OUT_PDF"
