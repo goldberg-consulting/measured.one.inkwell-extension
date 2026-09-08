@@ -1,1043 +1,215 @@
 # Inkwell
 
-![Inkwell: Markdown to Publication-Quality PDF](media/hero-banner.png)
+![Inkwell — Write. Run. Publish.](media/hero-banner.png)
 
-Inkwell lets you stay in markdown, stay in your editor, and still get publication-quality PDFs out the other end. Your analysis scripts run in place, their outputs land in the document, and the whole thing compiles to LaTeX without you ever opening a `.tex` file. Or open one. It handles those too.
+**Write Markdown in Cursor or VS Code. Turn it into a polished PDF.**
 
-**0.5 release preview:** The installer below is being validated. The 0.5 release
-artifact and matching Homebrew checksum have not been published yet; the current
-tap may still serve an earlier release. See [installation and release checks](docs/installation.md).
+Inkwell puts a live preview, runnable analysis, citations, and LaTeX templates
+beside your document. Write a simple report or a journal article; add Python, R,
+shell, or JavaScript when you need figures and results.
 
-**Quick install (macOS, once the 0.5 release is published):**
+[Install](#install) · [Your first PDF](#your-first-pdf) · [Controls](#everyday-controls) · [Examples](docs/examples.md) · [Syntax guide](guide.md)
 
-```bash
-brew install --cask goldberg-consulting/inkwell/inkwell
-```
+> **Version note:** This page describes **0.5 on `main`**. The latest published
+> release and Homebrew cask are **0.4.0**; their interface and setup differ.
+> Use the source-build instructions below to try 0.5. Its release VSIX and
+> matching Homebrew checksum are not published yet.
 
-Then reload your editor (`Cmd+Shift+P` → **Developer: Reload Window**). The 0.5 installer verifies the exact release in every detected editor and builds a smoke-test PDF. See [Installation](#installation) for editor selection, upgrades, existing TeX support, and Linux setup.
+## Install
 
-## How it works
+### macOS: latest published release
 
-1. **Write** in markdown with YAML frontmatter for metadata and styling
-2. **Run** code blocks (Python, R, Shell, Node) that produce figures, tables, and text
-3. **Compile** through Pandoc and LaTeX (XeLaTeX or pdfLaTeX, per template) with your chosen journal template
-4. **PDF** output with embedded results, citations, and formatted math
-
-![Run code blocks that generate figures and tables](media/run-preview.png)
-
-![Compile to PDF with journal formatting and embedded results](media/compile-preview.png)
-
-## Installation
-
-### macOS
-
-With Homebrew and Cursor or VS Code installed, use the fully qualified cask:
+Install [Cursor](https://cursor.com) or [VS Code](https://code.visualstudio.com)
+and [Homebrew](https://brew.sh), then run:
 
 ```bash
 brew install --cask goldberg-consulting/inkwell/inkwell
 ```
 
-The release VSIX is the authoritative extension artifact. The installer finds
-Cursor and VS Code in PATH, Homebrew locations, `/Applications`, and
-`~/Applications`; no editor shell-command setup is needed. It installs and
-verifies the exact release in every detected editor. Mermaid CLI comes from
-Homebrew. No global npm installation is required.
+The current cask installs **0.4.0** and its PDF tools, including MacTeX. This is a
+large first download. Reload your editor afterward: open the Command Palette
+with **Cmd+Shift+P**, then choose **Developer: Reload Window**.
 
-The cask includes full MacTeX and Node as direct dependencies. The standalone
-installer and Setup / Repair reuse a functioning existing TeX distribution and
-install MacTeX when none exists. Missing packages come from the requirements
-inside the release artifact. User-owned TinyTeX uses its own package manager;
-system MacTeX uses administrator permission when needed. Inkwell never changes
-the ownership of a TeX tree.
+If Inkwell does not appear, use **Extensions: Install from VSIX...** in the
+Command Palette. The current cask keeps its file at
+`$(brew --prefix)/share/inkwell/inkwell-0.4.0.vsix` — usually
+`/opt/homebrew/share/inkwell/inkwell-0.4.0.vsix` on Apple Silicon or
+`/usr/local/share/inkwell/inkwell-0.4.0.vsix` on Intel. You can also download the
+extension directly from [Releases](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases).
 
-Installation reports complete only after editor verification, the full doctor,
-and an actual Inkwell PDF build pass. Verification PDFs, setup state, and logs
-are retained under `~/Library/Application Support/Inkwell/verification/`.
-Reload an already-running editor after an upgrade. Use **Inkwell: Setup / Repair**
-for a later repair; the same workflow resumes interrupted setup.
+<details>
+<summary><strong>Try 0.5 now: build and install from source</strong></summary>
 
-From a checkout of the matching release, the versioned bootstrap script also
-supports editor selection. It downloads that release's VSIX
-and verifies its published checksum:
+With Git, Node.js, and npm installed:
 
 ```bash
-./scripts/install-inkwell-macos.sh --editor=cursor
-./scripts/install-inkwell-macos.sh --editor=code
-./scripts/install-inkwell-macos.sh --editor=all
-```
-
-`auto` and `all` select every detected supported editor. `cursor` and `code`
-narrow the selection; the cask always installs into every detected editor.
-Matching extension versions are verified without reinstalling. Newer versions
-are preserved and reported as partial installations. A deliberate downgrade
-requires the standalone installer with both `--allow-downgrade` and `--yes`.
-Existing TinyTeX is supported without replacing it by the standalone installer.
-The 0.5 release has no lean installer profile.
-The repository Brewfile is an optional tools-only bundle; it does not install
-an extension from a different distribution channel.
-
-Upgrade with `brew upgrade --cask goldberg-consulting/inkwell/inkwell`. On an
-Homebrew version that requests explicit trust, follow its trust prompt for the
-fully qualified tap and repeat the command.
-
-### Install a downloaded VSIX
-
-Download the release from [Releases](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases).
-In the editor, choose **Extensions: Install from VSIX...**, select the file, and
-reload the window. **Inkwell: Setup / Repair** checks the same installed artifact
-and offers a verified repair plan. The marketplace is not an alternative 0.5
-release channel.
-
-### Linux
-
-Install Pandoc 3 or later, a matching pandoc-crossref release, a full TeX Live
-installation, and Mermaid CLI through your platform's package manager. Then
-install the release VSIX and run **Inkwell: Setup / Repair** to inspect the
-capability report and prepare the project. The health probes are read-only;
-project setup can create or migrate scaffold files. Automatic system package installation is
-currently implemented for macOS; the doctor identifies missing Linux tools.
-Do not mix a distribution-owned TeX tree with an unrelated package manager.
-
-### Prepare a workspace
-
-Use **Inkwell: New Project** for a starter document or **Inkwell: Setup / Repair**
-for an existing workspace. Both verify the tools, migrate the scaffold safely,
-and build a smoke PDF in the same flow. Edited files remain intact with
-comparison proposals; built-in templates stay in the extension. A first preview,
-compile, export, or run action also offers workspace setup. **Don't ask here**
-remembers a workspace that should remain unconfigured.
-
-Python is optional. **Inkwell: Setup Python Environment** creates a project
-virtual environment through observed processes and verifies it before reporting
-success. See the [configuration guide](docs/configuration.md) and
-[syntax guide](guide.md) for document and project choices.
-
-### Health checks and setup progress
-
-Activation reads only a cached light health result. It does not scan TeX
-packages, run installer commands, or access the network. A fresh light check
-verifies packaged assets, executable versions, editor versions, and workspace
-state. A full check also tests cross-reference conversion, TeX ownership and
-required files, and a PDF build in a temporary project.
-
-**Setup / Repair** records each stage: check, consent for system changes,
-installation, fresh verification, project migration, and smoke PDF. It reports
-completion only after the required checks pass; failures retain diagnostics and
-can be resumed. See [the installation guide](docs/installation.md) for the shared
-JSON/text doctor, retained logs, and release validation requirements.
-
-### Build from source
-
-```bash
+git clone https://github.com/goldberg-consulting/measured.one.inkwell-extension.git
+cd measured.one.inkwell-extension
 npm ci
 npm run verify
 npm run package:vsix
 node scripts/verify-vsix.mjs inkwell-0.5.0.vsix --tag v0.5.0
 ```
 
-Packaging bundles the extension and its headless doctor, installer, and compiler,
-then records every required runtime asset hash. The verifier checks the actual
-VSIX against that contract.
+In your editor, choose **Extensions: Install from VSIX...**, select
+`inkwell-0.5.0.vsix`, and reload the window. Then run **Inkwell: Setup / Repair**.
+It checks your tools, offers any needed repairs, prepares the project, and
+verifies setup by building a real PDF. On macOS, it can reuse a working TeX
+installation or install missing tools after you approve the plan.
 
-## Quick start
+</details>
 
-1. `Cmd+Shift+P` > **Inkwell: New Project**
-2. Select a folder for your project
-3. Name your document (this becomes the main `.md` filename)
-4. Pick a template (Default, Tufte Handout, Tufte Book VDQI, Rho, TMSCE, Ludus, RMxAA, ETH Report, KTH Letter, or Hipster CV)
-5. Choose whether to set up a Python virtual environment (recommended if your document will have code blocks)
-6. Inkwell creates the project with starter files, example scripts, bibliography, and a syntax guide at `.inkwell/guide.md`
-7. Write your markdown in the generated `.md` file
-8. `Cmd+Alt+R` to **Run** code blocks
-9. `Cmd+Shift+R` to **Compile** to PDF
-10. `Cmd+Shift+V` to open the **Preview** panel (live HTML, compiled PDF, and build log)
+**Linux:** install the VSIX and provide Pandoc 3+, a compatible pandoc-crossref,
+TeX Live, and Mermaid CLI using your platform's package managers. In 0.5,
+**Setup / Repair** checks these tools and prepares the project; automatic system
+installation is currently macOS-only.
 
-## Project structure
+For upgrades, existing TeX installations, editor selection, and troubleshooting,
+see the [installation guide](docs/installation.md).
 
-Everything Inkwell manages lives under **one** `.inkwell/` at the **Inkwell project root** (the first folder found when walking up from your `.md` file that contains `.inkwell/`—usually the repo root next to `.cursor/`). Nested markdown (e.g. `docs/chapter.md`) does **not** get a second `.inkwell/` beside the file.
+## Your first PDF
 
-```
-my-paper/
-  my-paper.md              # your document (any path under the project root)
-  requirements.txt         # Python dependencies (if enabled)
-  venv/                    # Python environment (if enabled)
-  .inkwell/
-    manifest.json          # project config (template, settings)
-    guide.md               # syntax reference
-    scripts/               # analysis code (sine_plot.py, scatter.py, ...)
-    figures/               # static images, diagrams
-    references/            # .bib files
-    examples/              # demo .md files for each template
-    outputs/               # per-document cache dirs (gitignored), e.g. outputs/my-paper/
-    compiled/              # injected markdown for Pandoc (gitignored), e.g. compiled/my-paper.md
-    mermaid/               # cached mermaid renders (gitignored, shared by hash)
-    templates/             # project-local template overrides (optional)
-  .gitignore
-```
+These steps use **0.5**. Open the Command Palette with **Cmd+Shift+P** on macOS
+or **Ctrl+Shift+P** on Linux, then type **Inkwell** to find its commands.
 
-## Features
+1. Choose **Inkwell: New Project**. Pick a folder, name your document, and select
+   **Inkwell Default** for a straightforward report.
+2. Follow the setup prompts. Choose the Python environment option to run the
+   starter's analysis examples; Python is optional for ordinary writing.
+3. Edit the `.md` file that opens. Choose **Inkwell: Open Preview** to see it
+   beside your source.
+4. If your document has runnable code, click **Run** and wait for it to finish.
+5. Click **Compile**, then open the **PDF** tab. Your PDF is saved beside the
+   source: `my-report.md` becomes `my-report.pdf`.
 
-### Live preview
+**Already have a Markdown project?** Open its folder, run **Inkwell: Setup /
+Repair**, then open your document and its preview. Setup preserves your edited
+files and offers comparisons when bundled starter files have changed.
 
-Side panel (`Cmd+Shift+V`) with three tabs:
+![Inkwell Draft preview with live document content and Run controls](media/run-preview.jpg)
 
-- **Preview**: HTML rendering styled to match the PDF output. Supports KaTeX math, Mermaid diagrams, cross-references (`@fig:`, `@sec:`, `@tbl:`, `@eq:`), citation styling, title/abstract blocks, and frontmatter font overrides (`mainfont`, `monofont`). Updates as you type.
-- **PDF**: compiled output rendered in-panel
-- **Log**: compilation output, code block stderr, errors
+*0.5 preview closeup. Write and inspect results in Draft; Compile updates the PDF.*
 
-### Compilation output
+## Everyday controls
 
-Detailed build logs are available in the **Output** panel (`Cmd+Shift+U`). Select **Inkwell LaTeX** from the dropdown in the top-right corner of the panel. This shows:
+Keep your Markdown editor focused when using these shortcuts. On macOS,
+**Option** is the **Alt** key.
 
-- Template and PDF engine used for each compilation
-- Pass/fail status with elapsed time
-- LaTeX errors and warnings with line numbers
-- Missing package names (with quick-fix code actions in the editor)
-- Unresolved `{{key}}` binding placeholders and missing declared bibliography files, as warnings with source lines — before the PDF ships with literal braces or dropped citations
-- How the generated preamble was applied (merged into the template, or `-H` fallback) and which bibliography files were passed
-- Full Pandoc and LaTeX log output for debugging
+| Do this | Toolbar or command | macOS | Linux |
+| --- | --- | --- | --- |
+| Open the preview | **Inkwell: Open Preview** | Cmd+Shift+V | Ctrl+Shift+V |
+| Execute document code | **Run** / **Inkwell: Run Code Blocks** | Cmd+Option+R | Ctrl+Alt+R |
+| Build or refresh the PDF | **Compile** / **Inkwell: Compile PDF** | Cmd+Shift+R | Ctrl+Shift+R |
+| Stop a running analysis | **Cancel** in the Run panel | — | — |
+| Save a PDF somewhere else | **Inkwell: Export PDF to File...** | — | — |
 
-### Runnable code blocks
+**Run and Compile are separate steps.** After changing analysis code, run it
+again, then compile to put the new results in your PDF. Export also recompiles
+the document at the location you choose.
 
-Embed scripts directly or reference external files. Python, R, Shell, Node.
+The preview's **Print** button currently rebuilds the PDF. To print on paper,
+open the saved PDF in a PDF viewer and use its Print command.
 
-````markdown
-```{python file=".inkwell/scripts/analysis.py" output="results" caption="My figure" label="analysis"}
-```
+### Choose what you see
 
-```{python display="both" output="scatter" caption="Scatter plot with regression."}
-import numpy as np
-# ... your code here ...
-```
+- **Draft** updates as you type. Use it for writing, math, citations, and results.
+- **Print View** approximates the printed page layout while you work.
+- **PDF** shows the actual compiled file. Use this to check final page breaks,
+  fonts, figures, and references.
+- **Log** shows run and compilation messages when something needs attention.
 
-```{shell display="both"}
-echo "Built on $(date)"
-```
-````
+For a `.tex` document, the first tab is **Source** instead of Draft.
 
-**Code block attributes:**
+![Inkwell PDF tab showing the compiled report and PDF viewing controls](media/compile-preview.jpg)
 
-| Attribute | Description |
-|-----------|-------------|
-| `file`    | Run an external script instead of inline code |
-| `output`  | Name for cached artifacts (figures, tables) |
-| `display` | Visibility: `output`, `both`, `code`, `none` |
-| `env`     | Point a specific block at a different venv |
-| `caption` | Figure or table caption in the compiled PDF |
-| `label`   | Cross-reference label (produces `fig:label` or `tbl:label`) |
-| `cache`   | Set to `"false"` to re-run every time, skipping the content cache |
+*The PDF tab shows the actual compiled report. [Image sources](media/README.md).*
 
-Results cache under `.inkwell/outputs/<document-key>/` (derived from each source file’s path relative to the project root). Only re-run when the code actually changes.
+### Change reading size or document style
 
-### Generated tables and figures
+**Just make it easier to read:** use **A−**, **A+**, and **Reset** in Draft or
+Print View. In PDF, use **Fit width**, **Fit page**, or **Custom zoom**. These
+viewing controls are remembered and leave the exported document unchanged.
 
-Code blocks that write files to `INKWELL_OUTPUT_DIR` automatically embed them in the PDF. The `output` attribute names the artifact, and the file extension determines how it renders:
+**Change the exported document:** run **Inkwell: Configure Document Style**.
+Choose **This document** or **Project defaults**, then adjust a supported font,
+size, or spacing option. Save the document and compile again. A lock means the
+selected template controls that setting. [More about style](docs/style.md).
 
-- **Images** (`.png`, `.jpg`, `.svg`, `.pdf`, `.eps`) render as figures
-- **CSV** files render as literal-cell tables using the document's table style
-- **JSON** arrays of objects render as tables
+**Change the layout:** run **Inkwell: Select LaTeX Template** to set the project
+template. A document's `template:` frontmatter takes precedence. Browse the
+[ten built-in templates and custom-template guide](docs/templates.md).
 
-Markdown, CSV, and JSON tables share presets, captions, column alignment, colors,
-spacing, and width settings. Default and ETH Report support booktabs, grid, plain,
-zebra, and compact; fixed templates report unsupported choices.
-See [body-table settings and examples](docs/tables.md).
-- **Markdown** (`.md`) and **LaTeX** (`.tex`) files are passed through raw
+**Compile automatically:** open editor Settings, search for
+`inkwell.autoCompile`, and choose `onSave` or `interval`. The default is `off`;
+the interval defaults to 60 seconds. Automatic compilation does not run your
+analysis code.
 
-````markdown
-```{python output="summary" caption="Descriptive statistics." label="stats"}
-import os, numpy as np
-out = os.environ.get("INKWELL_OUTPUT_DIR", ".")
-with open(os.path.join(out, "summary.csv"), "w") as f:
-    f.write("Variable,n,Mean,Std\n")
-    f.write("x,150,-0.05,0.85\n")
-    f.write("y,150,-0.05,0.71\n")
-```
-````
+## Start with a small document
 
-The `caption` and `label` attributes add a numbered caption and a cross-referenceable label (`@Tbl:stats` in this case).
-
-### Inline data binding
-
-Code blocks can export named values that you reference later in prose, captions, or table cells. This connects your computed results to your writing so the numbers stay in sync.
-
-**Step 1: Export values from a code block** by printing `::inkwell key=value` lines. These lines are stripped from visible output:
-
-```python
-print(f"::inkwell sample_n={len(x)}")
-print(f"::inkwell corr_r={r_val:.3f}")
-print(f"::inkwell slope={m:.3f}")
-```
-
-**Step 2: Reference them in your markdown** using one of two syntaxes:
-
-| Syntax | What it does | Example |
-|--------|-------------|---------|
-| `{{key}}` | Inserts the raw value as-is | `{{sample_n}}` becomes `150` |
-| `` `{python} expr` `` | Evaluates a Python expression with all exported variables pre-loaded | `` `{python} f"{float(corr_r):.2f}"` `` becomes `0.87` |
-
-Use `{{key}}` for values that need no formatting (counts, labels). Use `` `{python} expr` `` when you need to format, round, or compute: f-strings, arithmetic, conditionals, and function calls all work. Variables are loaded as strings, so cast with `float()` or `int()` as needed.
+Save this as `my-report.md` in your prepared project, open Preview, and Compile:
 
 ```markdown
-The model was fitted to {{sample_n}} observations, yielding
-$r = `{python} f"{float(corr_r):.2f}"`$ and
-$\hat\beta = `{python} f"{float(slope):.1f}"`$.
+---
+title: My first report
+author: Your name
+template: default
+---
+
+# Findings
+
+Write in **Markdown**, including lists, links, and math: $E = mc^2$.
+
+## Next steps
+
+- Add a figure or table.
+- Compile and check the PDF.
 ```
 
-Re-run the code blocks (`Cmd+Alt+R`) after adding or changing `::inkwell` exports so the variable store picks up the new values.
+### Add analysis when you need it
 
-**Binding safety.** Blocks can also export many values at once by writing a `vars.json` artifact (`output="vars"`); its values must be flat scalars — strings, numbers, booleans. Objects and arrays are skipped with a log message instead of silently rendering as `[object Object]`. Any `{{key}}` that survives substitution — a typo, a stale payload, or blocks that were never run — produces a compile warning pointing at the offending line, so a dead binding can't ship as literal braces.
-
-### Mermaid diagrams
-
-Fenced mermaid blocks compile to figures with full cross-reference support. The preview panel renders them client-side via mermaid.js; PDF compilation uses `mmdc` (mermaid-cli) to produce high-resolution PNG images that Pandoc embeds directly in the LaTeX output.
+For executable code, use braces around the language name. For example, after
+**Inkwell: Setup Python Environment (venv)**:
 
 ````markdown
-```{mermaid caption="System architecture" label="arch"}
-graph LR
-    A[Client] --> B[API Gateway]
-    B --> C[Service]
-    C --> D[Database]
+```{python id="summary" display="both"}
+values = [12, 18, 24]
+print(f"Mean: {sum(values) / len(values):.1f}")
 ```
 ````
 
-Reference the diagram with `@Fig:arch` anywhere in the document. Plain ` ```mermaid ` blocks (without attributes) also render, but without captions or labels. All diagram types that `mmdc` supports work: flowcharts, sequence diagrams, ER diagrams, state diagrams, Gantt charts, and more.
+Click **Run**, then **Compile**. `display="both"` includes the code and its
+output; use `output`, `code`, or `none` for other display choices.
 
-Rendered artifacts are cached in `.inkwell/mermaid/` by content hash. A diagram only re-renders when its source changes.
+For longer analyses, use **Extract Code Block to Script** to move code into an
+editable file under `.inkwell/scripts/`. Generated results and run history live
+under `.inkwell/runs/`. Declare data files with `inputs=` so changes invalidate
+cached results. See [editable scripts and run controls](docs/run-files.md).
 
-**Requirements:** Homebrew `mermaid-cli` (installed by Setup / Repair) for PDF compilation. If `mmdc` is not installed, mermaid blocks pass through as code listings.
+### Add references
 
-### Editable run scripts
+Use **Inkwell: Configure Bibliography** to select your `.bib` files and citation
+style. Type `@` in the document for citation suggestions. Use **Inkwell:
+Bibliography Doctor** to diagnose missing files or duplicate keys.
+[Citations and cross-references](docs/references.md) explains the details.
 
-**Extract Code Block to Script** creates editable source under `.inkwell/scripts/`.
-Use **Run This Block**, **Run Changed Blocks**, and **Show Current Run Details**
-from the Command Palette or CodeLens. Run commands save stable fence IDs before
-execution and reject stale or failed results. See the [run-file guide](docs/run-files.md).
+## When something needs attention
 
-### Citations and bibliography
+- **A tool is missing or setup was interrupted:** run **Inkwell: Setup / Repair**.
+- **The PDF looks old:** wait for Run to finish, then Compile. Check the PDF tab.
+- **A run or compile failed:** open **Log**. For detailed compiler output, open
+  the editor's **Output** panel and select **Inkwell LaTeX**.
+- **Your font or layout change has no effect:** check for document frontmatter
+  overriding project defaults, or a template lock in **Configure Document Style**.
 
-Add a `.bib` file and reference it in your frontmatter:
+## Go further
 
-```yaml
-bibliography: .inkwell/references/refs.bib
-link-citations: true
-```
+- [Example gallery](docs/examples.md) — papers, reports, books, letters, and CVs.
+- [Syntax guide](guide.md) — frontmatter, code, figures, math, and diagrams.
+- [Configuration](docs/configuration.md) — document settings, project defaults, and upgrades.
+- [Tables](docs/tables.md) · [References](docs/references.md) · [Preview behavior](docs/preview-and-performance.md).
+- [Releases](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases) · [Report an issue](https://github.com/goldberg-consulting/measured.one.inkwell-extension/issues).
 
-Cite with standard Pandoc syntax: `[@knuth1984]`, `[@harris2020; @hunter2007]`. Inkwell runs `--citeproc` automatically. A formatted bibliography appears wherever you place a `## References` heading.
+Contributing? Run `npm run verify` before opening a PR. To build a distributable
+extension, use `npm run package:vsix`; see [release verification](docs/release.md).
 
-**Numeric citations by default.** Without a declared style, citations render through Inkwell's bundled numeric CSL: bracketed, comma-grouped (`[@a; @b; @c]` becomes **[1,2,3]**), with a numbered reference list in order of first citation. Both the PDF and the live preview use it. Declare `csl:` in frontmatter (or in `defaults.yaml`) to use any other CSL style — author-date, IEEE, Vancouver, a journal's own file.
-
-**Section-level or document-level bibliographies.** The default is one reference list for the whole document. Set `bibliography-scope: section` and every top-level section (chapters in book templates) gets its own reference list at its end — place a `## References` heading at the end of each citing chapter, exactly like the document-level convention. Citation numbers restart per section. `section-bibs-level: 2` moves the split to a deeper heading level. See the [Tufte Book demo](examples/demo-tufte-book-vdqi.md) for a working per-chapter setup.
-
-An explicit `bibliography:` list replaces automatic discovery, and the first file wins when citation keys overlap. Every duplicate definition is diagnosed. Without a declared list, Inkwell discovers sorted `.bib` files in the project root, `references/`, and `.inkwell/references/`. Missing files stop compilation with a located diagnostic.
-
-Use **Inkwell: Configure Bibliography** to choose or create files, select CSL, and change reference styling. The command makes one undoable unsaved frontmatter edit. Type `@` for suggestions, hover for source details, or run **Bibliography Doctor** to open reported problems. See the [bibliography guide](docs/references.md) for canonical settings and compatibility.
-
-### Table of contents, list of figures, list of tables
-
-```yaml
-toc: true
-lof: true
-lot: true
-```
-
-### Python environments
-
-Set `python-env: ./venv` in your frontmatter for the whole document, or `env="./other-venv"` on a single block. The **Setup Python Environment** command creates the venv and installs from `requirements.txt`.
-
-### Formatting from frontmatter
-
-Style the compiled output without editing LaTeX:
-
-```yaml
-inkwell:
-  code-bg: "#f5f5f5"
-  code-border: true
-  code-font-size: small
-  tables: booktabs
-  table-font-size: small
-  hanging-indent: true
-  columns: 2
-```
-
-`inkwell:` styles compose with your own `header-includes:` block — Inkwell merges its generated preamble into the template ahead of your commands, so custom LaTeX always renders and wins any conflict. (Previously, setting any `inkwell:` style key silently discarded the document's `header-includes`.)
-
-Use **Inkwell: Configure Document Style** to choose a font, physical point size,
-spacing, or heading/code/table/caption/reference size. Save the choice as one
-undoable frontmatter edit or as project defaults. Default and ETH Report support
-these controls; fixed templates show their locked effective values. Legacy
-`fontsize`, `mainfont`, `sansfont`, `monofont`, and flat style keys remain readable.
-See [document styling](docs/style.md) for supported values and compatibility.
-
-The preview toolbar's **A− / A+ / Reset** controls change readability from 50% to
-200%, independently of the document. The workspace remembers the preference;
-`inkwell.preview.fontScale` supplies its initial value. PDF **Fit width**, **Fit
-page**, and **Custom zoom** are separate controls. These viewer controls never
-change the PDF or saved document.
-
-Math, diagrams, highlighting, and PDF viewing work offline. The PDF viewer keeps
-at most six page canvases and reuses the loaded file while you zoom or scroll.
-Compile requests preserve each document, and unchanged timed builds reuse a
-verified successful output. See [preview and compilation](docs/preview-and-performance.md).
-
-### Self-contained `.inkwell/` workspace
-
-All extension-managed resources live under a single `.inkwell/` directory at the **project root**: scripts, figures, references, examples, per-document output caches (`.inkwell/outputs/<doc-key>/`), compiled staging (`.inkwell/compiled/`), shared mermaid cache, and generated run history. Built-in templates stay in the extension. Markdown can live in subfolders; with a **single-folder workspace** opened at the repo root, Inkwell uses that root’s `.inkwell/` (not a nested `.inkwell` next to the file). **Multi-Inkwell monorepos:** open each subproject as its own workspace folder (multi-root), or only the root that should own `.inkwell/`. The scaffold creates the full structure via **New Project** or **Setup Workspace**. Re-running Setup Workspace backfills new files from extension updates.
-
-## Templates
-
-Inkwell ships with ten templates. Each template includes a Pandoc `.latex` wrapper that compiles with the template's native document class. Templates declare their preferred PDF engine (`xelatex` or `pdflatex`) in `template.json`; Inkwell selects the right one automatically.
-
-| Template | Class | Engine | Description |
-|----------|-------|--------|-------------|
-| **Inkwell Default** | `article` | xelatex | Clean article with theorem environments, code highlighting, title page |
-| **Tufte Handout** | `tufte-handout` | pdflatex | Edward Tufte-inspired layout with wide margins, sidenotes, and margin figures |
-| **Tufte Book VDQI** | `tufte-book` | pdflatex | Full book layout with VDQI-style title page, parts, chapters, and front matter |
-| **Rho Academic** | `rho` | pdflatex | Two-column academic article with colored headers, abstract box, footer metadata |
-| **TMSCE** | `tmsce` | pdflatex | Transactions on Mathematical Sciences and Computational Engineering |
-| **Ludus Academik** | `ludusofficial` | xelatex | Ludus Academik Journal (themed, two-column) |
-| **RMxAA** | `rmaa-rho` | pdflatex | Revista Mexicana de Astronomia y Astrofisica (v4.6, two-column) |
-| **KTH Letter** | `kth-letter` | pdflatex | Official KTH (Royal Institute of Technology) letterhead |
-| **ETH Report** | `standard` (KOMA) | xelatex | ETH Zürich IVT working paper with title page, abstract, keywords; frontmatter `fontsize`/`geometry`/`linestretch`/`mainfont` overrides |
-| **Hipster CV** | `simplehipstercv` | pdflatex | Two-column resume/CV with shaded sidebar, name banner, and logo timeline |
-
-Select a template with `template: tufte` in your YAML frontmatter, or use `Cmd+Shift+P` > **Inkwell: Select LaTeX Template**.
-
-Journal-specific metadata (DOI, volume, issue, author affiliations, received/accepted dates) is set through YAML frontmatter. See the example files in [`examples/`](examples/) for complete working documents with each template. When you scaffold a project, these are copied to `.inkwell/examples/` for reference.
-
-### Custom templates
-
-You can add your own journal or house style by creating a template directory. Templates live in one of three locations, searched in this order:
-
-| Location | Scope | Path |
-|----------|-------|------|
-| Built-in | Ships with Inkwell | `<extension>/templates/<name>/` |
-| Global | All projects on this machine | `~/.inkwell/templates/<name>/` |
-| Project-local | Single project only | `.inkwell/templates/<name>/` |
-
-A global or project-local template with the same name as a built-in will override it, provided the override includes its own `.latex` Pandoc wrapper. Directories that contain only supporting files (`.cls`, `.sty`, images) without a `.latex` wrapper will not shadow a built-in template.
-
-#### Creating a template
-
-A minimal template directory looks like this:
-
-```
-my-journal/
-  template.json          # required: manifest
-  my-journal.latex       # required: Pandoc template wrapper
-  my-journal.cls         # the journal's LaTeX document class
-  my-journal.sty         # style files, if any
-  logos/logo.png         # images referenced by the class
-```
-
-**Step 1: Create the manifest.** `template.json` declares the template name and preferred PDF engine:
-
-```json
-{
-  "name": "My Journal",
-  "description": "Short description shown in the template picker.",
-  "engine": "xelatex"
-}
-```
-
-`engine` must be `"xelatex"` or `"pdflatex"`. Inkwell selects the right one automatically at compile time.
-
-**Step 2: Write the Pandoc template wrapper.** This is a `.latex` file that bridges Pandoc's variable system (`$title$`, `$body$`, `$for(...)$`, etc.) to the journal class. At minimum it must contain `\documentclass`, `\begin{document}`, `$body$`, and `\end{document}`. A basic starting point:
-
-```latex
-\documentclass{my-journal}
-
-\title{$if(title)$$title$$else$Untitled$endif$}
-\author{$for(author)$$author$$sep$ \and $endfor$}
-
-% Pandoc compatibility
-\providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
-
-$for(header-includes)$
-$header-includes$
-$endfor$
-
-\begin{document}
-\maketitle
-
-$body$
-
-\end{document}
-```
-
-The built-in templates in `templates/` are complete working examples. `rmxaa/rmxaa.latex` shows how to handle dual-language abstracts, author affiliations with superscripts, longtable-to-float conversion for two-column layouts, and Pandoc syntax highlighting. `tmsce/tmsce.latex` and `ludus/ludus.latex` show simpler patterns.
-
-**Step 3: Include supporting files.** Drop the journal's `.cls`, `.sty`, `.bst`, font, and image files into the template directory. Subdirectories are fine; Inkwell adds the template directory to `TEXINPUTS` so LaTeX can find files in nested paths (e.g., `\documentclass{my-class-dir/my-journal}` works).
-
-Inkwell automatically copies these file types to the build directory:
-
-`.cls` `.sty` `.bst` `.bib` `.def` `.fd` `.cfg` `.clo` `.ldf` `.png` `.jpg` `.jpeg` `.pdf` `.eps` `.svg` `.ttf` `.otf` `.woff` `.woff2`
-
-**Step 4: Reference it in your document.** Set the template name in YAML frontmatter:
-
-```yaml
----
-template: my-journal
-title: "Paper Title"
----
-```
-
-Or select it with `Cmd+Shift+P` > **Inkwell: Select LaTeX Template**.
-
-#### Adapting an existing journal class
-
-Most journal submission packages ship a `.cls` file and a sample `.tex` document. To turn one into an Inkwell template:
-
-1. Create a directory under `~/.inkwell/templates/` (or `.inkwell/templates/` in your project)
-2. Copy all `.cls`, `.sty`, `.bst`, font, and image files from the journal package
-3. Create `template.json` with the journal name and the correct engine
-4. Open the sample `.tex` file and translate its preamble into a `.latex` Pandoc wrapper, replacing hardcoded values with Pandoc variables (`$title$`, `$author$`, `$abstract$`, etc.)
-5. Map journal-specific metadata (DOI, volume, affiliations) to custom YAML frontmatter fields and wire them into the wrapper with `$if(field)$...$endif$` blocks
-6. Test with a simple markdown file to verify the output matches the journal's formatting
-
-## Examples
-
-The [`examples/`](examples/) directory holds demo `.md` files for each template. Shared assets for those demos live in the **workspace root** [`.inkwell/`](.inkwell/)—**`scripts/`**, **`references/refs.bib`**, and generated figures under **`figures/`**—the same layout as **New Project / Bootstrap**. Open this repository as the workspace folder so Inkwell resolves `.inkwell/…` from the root.
-
-To try the bundled examples (from the **repository root**):
-
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r examples/requirements.txt
-```
-
-Then open any `examples/*.md` file, hit **Run**, then **Compile**.
-
----
-
-### Inkwell Default
-
-Clean single-column article with table of contents, figures, math, and syntax-highlighted code.
-
-<table><tr>
-<td width="50%">
-
-```yaml
-title: "Inkwell Default Template Demo"
-author: "Inkwell"
-date: "February 2026"
-toc: true
-lof: true
-bibliography: .inkwell/references/refs.bib
-inkwell:
-  code-bg: "#f5f5f5"
-  code-border: true
-  tables: booktabs
-```
-
-Features: TOC, numbered equations, runnable Python code blocks with inline output, figures, tables, and citations.
-
-[Source](examples/demo-default.md)
-
-</td>
-<td width="50%">
-
-![Inkwell Default output](media/examples/demo-default.png)
-
-</td>
-</tr></table>
-
----
-
-### Python Run & Insert
-
-The run-and-insert walkthrough: Python blocks generate the figure, the table, and every number in the prose. Run the blocks (`Cmd+Alt+R`), compile (`Cmd+Shift+R`), and nothing in the PDF can drift from the code.
-
-<table><tr>
-<td width="50%">
-
-````markdown
-```{python display="both" output="trend"
-    caption="Monthly ridership with trend."
-    label="trend"}
-# ...compute, save trend.png...
-print(f"::inkwell corr_r={corr:.3f}")
-```
-
-The fit uses {{n_obs}} observations
-and yields $r = {{corr_r}}$
-($r^2 = `{python} f"{float(corr_r)**2:.2f}"`$).
-````
-
-Features: `::inkwell` exports and `vars.json` bulk bindings, `{{key}}` substitution, inline `{python}` expressions, generated CSV table, grouped numeric citations ([1,2,3]), and unresolved-binding compile warnings.
-
-[Source](examples/demo-python-report.md) | [PDF](examples/demo-python-report.pdf)
-
-</td>
-<td width="50%">
-
-![Python run-and-insert output](media/examples/demo-python-report.png)
-
-</td>
-</tr></table>
-
----
-
-### Tufte Handout
-
-Edward Tufte-inspired layout with wide margins for sidenotes, margin figures, and annotations.
-
-<table><tr>
-<td width="50%">
-
-```yaml
-template: tufte
-title: "On the Principles of Analytical Display"
-author: "Inkwell"
-date: "February 2026"
-abstract: |
-  Good information design relies on showing
-  the data above all else.
-classoption:
-  - justified
-  - a4paper
-bibliography: .inkwell/references/refs.bib
-```
-
-Features: margin notes via `\marginnote{}` or `\sidenote{}`, margin figures via `\begin{marginfigure}`, full-width sections via `\begin{fullwidth}`, `\newthought` for paragraph openers, Palatino typography. Use raw LaTeX for these; fenced divs (`::: {.aside}`, `::: {.fullwidth}`) are silently unwrapped by Pandoc and do not work.
-
-[Source](examples/demo-tufte.md) | [PDF](examples/demo-tufte.pdf)
-
-</td>
-<td width="50%">
-
-![Tufte Handout output](media/examples/demo-tufte.png)
-
-</td>
-</tr></table>
-
----
-
-### Tufte Book VDQI
-
-Full-length book layout using the `tufte-book` class, with a title page and table of contents styled after *The Visual Display of Quantitative Information*.
-
-<table><tr>
-<td width="50%">
-
-```yaml
-template: tufte-book-vdqi
-title: "A Tufte-Style Book"
-subtitle: "With a VDQI Title and Contents Page"
-author: "Inkwell"
-edition: "First edition"
-publisher: "Measured One Press"
-top-level-division: chapter
-toc: true
-lof: true
-copyright: true
-dedication: |
-  Dedicated to readers who prefer evidence.
-epigraphs:
-  - text: "Above all else show the data."
-    author: "Edward R. Tufte"
-```
-
-Features: VDQI-style title page (author top, title above center, publisher at the foot), epigraph/copyright/dedication front matter, `\part{...}` divisions, chapters from `#` headings (`top-level-division: chapter`), plus all Tufte Handout margin features.
-
-[Source](examples/demo-tufte-book-vdqi.md) | [PDF](examples/demo-tufte-book-vdqi.pdf)
-
-</td>
-<td width="50%">
-
-![Tufte Book VDQI output](media/examples/demo-tufte-book-vdqi.png)
-
-</td>
-</tr></table>
-
----
-
-### KTH Letter
-
-Official KTH (Royal Institute of Technology) letterhead with institutional logo and footer.
-
-<table><tr>
-<td width="50%">
-
-```yaml
-template: kth-letter
-name: "Elis Goldberg"
-email: "elis@kth.se"
-web: "www.kth.se"
-telephone: "+46 8 790 60 00"
-dnr: "Dnr: 2026-0042"
-recipient:
-  - "Prof. Ada Lovelace"
-  - "Department of Computing"
-  - "University of London"
-  - "United Kingdom"
-opening: "Dear Professor Lovelace,"
-closing: "Kind regards,"
-```
-
-Features: KTH branded letterhead with school logo, institutional footer with address and contact details, page numbering, recipient address block, section headings, tables (booktabs), code blocks with syntax highlighting, math (amsmath), graphics, and hyperlinks.
-
-*(No bundled demo file — start from the YAML above or scaffold with **New Project** and pick KTH Letter.)*
-
-</td>
-</tr></table>
-
----
-
-### Hipster CV
-
-Two-column resume/CV: full-width name banner, shaded sidebar with photo, about blocks, language skill dots, and contact bubbles, plus a main column of timeline entries with company logos.
-
-<table><tr>
-<td width="50%">
-
-```yaml
-template: hipster-cv
-classoption: [lighthipster]
-first-name: "Eli"
-last-name: "Goldberg"
-tagline: "PhD, MSc"
-photo: "headshot.jpeg"
-sidebar:
-  - title: "About me"
-    text: |
-      Healthcare data scientist,
-      technologist, and investor.
-languages:
-  - name: English
-    note: native
-  - name: French
-    level: B1
-    filled: 2
-    empty: 2
-contact:
-  - icon: At
-    text: elisgoldberg
-    url: "mailto:eli@example.com"
-footer:
-  name: "Eli Goldberg"
-  location: "Boston, USA"
-  email: "eli@example.com"
-```
-
-Features: six color themes via `classoption`, YAML-driven sidebar, `\cvevent{...}` timeline entries with optional logos inside `\begin{cventries}`, `\cvyear{...}` year lists for education/patents/publications, FontAwesome contact bubbles, Raleway typography.
-
-[Source](examples/demo-hipster-cv.md) | [PDF](examples/demo-hipster-cv.pdf)
-
-</td>
-<td width="50%">
-
-![Hipster CV output](media/examples/demo-hipster-cv.png)
-
-</td>
-</tr></table>
-
----
-
-### ETH Report
-
-ETH Zürich IVT working paper with title page, abstract, keywords, and suggested-citation block.
-
-<table><tr>
-<td width="50%">
-
-```yaml
-template: eth-report
-papertype: "Working Paper"
-title: "Signal Decomposition Methods
-        for Urban Traffic Flow Analysis"
-subtitle: "A Computational Approach"
-eth-authors:
-  - name: "Author One"
-    department: "Department"
-    institution: "ETH Zürich"
-    address: "CH-8093 Zurich"
-    email: "author@ethz.ch"
-reportdate: "March 2026"
-reportnumber: "1042"
-keywords: "keyword1, keyword2"
-toc: true
-lof: true
-lot: true
-```
-
-Features: KOMA-Script working-paper title page, report number and date, abstract with keywords, TOC/LOF/LOT front matter, suggested-citation block. Compiles with XeLaTeX: system fonts via `mainfont`, plus `fontsize` / `geometry` / `linestretch` overrides and hyperlinked citations.
-
-[Source](examples/demo-eth-report.md) | [PDF](examples/demo-eth-report.pdf)
-
-</td>
-<td width="50%">
-
-![ETH Report output](media/examples/demo-eth-report.png)
-
-</td>
-</tr></table>
-
----
-
-### RMxAA (Revista Mexicana de Astronomia y Astrofisica)
-
-Two-column astronomy journal with dual-language abstracts, line numbers, and the RMxAA masthead.
-
-<table><tr>
-<td width="50%">
-
-```yaml
-template: rmxaa
-classoption: [9pt, twoside]
-title: "Signal Decomposition in Stellar
-        Light Curves"
-rmxaa-authors:
-  - name: "J. Smith"
-    affiliations: "1"
-  - name: "A. Jones"
-    affiliations: "2"
-rmxaa-affiliations:
-  - id: "1"
-    text: "Universidad Nacional, ..."
-  - id: "2"
-    text: "State University, ..."
-resumen: |
-  Demostramos la plantilla ...
-keywords: "Fourier analysis, ..."
-vol: 100
-received: "January 15, 2026"
-accepted: "February 20, 2026"
-```
-
-Features: superscripted author-affiliation mapping, Spanish resumen, journal header with volume/pages/year, corresponding author block, two-column body with numbered sections.
-
-[Source](examples/demo-rmxaa.md) | [PDF](examples/demo-rmxaa.pdf)
-
-</td>
-<td width="50%">
-
-![RMxAA output](media/examples/demo-rmxaa.png)
-
-</td>
-</tr></table>
-
----
-
-### TMSCE (Transactions on Mathematical Sciences and Computational Engineering)
-
-Single-column journal with DOI, received/revised/accepted dates, and keyword block.
-
-<table><tr>
-<td width="50%">
-
-```yaml
-template: tmsce
-title: "On the Convergence of Fourier
-        Partial Sums"
-tmsce-authors:
-  - name: "J. Smith"
-    superscript: "1"
-  - name: "A. Jones"
-    superscript: "2"
-tmsce-affiliations:
-  - superscript: "1"
-    text: "Dept. of Mathematics, ..."
-  - superscript: "2"
-    text: "Dept. of Applied Sciences, ..."
-journalname: "Transactions on ..."
-doi: "https://doi.org/10.0000/..."
-keywords: "Fourier series, ..."
-received: "15 January 2026"
-accepted: "20 February 2026"
-```
-
-Features: DOI link, corresponding author email, configurable journal name in footer, keywords with date stamps, numbered equations, syntax-highlighted code, bibliography.
-
-[Source](examples/demo-tmsce.md) | [PDF](examples/demo-tmsce.pdf)
-
-</td>
-<td width="50%">
-
-![TMSCE output](media/examples/demo-tmsce.png)
-
-</td>
-</tr></table>
-
----
-
-### Rho Academic Article
-
-Two-column academic layout with colored section headers, styled abstract box, and footer metadata.
-
-<table><tr>
-<td width="50%">
-
-```yaml
-template: rho
-title: "Paper Title"
-journalname: "Rho Journal"
-rho-authors:
-  - name: "Author One"
-    superscript: "1,*"
-  - name: "Author Two"
-    superscript: "2"
-rho-affiliations:
-  - superscript: "1"
-    text: "First University, ..."
-  - superscript: "*"
-    text: "Equal contribution"
-leadauthor: "Author et al."
-logo: "logo.png"
-doi: "https://doi.org/10.0000/..."
-received: "January 10, 2026"
-accepted: "February 15, 2026"
-```
-
-Features: colored section headers, keyword box, corresponding-author block with dates/DOI/license, footer metadata, optional logo, optional line numbers.
-
-[Source](examples/demo-rho.md) | [PDF](examples/demo-rho.pdf)
-
-</td>
-<td width="50%">
-
-![Rho Academic output](media/examples/demo-rho.png)
-
-</td>
-</tr></table>
-
----
-
-### Ludus Academik
-
-Themed two-column layout with color-coded section headers and journal branding.
-
-<table><tr>
-<td width="50%">
-
-```yaml
-template: ludus
-classoption: [red, fullpaper]
-title: "Procedural Content Generation
-        in Digital Narratives"
-shorttitle: "Procedural Content ..."
-ludus-authors:
-  - name: "John Smith"
-    superscript: "1"
-  - name: "Alice Jones"
-    superscript: "2"
-journalname: "LUDUS"
-publicationyear: "2026"
-articledoi: "10.1234/ludus.2026.demo"
-acknowledgments: |
-  The authors thank ...
-```
-
-Features: theme selection (`red`, `blue`, `green`, `orange`), article type (`fullpaper`, `shortpaper`), branded header with journal name and DOI, colored section headings, acknowledgments block.
-
-[Source](examples/demo-ludus.md) | [PDF](examples/demo-ludus.pdf)
-
-</td>
-<td width="50%">
-
-![Ludus Academik output](media/examples/demo-ludus.png)
-
-</td>
-</tr></table>
-
-## Commands
-
-All commands are available from the command palette (`Cmd+Shift+P` / `Ctrl+Shift+P`). Type "Inkwell" to filter.
-
-| Command | Shortcut | Description |
-|---------|----------|-------------|
-| **Inkwell: New Project** | | Scaffold a project with starter files, bibliography, and example scripts under `.inkwell/` |
-| **Inkwell: Setup Workspace** | | Add or update `.inkwell/` with standard subdirectories, examples, and starter files |
-| **Inkwell: Open Preview** | `Cmd+Shift+V` | Side panel with live HTML, compiled PDF, and build log tabs |
-| **Inkwell: Compile PDF** | `Cmd+Shift+R` | Compile through Pandoc + XeLaTeX/pdfLaTeX (engine selected per template) |
-| **Inkwell: Run Code Blocks** | `Cmd+Alt+R` | Execute code blocks and record verified results and history in `.inkwell/runs/` |
-| **Inkwell: Cancel Running Code Blocks** | | Stop in-progress code execution |
-| **Inkwell: Clear Code Block Cache** | | Delete cached outputs so all blocks re-run on next execution |
-| **Inkwell: Export PDF to File...** | | Save the compiled PDF to a chosen location |
-| **Inkwell: Select LaTeX Template** | | Pick from built-in, global, or project-local templates |
-| **Inkwell: Setup Python Environment** | | Create a venv and install from `requirements.txt` |
-| **Inkwell: Setup / Repair** | | Check tools, review repairs, migrate the project, and verify a real PDF build |
-
-**Tip:** If you are developing from a folder (`npm run compile` / watch), reload with `Cmd+Shift+P` > **Developer: Reload Window**. To ship a VSIX, use **`npm run package:vsix`** so all four entry points and the asset manifest are rebuilt. Verify the resulting artifact before installing it.
-
-**Contributor workflow:** Run `npm run verify` before opening a PR (typecheck, ESLint, and template regressions via `scripts/check-template-regressions.mjs`). The same `verify` job runs in GitHub Actions on pushes and PRs to `main`, and the Husky **pre-commit** hook runs `npm run verify` after `npm install`.
-
-## Settings
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `inkwell.autoCompile` | `off` | `off`, `onSave`, or `interval` |
-| `inkwell.autoCompileIntervalSeconds` | `60` | Seconds between auto-compilations |
-| `inkwell.defaultCodeDisplay` | `output` | Default code block visibility |
-
-## Cursor AI agent
-
-Inkwell includes a Cursor agent at `.cursor/agents/inkwell-guide.md`. When working in Cursor, invoke it with `@inkwell-guide` in chat to get help with:
-
-- Writing YAML frontmatter for any template
-- Converting LaTeX documents to Inkwell markdown
-- Setting up code blocks, inline data binding, and cross-references
-- Debugging compilation errors and stale caches
-- Adding custom LaTeX packages via `header-includes`
-
-The agent references the full [Syntax Guide](guide.md) for field names, attribute tables, and conversion rules.
-
-## Releases
-
-### [v0.2.0](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.2.0) (April 6, 2026)
-
-Homebrew cask install (`brew install --cask inkwell`), merged Bootstrap/Update into Setup Workspace, Run Code Blocks shortcut changed to `Cmd+Alt+R`, stability and packaging fixes, release automation.
-
-### [v0.1.9](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.1.9) (March 19, 2026)
-
-Setup Workspace seeds **`.inkwell/scripts/`** (including `convergence_table.py`) and references like New Project.
-
-### [v0.1.8](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.1.8) (March 19, 2026)
-
-Bundled **`.inkwell/`** at repo root for demo scripts and bibliography; example `.md` files use `.inkwell/…` paths consistently.
-
-### [v0.1.7](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.1.7) (March 19, 2026)
-
-Single **project-root** `.inkwell/` for outputs, mermaid, and compiled staging (with per-document subfolders). Prefers the **workspace folder** when it contains `.inkwell/` so nested stray folders don’t take over. See [CHANGELOG](CHANGELOG.md).
-
-### [v0.1.6](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.1.6) (March 19, 2026)
-
-PATH augmentation for **Mermaid (`mmdc`)** and TeX subprocesses when the editor is **GUI-launched** (no shell `PATH`): **nvm**, **fnm**, **Volta**, `~/.npm-global/bin`, plus a one-time login-shell fallback. Toolchain **mmdc** probe matches. README VSIX verification and troubleshooting updated.
-
-See the [CHANGELOG](CHANGELOG.md).
-
-### [v0.1.5](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.1.5) (March 19, 2026)
-
-Consolidated `.inkwell/` workspace, new ETH Report template, and quality-of-life improvements.
-
-- All scaffold resources (scripts, figures, references, examples) moved under `.inkwell/` for a clean project root
-- New **ETH Report** template (ETH Zürich IVT working paper, KOMA-Script, pdfLaTeX)
-- New Project now generates template-specific YAML frontmatter (authors, affiliations, journal metadata)
-- Run Code Blocks button added to editor title bar
-- Fixed toolchain setup re-downloading MacTeX when already installed
-- Fixed mermaid rendering cache and silent error handling
-- Added "default" as template alias for Inkwell Default
-
-See the [CHANGELOG](CHANGELOG.md) for the full list.
-
-### [v0.1.0](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.1.0) (March 9, 2026)
-
-First release.
-
-**Templates**: Default (single-column article), Tufte Handout, Rho (two-column academic), TMSCE, Ludus Academik, RMxAA (astronomy journal), KTH Letter.
-
-**Live preview**: HTML preview with KaTeX math, Mermaid diagrams, cross-references, citations, font matching, and LaTeX table rendering. PDF tab and build log tab.
-
-**Runnable code blocks**: Python, R, Shell, Node. Content-hash caching, inline data binding (`{{key}}` and `` `{python} expr` ``), Mermaid diagram compilation.
-
-**Compilation**: Pandoc + XeLaTeX/pdfLaTeX with per-template engine selection, pandoc-crossref support, bibliography processing, and toolchain detection with guided install.
-
-**Project scaffolding**: `Inkwell: New Project` and `Inkwell: Setup Workspace` commands with starter files, bibliography, example scripts, and syntax guide.
-
-**Quality gates**: CI verify workflow (typecheck + lint + template regression tests), pre-commit hook.
-
-**Bug fixes**: Pandoc 3.x table compatibility (`\usepackage{array}`), Tufte feature detection with build log warnings, bibliography resolution in subdirectories, PDF cache collision and compile deadlock fixes, stale TeX artifact purging.
-
-## License
-
-[Inkwell Source License v1.0](LICENSE). Use it freely, give credit, and if you build something better, contribute it back or share it under the same terms.
+[License](LICENSE)

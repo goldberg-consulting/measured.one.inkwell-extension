@@ -1111,7 +1111,7 @@ export class InkwellPreviewProvider {
       <button class="inkwell-compile-btn" id="print-btn" title="Print / Save as PDF">
         <span>&#128424;</span> Print
       </button>
-      <button class="inkwell-compile-btn" id="run-btn" title="Run Code Blocks (Cmd+Shift+B)" style="display:none;">
+      <button class="inkwell-compile-btn" id="run-btn" title="Run Code Blocks (Cmd+Alt+R / Ctrl+Alt+R)" style="display:none;">
         <span id="run-icon">&#9881;</span> Run
       </button>
       <button class="inkwell-compile-btn" id="compile-btn" title="Compile PDF (Cmd+Shift+R)">

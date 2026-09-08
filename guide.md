@@ -199,7 +199,11 @@ fig.savefig(os.path.join(out, "my_figure.png"), dpi=200)
 
 ### Caching
 
-Results are cached in `.inkwell/outputs/`. Blocks only re-run when their source code changes. Use **Inkwell: Clear Code Block Cache** to force a full re-run.
+Results and history are stored in `.inkwell/runs/`. Inkwell reuses verified
+results while the source, declared `inputs=`, environment, and upstream outputs
+still match. Declare any data files that affect a result so their changes make
+the block stale. Use **Inkwell: Clear Code Block Cache** to force a full re-run;
+your editable scripts are preserved. See [run files and dependencies](https://github.com/goldberg-consulting/measured.one.inkwell-extension/blob/main/docs/run-files.md).
 
 To suppress caching for a specific block (e.g., one that reads live data or uses randomness without a seed), set `cache="false"`:
 
