@@ -1,0 +1,356 @@
+{
+  "schemaVersion": 1,
+  "platform": "darwin-arm64",
+  "reviewedAt": "2026-09-08T03:41:49.571295+00:00",
+  "reviewer": "Codex visual inspection",
+  "fixtureCount": 37,
+  "pageCount": 117,
+  "scope": "Initial rendered baseline review; release candidate comparison is separate.",
+  "intentionalCorrections": [
+    "Ludus values now export and resolve from the seeded scatter script.",
+    "Anonymous demo run IDs are persisted before execution; bulk values and missing figures now appear.",
+    "The book full-width Markdown table is parsed semantically between fenced raw TeX boundaries.",
+    "KTH starred reference headings no longer print an asterisk."
+  ],
+  "fixtures": [
+    {
+      "id": "demo-default",
+      "artifactSha256": "4061c0e4dd3783bf25a5e90cd814fe32ff581f3996d11e4c07851dec1dd81c2c",
+      "pages": {
+        "page-001.png": "19dc523416c3f778f1ae4eb0c5eaae38b84d96d991ce3149337847aa8dfc5518",
+        "page-002.png": "6d6cddcc14a23bc0c0460ddecd9046ba96a776ce32cba407da4184313f94db36",
+        "page-003.png": "462914eb53f50c3573ee3d57bd63c22784435de6dab10c18f3194fa0fa548cd8",
+        "page-004.png": "a3f98e76079059f0e7fb0d94b1dba18d1c8ed2fc842a514d6439c1317338455c"
+      }
+    },
+    {
+      "id": "demo-eth-report",
+      "artifactSha256": "4061c0e4dd3783bf25a5e90cd814fe32ff581f3996d11e4c07851dec1dd81c2c",
+      "pages": {
+        "page-001.png": "940a58abb14f5f5260362ac8eda276e2d8e928b4038eec8f78ce9d5453346237",
+        "page-002.png": "21ea0413734361ace1dc22819a4d7a7bc6d18ea57044d8f2dcb3b185422fabdb",
+        "page-003.png": "582af6e9d68379f4cf9dc5e636caab49d7bf153b95b490234a1b3453845da41e",
+        "page-004.png": "6667d22fc493197f9eafc58758401a2fc7ec22a2c27a1b1081977df34d65e67e",
+        "page-005.png": "8a747e692a3079a22b11f15733b3e883a875c578008eede2b85edb742eddc0a4",
+        "page-006.png": "996511e78d7a9b68aeb7d512926bff7b19bde08831341886016a55206319d173"
+      }
+    },
+    {
+      "id": "demo-hipster-cv",
+      "artifactSha256": "4061c0e4dd3783bf25a5e90cd814fe32ff581f3996d11e4c07851dec1dd81c2c",
+      "pages": {
+        "page-001.png": "1a6f5f7c4baf1109573b864051f165d809402268cb833f3a3b67b2a36f3a6d47"
+      }
+    },
+    {
+      "id": "demo-ludus",
+      "artifactSha256": "4061c0e4dd3783bf25a5e90cd814fe32ff581f3996d11e4c07851dec1dd81c2c",
+      "pages": {
+        "page-001.png": "f6c5d8df433c0d16acd4a68f7f2d7797855a7d4699f84cf75371d50e1013eb3e",
+        "page-002.png": "c23ff585f43f049bca268d3066926efa1d678f7ff641f28699cda68d4704a4d6"
+      }
+    },
+    {
+      "id": "demo-python-report",
+      "artifactSha256": "4061c0e4dd3783bf25a5e90cd814fe32ff581f3996d11e4c07851dec1dd81c2c",
+      "pages": {
+        "page-001.png": "f3a29a57be768e56aab174f35a43f04dc9c53c07c6f6d97287130286f05af464",
+        "page-002.png": "fd85bfbccb28cbe40fa7c92f6424206110789e3999668b0b9943c3f2f57e14f4",
+        "page-003.png": "c8cb831b9b5522bc093dd2407b9cdec61e2f4ab8910e978dcabcd9e042571e78",
+        "page-004.png": "c1d7be856aa0f27cc47ebb03e3cb5a86e635da2c46b33178bb5173fc65ee7fa5",
+        "page-005.png": "38c298d78761df26a90f7c0b5f73f0a70a0aa25fef66d5706978c4121f714f98"
+      }
+    },
+    {
+      "id": "demo-rho",
+      "artifactSha256": "4061c0e4dd3783bf25a5e90cd814fe32ff581f3996d11e4c07851dec1dd81c2c",
+      "pages": {
+        "page-001.png": "f84c0152c0d7136e6e706df3e574f224834e5649b0097e57f2c00f26780be569",
+        "page-002.png": "fe454ff5cdfcf63481c3758d1c7b141bc26fa0af3cf7f0d47b23750a0b0b70c1"
+      }
+    },
+    {
+      "id": "demo-rmxaa",
+      "artifactSha256": "4061c0e4dd3783bf25a5e90cd814fe32ff581f3996d11e4c07851dec1dd81c2c",
+      "pages": {
+        "page-001.png": "b02666817c3fa3bc4d8befd03e1dbfdf9e3cbffb0320cee21e9d6f66d0d3287d",
+        "page-002.png": "b853b6fd422f721c284fe04094f84b792f0d14482ef1c9c75618f3b352ea6500"
+      }
+    },
+    {
+      "id": "demo-tmsce",
+      "artifactSha256": "4061c0e4dd3783bf25a5e90cd814fe32ff581f3996d11e4c07851dec1dd81c2c",
+      "pages": {
+        "page-001.png": "8e27029bbff399c42b99666170d948209ad12c117dbd65318f471c72aed64203",
+        "page-002.png": "08bb9ed5ba5cc2ed2a00cdf36e96bc4d89b16e681f7de276f31b50d94c6e938a",
+        "page-003.png": "68da59fc9a3bc364b7afe07adb781952dd0e202e588d66b55f6ecb05cbfbd744"
+      }
+    },
+    {
+      "id": "demo-tufte",
+      "artifactSha256": "4061c0e4dd3783bf25a5e90cd814fe32ff581f3996d11e4c07851dec1dd81c2c",
+      "pages": {
+        "page-001.png": "4031952fd1d3ab1815c2960368fceaaca0a1d272a92cf651441fdbfd2a66956c",
+        "page-002.png": "c4753d40ef1801e49b1c5a5ccee0d6620fdb93aa29df1781a805846b074cc427",
+        "page-003.png": "64956cd0d30a9bbea32229a5a87a017c04f9b2b21ea37de65eaf1a25363bd0d2"
+      }
+    },
+    {
+      "id": "demo-tufte-book-vdqi",
+      "artifactSha256": "4061c0e4dd3783bf25a5e90cd814fe32ff581f3996d11e4c07851dec1dd81c2c",
+      "pages": {
+        "page-001.png": "2e0c6fcaff3546cad23949f57ee4947ca244f160fcc4f712434fae11e3e978c9",
+        "page-002.png": "57fd31f6314b7d6c468ef1d6f41dc6f6be9ff3131d52a05435a3ccc31fabdf47",
+        "page-003.png": "ed11a5c7b3d31d2323b2e07aa518ab7aa61af875cbc7bd846fef7861b35c59f0",
+        "page-004.png": "bda61fcdb7162dd2434b3392d16e91963c3af715012e1d3d0d4aaac5c76b4a66",
+        "page-005.png": "bbc9a0cb6e96420d38faf31c57bac6641679de51f8fb03d31e59a8e0f62339f6",
+        "page-006.png": "57fd31f6314b7d6c468ef1d6f41dc6f6be9ff3131d52a05435a3ccc31fabdf47",
+        "page-007.png": "c2cd9969b78a11dae0ab707c542f13aee1135592ad92a5f88d129982e9ac162e",
+        "page-008.png": "57fd31f6314b7d6c468ef1d6f41dc6f6be9ff3131d52a05435a3ccc31fabdf47",
+        "page-009.png": "a442c535a1114f14a81f71092f289469d835acc27af21904d3b6adf26be107b0",
+        "page-010.png": "57fd31f6314b7d6c468ef1d6f41dc6f6be9ff3131d52a05435a3ccc31fabdf47",
+        "page-011.png": "d961264ad3be62d7200dfb7c367abfdbbde3775d218ebb4d1275028575aa08d4",
+        "page-012.png": "57fd31f6314b7d6c468ef1d6f41dc6f6be9ff3131d52a05435a3ccc31fabdf47",
+        "page-013.png": "1d7c3c36a43636628349a78e20ff6b1301b7fd7dfae43e11ff755ff87315ac01",
+        "page-014.png": "57fd31f6314b7d6c468ef1d6f41dc6f6be9ff3131d52a05435a3ccc31fabdf47",
+        "page-015.png": "ea4e4ae08cbe685a2527719b4feeb44e8daa361bb5383712889b3ff4378e9674",
+        "page-016.png": "6cec4fb1d82844345f84bd968cb08a8e25e90410f2ab1f6767437540c5ce6b9d",
+        "page-017.png": "fed18c4920bbc71e0777e355ed7859972b05ff3f48752bb1f61fbaf664dd170c",
+        "page-018.png": "57fd31f6314b7d6c468ef1d6f41dc6f6be9ff3131d52a05435a3ccc31fabdf47",
+        "page-019.png": "37082d0777700fcdded75dbcb7f2ff2ea8d39308930ce83970942a7befb36215",
+        "page-020.png": "57fd31f6314b7d6c468ef1d6f41dc6f6be9ff3131d52a05435a3ccc31fabdf47",
+        "page-021.png": "656bc8237266cc9074b7f26807bbceb5343d1acca3c2497f63310879096d943c",
+        "page-022.png": "82cff40814cfabe2fc79333a7787521b812710572c58b9db469a070106ec3dcf",
+        "page-023.png": "b23fe15bb5a255f0a25b275fe2d81f070ae34a77df57c54adcbfa49bc91cea7c",
+        "page-024.png": "57fd31f6314b7d6c468ef1d6f41dc6f6be9ff3131d52a05435a3ccc31fabdf47",
+        "page-025.png": "0874f946021ac167bf5cc46f2bcba5782d6596bc5c597f140013dfeb04b009bf",
+        "page-026.png": "57fd31f6314b7d6c468ef1d6f41dc6f6be9ff3131d52a05435a3ccc31fabdf47",
+        "page-027.png": "f1d758e8f438c2961332de0ef3f2f71864652d385767a408207b5ab49ef94b2b",
+        "page-028.png": "57fd31f6314b7d6c468ef1d6f41dc6f6be9ff3131d52a05435a3ccc31fabdf47",
+        "page-029.png": "50a804ac7b6c53d541847f10e1e8ad30c06123f17c4e663ca99255f0c50206d7"
+      }
+    },
+    {
+      "id": "kth-letter-capabilities",
+      "artifactSha256": "4061c0e4dd3783bf25a5e90cd814fe32ff581f3996d11e4c07851dec1dd81c2c",
+      "pages": {
+        "page-001.png": "09460856ee51ded6b2fcec4e02d9593ff8d8135f9516163ff991efe1e58d5840"
+      }
+    },
+    {
+      "id": "references-default-always",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "ad8657142e7614c3d5f37c1e6d4e85c8ad368ba464d415cb4b027278c0d59621",
+        "page-002.png": "2008893c104ee3e74f9b4676aed501143811d2c78e798f450765beb5a1372983",
+        "page-003.png": "3be23dd04aebf4e297fb7e00856fe6780b9d18b687457be1177c3c3eb932e570"
+      }
+    },
+    {
+      "id": "references-default-never",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "ad8657142e7614c3d5f37c1e6d4e85c8ad368ba464d415cb4b027278c0d59621",
+        "page-002.png": "0871f896a67e05cf54c4d89c96b1d79bcd4b78a8be7db6d22d157aaf5ce20926"
+      }
+    },
+    {
+      "id": "references-eth-report-always",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "5d6a339f4aace91934a1531fd4e337a61642d3ce29aef9e8f83ef8b44d7efeed",
+        "page-002.png": "dc29c85e81afcf4f51c2a65911d7da39dbc108da610600c96b8e72064132dbaa",
+        "page-003.png": "12786c74c9833a8a647d4f4286aae7d5176161d36ff1ee2c9983c40ecedc6548"
+      }
+    },
+    {
+      "id": "references-eth-report-never",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "5d6a339f4aace91934a1531fd4e337a61642d3ce29aef9e8f83ef8b44d7efeed",
+        "page-002.png": "1559158464b192e612f06dee97a52fa068617b1268b7205f1602c3bde1f3090b"
+      }
+    },
+    {
+      "id": "table-bridge-hipster-cv",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "d97fcc186e5e72793e9262e905bf9fd4372f647297def6e37c21c868106df7c5"
+      }
+    },
+    {
+      "id": "table-bridge-ludus",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "20ea12b1a00372234d747dd399d9c7d4f6c78e0f7e33d5c53c55d34587ff547d"
+      }
+    },
+    {
+      "id": "table-bridge-rho",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "c95d3e160433023ab55ee717898fed42aef5b6156463d9cdde522b57bfbd3881",
+        "page-002.png": "9d48b06001bc0c6612c9ab0d70da580e060068027fd608f09ed55e6633c58957"
+      }
+    },
+    {
+      "id": "table-bridge-rmxaa",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "ce921fc87a8a064fa0c11e9affd4fbe8b3e6b1ac4e36f0d56ad83372300fb27e"
+      }
+    },
+    {
+      "id": "table-rich-default",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "03fe04884d7cd2e7feb1cca9d06ef3242f1505f39f3224acf43c70762ba777df",
+        "page-002.png": "d5ea61806ce63d4227d006cc0ba38ed87cba43334a7198d026087007472fb7a0"
+      }
+    },
+    {
+      "id": "table-rich-eth-report",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "e5ce606edba73ed4678bfcb564434ba0a6a996c25d03f91b9d4c4ea550a14897",
+        "page-002.png": "86ba17220eed80d24f677a991c6a1f94bad8534a4b8276f6c4fcd922fe28f173"
+      }
+    },
+    {
+      "id": "tables-default-booktabs",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "7c0d6cec3f53276038a24ad7b35660d82c3462d0d8b035bfc7f58074e6e0eab6",
+        "page-002.png": "01bd3aeceba1783e760c14d8e2b476ed677b58175099317f64413c0608f3fbd6",
+        "page-003.png": "89aa80543b43aaee4c87bc109038fae4542b87954025df5b38d789eb45277d49"
+      }
+    },
+    {
+      "id": "tables-default-compact",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "7c0d6cec3f53276038a24ad7b35660d82c3462d0d8b035bfc7f58074e6e0eab6",
+        "page-002.png": "01bd3aeceba1783e760c14d8e2b476ed677b58175099317f64413c0608f3fbd6",
+        "page-003.png": "9123fb656502b4ec105428aba684d015dad9cb377ecb7c8006f890a96628e056"
+      }
+    },
+    {
+      "id": "tables-default-grid",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "7c0d6cec3f53276038a24ad7b35660d82c3462d0d8b035bfc7f58074e6e0eab6",
+        "page-002.png": "01bd3aeceba1783e760c14d8e2b476ed677b58175099317f64413c0608f3fbd6",
+        "page-003.png": "33fca6b26bcece96a3c40628558d2a57f34adb688a67061be0dbc87a118272e7"
+      }
+    },
+    {
+      "id": "tables-default-plain",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "7c0d6cec3f53276038a24ad7b35660d82c3462d0d8b035bfc7f58074e6e0eab6",
+        "page-002.png": "01bd3aeceba1783e760c14d8e2b476ed677b58175099317f64413c0608f3fbd6",
+        "page-003.png": "2930c57fb2eb416bc3bfca64fac2b8eeacdba20ac7f0f928bbeb44c152fad289"
+      }
+    },
+    {
+      "id": "tables-default-zebra",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "7c0d6cec3f53276038a24ad7b35660d82c3462d0d8b035bfc7f58074e6e0eab6",
+        "page-002.png": "01bd3aeceba1783e760c14d8e2b476ed677b58175099317f64413c0608f3fbd6",
+        "page-003.png": "2a5f6e51cca2b99dc2e4eb28b460f069710aae0e1fa277b198fd45738ae2548e"
+      }
+    },
+    {
+      "id": "tables-eth-report-booktabs",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "2f0df67b684487d52ba77f7b6cd27571938e1574358410d541c998f10dbe466c",
+        "page-002.png": "3f3dad5dac783437f7482ff1f828d8c9a4417e38213f441fa2a601c13db811d6"
+      }
+    },
+    {
+      "id": "tables-eth-report-compact",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "2f0df67b684487d52ba77f7b6cd27571938e1574358410d541c998f10dbe466c",
+        "page-002.png": "70fc231017fecf485f140fa54429921e86640a03dddf89cedf355ba928e8d2e4"
+      }
+    },
+    {
+      "id": "tables-eth-report-grid",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "2f0df67b684487d52ba77f7b6cd27571938e1574358410d541c998f10dbe466c",
+        "page-002.png": "c468be99a44fce80ac2a629e51cc9cef9ab2353437b8ae1faea29ad39ca7eaa5"
+      }
+    },
+    {
+      "id": "tables-eth-report-plain",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "2f0df67b684487d52ba77f7b6cd27571938e1574358410d541c998f10dbe466c",
+        "page-002.png": "f8d9b4258c2e7841f896fade507de96a87101a6e2553b3fd7329d96067077405"
+      }
+    },
+    {
+      "id": "tables-eth-report-zebra",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "2f0df67b684487d52ba77f7b6cd27571938e1574358410d541c998f10dbe466c",
+        "page-002.png": "4b19f1ea6bb74f2b034f0902448fa47d655aa815c3092c371b49df7c28291f65"
+      }
+    },
+    {
+      "id": "typography-default-10",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "425aa6a50d41d34dd7f872330f5f9dcf66b636407c976f7b80a44c7862960bed",
+        "page-002.png": "b9cab15303ef9cc03ac3155f8f236cfe5de864a80e61b071794fd02cd2ed6fca",
+        "page-003.png": "944576437c7b89a384b134b9ee735df3cb32272ee6813ad0acc3617e0c097279"
+      }
+    },
+    {
+      "id": "typography-default-11",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "36f26f01e26a57aad8276c4c940e28c4ae600e9d182a81fc12c8e57f47ee89f1",
+        "page-002.png": "8738f4f0fc9a88af3a9fc94b751e5aae60f906e297b8889aa32b50f8a7d28872",
+        "page-003.png": "12ff197eb7c2f4d9e5d16e27ee7a73686590597b904f2d2e0a3f90c9837cc499"
+      }
+    },
+    {
+      "id": "typography-default-12",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "f388d02f0c1d3e10ea752d77273fbed70651b971b2021836af49e7fc4c0bfa32",
+        "page-002.png": "408ceeb4d8ad3974bbe4e8cabbf79632fb8ed5f9084de24155d22fbb82586127",
+        "page-003.png": "cb7cfc486122a6126dc54d82633669878c94092495d815ae71a443ef5ec12104"
+      }
+    },
+    {
+      "id": "typography-eth-report-10",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "1cf9cc3c0fbec7b481611d06032cbc8715143b550ebb3931de5f9c6155fffe9d",
+        "page-002.png": "63901dc402616c5139a3984c598b5001fcddbf2e5231fb8e557e2418d240ec33"
+      }
+    },
+    {
+      "id": "typography-eth-report-11",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "7eb0cf031f88e188bad6971b8125a862dd1cc93ff231c52f56da58697cc662b7",
+        "page-002.png": "f3c6a76aae4be41e4cb11db577b005a4e3841a5ee05c3d5c20642bdb2b6a5f99"
+      }
+    },
+    {
+      "id": "typography-eth-report-12",
+      "artifactSha256": "2a62faa8112f14a864d7ef3e1754bdc0709a82b411c5f0c14a1732062831e0df",
+      "pages": {
+        "page-001.png": "768f337029dd57153e516d81ca844d5f239f2b1602895e0fa7c1e947935dd2d7",
+        "page-002.png": "d589b3787e84d2fc10d0fc39300f928188b604188b86a7e194277707a43f0b25"
+      }
+    }
+  ]
+}

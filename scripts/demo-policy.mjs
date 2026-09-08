@@ -7,6 +7,7 @@ export const unresolvedPatterns = [
   /(?:Reference|Citation)\s+[`'"][^\n]+?undefined/i,
   /There were undefined (?:references|citations)/i,
   /(?:reference|citation)\s+[^\n]*?(?:not found|undefined|unresolved)/i,
+  /^Unresolved placeholder\s+\{\{/i,
 ];
 
 export function checkWarnings(log, demo, allowlist = []) {
@@ -15,6 +16,13 @@ export function checkWarnings(log, demo, allowlist = []) {
   }
   return [...new Set(log.split(/\r?\n/).filter(line => unresolvedPatterns.some(pattern => pattern.test(line))))]
     .filter(line => !allowlist.some(item => item.demo === demo && new RegExp(item.pattern).test(line)));
+}
+
+export function checkDemoDiagnostics(finalLog, diagnostics, demo, allowlist = []) {
+  // Compiler diagnostics can retain early TeX-pass warnings that subsequently
+  // converge. Bindings originate before TeX and remain final diagnostics.
+  const bindings = diagnostics.filter(item => /^Unresolved placeholder\s+\{\{/i.test(item.message || '')).map(item => item.message);
+  return checkWarnings([finalLog, ...bindings].join('\n'), demo, allowlist);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

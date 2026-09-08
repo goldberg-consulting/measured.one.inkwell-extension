@@ -135,7 +135,7 @@ the chapter text.}
 
 The blank margin figure above is intentional: it keeps the demo self-contained
 without requiring an external asset. In a real book, replace the framed rule
-with `\includegraphics[width=\linewidth]{path/to/figure.pdf}`.
+with a local figure using `\includegraphics`.
 
 \part{Margin and Measure}
 
@@ -184,7 +184,9 @@ combined bibliography wherever the final references heading is placed.
 rhythm, but some comparisons need more width. Tufte layouts solve this by
 allowing occasional full-width material.
 
+```{=latex}
 \begin{fullwidth}
+```
 
 | Page element | Best use | Caution |
 |--------------|----------|---------|
@@ -195,7 +197,9 @@ allowing occasional full-width material.
 
 : Choosing the right page region for analytical content.
 
+```{=latex}
 \end{fullwidth}
+```
 
 The full-width table appears in the flow of the chapter, but it occupies the
 same horizontal measure as the body plus margin. This is helpful for comparative

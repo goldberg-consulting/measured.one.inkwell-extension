@@ -64,6 +64,20 @@ async function until(fn, timeout = 15000) {
   throw new Error('Timed out waiting for the offline preview fixture');
 }
 
+function zoomedPageInk() {
+  const canvas = document.querySelector('[data-page="50"] canvas');
+  if (!canvas || canvas.style.width !== '1224px' || canvas.width !== 1224 || canvas.height !== 1584) return false;
+  // This fixture contains one text operation near the top of each page. Check
+  // its actual painted pixels, including alpha: a newly attached transparent
+  // canvas has zero RGB values and must not count as rendered black text.
+  const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, 300).data;
+  let inkPixels = 0;
+  for (let index = 0; index < pixels.length; index += 4) {
+    if (pixels[index + 3] >= 128 && pixels[index] < 128 && pixels[index + 1] < 128 && pixels[index + 2] < 128) inkPixels++;
+  }
+  return inkPixels >= 20 && { page: 50, cssWidth: canvas.style.width, width: canvas.width, height: canvas.height, inkPixels };
+}
+
 test('real bundled preview renders math, Mermaid, code and bounded PDF pages with external network blocked', { skip: !chrome, timeout: 120000 }, async t => {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'inkwell-offline-browser-'));
   const requests = [], denied = [];
@@ -102,17 +116,36 @@ test('real bundled preview renders math, Mermaid, code and bounded PDF pages wit
     '--remote-debugging-port=0', `--user-data-dir=${temporary}`, '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
   let stderr = '';
   browser.stderr.on('data', data => { stderr += data; });
+  let connection;
+  const waitFor = async predicate => {
+    try { return await until(predicate); }
+    catch (error) {
+      let state;
+      try {
+        state = connection && await Promise.race([connection.evaluate(`({ready:window.previewReady,metrics:window.inkwellPreviewMetrics,
+          errors:window.previewErrors,policies:window.previewPolicies,saved:window.previewSaved,
+          canvases:[...document.querySelectorAll('.pdf-page-placeholder canvas')].map(canvas=>({page:canvas.parentElement.dataset.page,width:canvas.width,height:canvas.height,cssWidth:canvas.style.width})),
+          pdfStatus:document.getElementById('pdf-placeholder')?.textContent,log:document.getElementById('log-entries')?.textContent.slice(-2000)})`), delay(1000).then(() => ({ diagnosticTimeout: true }))]);
+      } catch (cause) { state = { diagnosticError: String(cause) }; }
+      const failure = { predicate: predicate.toString(), error: String(error), assetRoot, browserExit: browser.exitCode,
+        browserSignal: browser.signalCode, state, requests: requests.slice(-100), denied, browserStderr: stderr.slice(-4000) };
+      const file = path.join(os.tmpdir(), `inkwell-offline-failure-${Date.now()}-${process.pid}.json`);
+      fs.writeFileSync(file, JSON.stringify(failure, null, 2) + '\n');
+      t.diagnostic(`Offline browser failure evidence: ${file}`);
+      throw new Error(`Offline preview wait failed: ${predicate.toString()}\n${JSON.stringify(state)}\nEvidence: ${file}`, { cause: error });
+    }
+  };
   t.after(async () => {
     browser.kill('SIGTERM');
     await Promise.race([new Promise(resolve => browser.once('close', resolve)), delay(2000)]);
     fs.rmSync(temporary, { recursive: true, force: true });
   });
-  const debug = await until(async () => {
+  const debug = await waitFor(async () => {
     const portFile = path.join(temporary, 'DevToolsActivePort');
     return fs.existsSync(portFile) && fs.readFileSync(portFile, 'utf8').split('\n')[0];
   });
   const targets = await (await fetch(`http://127.0.0.1:${debug}/json/list`)).json();
-  const connection = await cdp(targets.find(target => target.type === 'page').webSocketDebuggerUrl);
+  connection = await cdp(targets.find(target => target.type === 'page').webSocketDebuggerUrl);
   t.after(() => connection.close());
   await connection.call('Runtime.enable');
   await connection.call('Fetch.enable', { patterns: [{ urlPattern: '*' }] });
@@ -122,7 +155,7 @@ test('real bundled preview renders math, Mermaid, code and bounded PDF pages wit
     connection.call(allowed ? 'Fetch.continueRequest' : 'Fetch.failRequest', allowed ? { requestId: event.requestId } : { requestId: event.requestId, errorReason: 'InternetDisconnected' }).catch(() => {});
   });
   await connection.call('Page.navigate', { url: origin });
-  await until(() => connection.evaluate('window.previewReady === true'));
+  await waitFor(() => connection.evaluate('window.previewReady === true'));
   assert.equal(requests.some(url => url.startsWith('/media/vendor/')), false, 'plain empty preview must not load optional vendors');
   const send = data => connection.evaluate(`window.dispatchEvent(new MessageEvent('message',{data:${JSON.stringify(data)}}))`);
   const base = { documentUri: 'file:///offline.md', sourceVersion: 1, revision: 1 };
@@ -130,23 +163,25 @@ test('real bundled preview renders math, Mermaid, code and bounded PDF pages wit
     '<pre><code class="language-python">def answer():\n    return 42</code></pre><pre><code class="language-mermaid">graph TD; A[Local] --> B[Offline]</code></pre>';
   await connection.evaluate("document.querySelector('[data-tab=print]').click()");
   await send({ ...base, type: 'updateContent', html, pdfUri: resourceOrigin + '/fixture.pdf', title: 'Offline rendering' });
-  await until(() => connection.evaluate("!!document.querySelector('.katex') && !!document.querySelector('.mermaid svg') && !!document.querySelector('code.hljs .hljs-keyword')"));
-  await until(() => connection.evaluate("!!document.querySelector('#print-page-stage .katex') && !!document.querySelector('#print-page-stage .mermaid svg') && !!document.querySelector('#print-page-stage code.hljs .hljs-keyword')"));
+  await waitFor(() => connection.evaluate("!!document.querySelector('.katex') && !!document.querySelector('.mermaid svg') && !!document.querySelector('code.hljs .hljs-keyword')"));
+  await waitFor(() => connection.evaluate("!!document.querySelector('#print-page-stage .katex') && !!document.querySelector('#print-page-stage .mermaid svg') && !!document.querySelector('#print-page-stage code.hljs .hljs-keyword')"));
   assert.equal(requests.some(url => url.includes('pdfjs/')), false, 'PDF engine stays unloaded until the PDF tab opens');
   await connection.evaluate("document.querySelector('[data-tab=pdf]').click()");
-  await until(() => connection.evaluate('window.inkwellPreviewMetrics.renderedPages >= 6'));
+  await waitFor(() => connection.evaluate('window.inkwellPreviewMetrics.renderedPages >= 6'));
   let measured = await connection.evaluate(`({pages:document.querySelectorAll('.pdf-page-placeholder').length,canvas:document.querySelectorAll('.pdf-page-placeholder canvas').length,
     metrics:window.inkwellPreviewMetrics,policies:window.previewPolicies,errors:window.previewErrors,
     ink:[...document.querySelector('canvas').getContext('2d').getImageData(0,0,document.querySelector('canvas').width,document.querySelector('canvas').height).data].some((v,i)=>i%4!==3&&v<128)})`);
   assert.equal(measured.pages, 100); assert.ok(measured.canvas <= 6); assert.equal(measured.metrics.pdfTransfers, 1); assert.equal(measured.ink, true, 'actual PDF.js canvas must contain rendered page text');
   assert.deepEqual(measured.errors, []); assert.deepEqual(measured.policies, []);
   await connection.evaluate("document.querySelector('[data-page=\"50\"]').scrollIntoView({block:'start'})");
-  await until(() => connection.evaluate("!!document.querySelector('[data-page=\"50\"] canvas') && !document.querySelector('[data-page=\"1\"] canvas')"));
+  await waitFor(() => connection.evaluate("!!document.querySelector('[data-page=\"50\"] canvas') && !document.querySelector('[data-page=\"1\"] canvas')"));
   await connection.evaluate("const zoom=document.getElementById('pdf-zoom');zoom.value='200';zoom.dispatchEvent(new Event('change'))");
-  await until(() => connection.evaluate("document.querySelector('[data-page=\"50\"] canvas')?.style.width === '1224px'"));
-  await until(() => connection.evaluate('window.inkwellPreviewMetrics.renderedPages >= 18'));
+  // Zoom correctly cancels old in-flight page tasks, so their historical
+  // completion count is nondeterministic. Assert the current visible output.
+  const page50InkAt200Percent = await waitFor(() => connection.evaluate(`(${zoomedPageInk.toString()})()`));
   measured = await connection.evaluate('({metrics:window.inkwellPreviewMetrics, state:window.previewSaved})');
   assert.equal(measured.metrics.pdfTransfers, 1); assert.ok(measured.metrics.peakCanvases <= 6);
+  assert.ok(await connection.evaluate("document.querySelectorAll('.pdf-page-placeholder canvas').length <= 6"));
   assert.equal(measured.state.pdfFitMode, 'custom'); assert.equal(measured.state.pdfZoom, 200);
   assert.ok(measured.state.scrollByDocument['file:///offline.md'].pdf.top > 0);
   assert.equal(requests.filter(url => url === '/fixture.pdf').length, 1, 'scroll and zoom must not resend or refetch the PDF');
@@ -156,7 +191,7 @@ test('real bundled preview renders math, Mermaid, code and bounded PDF pages wit
     const render=module.default.render;module.default.render=(...args)=>new Promise(resolve=>{window.releaseOldMermaid=()=>{
       module.default.render=render;resolve(render(...args));};});})()`);
   await send({ ...base, revision: 2, sourceVersion: 2, type: 'updateContent', html: '<pre><code class="language-mermaid">graph LR; OLD[Stale diagram] --> X[Must not appear]</code></pre>', pdfUri: resourceOrigin + '/fixture.pdf' });
-  await until(() => connection.evaluate('typeof window.releaseOldMermaid === "function"'));
+  await waitFor(() => connection.evaluate('typeof window.releaseOldMermaid === "function"'));
   await send({ ...base, revision: 3, sourceVersion: 3, type: 'updateContent', html: '<p>Newest content</p>', pdfUri: null });
   await send({ ...base, revision: 2, sourceVersion: 2, type: 'updateContent', html: '<p>STALE content</p>', pdfUri: resourceOrigin + '/fixture.pdf' });
   await connection.evaluate('window.releaseOldMermaid()');
@@ -164,7 +199,7 @@ test('real bundled preview renders math, Mermaid, code and bounded PDF pages wit
   assert.equal(await connection.evaluate("document.getElementById('article-content').textContent"), 'Newest content');
   assert.equal(await connection.evaluate("document.querySelectorAll('.pdf-page-placeholder canvas').length"), 0);
   await send({ ...base, revision: 4, type: 'updateContent', html: '<p>Old document loading PDF</p>', pdfUri: resourceOrigin + '/slow.pdf' });
-  await until(() => connection.evaluate('window.inkwellPreviewMetrics.pdfTransfers === 2'));
+  await waitFor(() => connection.evaluate('window.inkwellPreviewMetrics.pdfTransfers === 2'));
   await send({ revision: 5, documentUri: 'file:///new-document.md', sourceVersion: 1, type: 'updateContent', html: '<p>New document</p>', pdfUri: null });
   await delay(600);
   assert.equal(await connection.evaluate("document.querySelectorAll('.pdf-page-placeholder').length"), 0);
@@ -175,10 +210,10 @@ test('real bundled preview renders math, Mermaid, code and bounded PDF pages wit
   await connection.evaluate("document.querySelector('[data-tab=preview]').click()");
   await send({ revision: 6, documentUri: 'file:///scroll-a.md', sourceVersion: 1, type: 'updateContent', html: longArticle, pdfUri: null });
   await connection.evaluate("document.getElementById('pane-preview').scrollTop=3000");
-  await until(() => connection.evaluate("window.previewSaved.scrollByDocument['file:///scroll-a.md']?.preview?.top === 3000"));
+  await waitFor(() => connection.evaluate("window.previewSaved.scrollByDocument['file:///scroll-a.md']?.preview?.top === 3000"));
   await connection.evaluate("document.querySelector('[data-tab=print]').click()");
   await connection.evaluate("document.getElementById('pane-print').scrollTop=1500");
-  await until(() => connection.evaluate("window.previewSaved.scrollByDocument['file:///scroll-a.md']?.print?.top === 1500"));
+  await waitFor(() => connection.evaluate("window.previewSaved.scrollByDocument['file:///scroll-a.md']?.print?.top === 1500"));
   await connection.evaluate("document.querySelector('[data-tab=preview]').click()");
   await send({ revision: 7, documentUri: 'file:///scroll-b.md', sourceVersion: 1, type: 'renderStarted', documentChanged: true });
   await delay(80);
@@ -186,15 +221,15 @@ test('real bundled preview renders math, Mermaid, code and bounded PDF pages wit
   assert.equal(await connection.evaluate("document.getElementById('pane-preview').scrollTop"), 0, 'a new document starts at its own top');
   assert.equal(await connection.evaluate("document.getElementById('pane-print').scrollTop"), 0);
   await connection.evaluate("document.getElementById('pane-preview').scrollTop=900");
-  await until(() => connection.evaluate("window.previewSaved.scrollByDocument['file:///scroll-b.md']?.preview?.top === 900"));
+  await waitFor(() => connection.evaluate("window.previewSaved.scrollByDocument['file:///scroll-b.md']?.preview?.top === 900"));
   await send({ revision: 8, documentUri: 'file:///scroll-a.md', sourceVersion: 1, type: 'renderStarted', documentChanged: true });
   await delay(80);
   await send({ revision: 8, documentUri: 'file:///scroll-a.md', sourceVersion: 1, type: 'draftContent', html: longArticle });
   await delay(80);
   await send({ revision: 8, documentUri: 'file:///scroll-a.md', sourceVersion: 1, type: 'updateContent', html: longArticle, pdfUri: null });
-  await until(() => connection.evaluate("document.getElementById('pane-preview').scrollTop === 3000"));
+  await waitFor(() => connection.evaluate("document.getElementById('pane-preview').scrollTop === 3000"));
   await connection.evaluate("document.querySelector('[data-tab=print]').click()");
-  await until(() => connection.evaluate("document.getElementById('pane-print').scrollTop === 1500"));
+  await waitFor(() => connection.evaluate("document.getElementById('pane-print').scrollTop === 1500"));
   const selectedRun = { revision: 8, documentUri: 'file:///scroll-a.md', sourceVersion: 1, runId: 1 };
   await send({ ...selectedRun, type: 'runStarted', blockCount: 1, blockIndices: [2] });
   assert.deepEqual(await connection.evaluate("[...document.querySelectorAll('#run-block-list .run-block-item')].map(row=>row.id)"), ['run-block-2']);
@@ -219,7 +254,7 @@ test('real bundled preview renders math, Mermaid, code and bounded PDF pages wit
     const measurements = {};
     for (const [pane, tab, selector] of [['draft', 'preview', '#article-content'], ['print', 'print', '#print-page-stage']]) {
       await connection.evaluate(`document.querySelector('[data-tab=${tab}]').click()`);
-      await until(() => connection.evaluate(`document.querySelector(${JSON.stringify(selector)}).textContent.includes(${JSON.stringify('Body parity ' + fixture.id)}) && document.querySelectorAll(${JSON.stringify(selector + ' .csl-entry')}).length === 2 && !!document.querySelector(${JSON.stringify(selector + ' pre code.hljs')})`));
+      await waitFor(() => connection.evaluate(`document.querySelector(${JSON.stringify(selector)}).textContent.includes(${JSON.stringify('Body parity ' + fixture.id)}) && document.querySelectorAll(${JSON.stringify(selector + ' .csl-entry')}).length === 2 && !!document.querySelector(${JSON.stringify(selector + ' pre code.hljs')})`));
       measurements[pane] = await connection.evaluate(`(${styleParity.measure.toString()})(${JSON.stringify(selector)})`);
       styleParity.assertStyles(measurements[pane], fixture.expected, pane);
     }
@@ -232,7 +267,7 @@ test('real bundled preview renders math, Mermaid, code and bounded PDF pages wit
   assert.deepEqual(denied, [], 'the preview must make no external runtime requests with the network blocked');
   const report = { schemaVersion: 1, recordedAt: new Date().toISOString(), node: process.version, platform: process.platform,
     browser: await connection.call('Browser.getVersion'), assetRoot, vendorVersions: JSON.parse(fs.readFileSync(path.join(assetRoot, 'media/vendor/versions.json'), 'utf8')).packages,
-    ...measured.metrics, fixturePages: 100, actualPdfRequests: requests.filter(url => url.endsWith('.pdf')).length,
+    ...measured.metrics, fixturePages: 100, page50InkAt200Percent, actualPdfRequests: requests.filter(url => url.endsWith('.pdf')).length,
     externalRequests: denied.length, externalNetworkBlocked: true, crossOriginResources: true, printEnhancementsVerified: true, documentScrollIsolationVerified: true, selectedRunProgressVerified: true, cspViolations: [], browserErrors: [],
     styleParity: { verified: true, caseCount: computedStyles.length, templateCount: 10, panes: ['draft', 'print'], physicalPointUnit: '1/72.27 inch', fontCheck: 'computed declared family; PDF golden checks pin actual rendered fonts',
       providerModuleRoot: root, providerAttribution: 'Checkout compiled provider and Pandoc filters; release CI builds these from the release commit. The VSIX ships bundled entrypoints, not standalone provider modules.', clientAssetRoot: assetRoot,

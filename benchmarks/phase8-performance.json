@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "sustainedComparison": true,
+  "artifactSha256": "50df1260e8e75039e8b8b60896f6c62703e546eca6ede63beedfe1c706ece166",
+  "baselineMedianMs": 13054.808541000028,
+  "candidateMedianMs": 8754.322333999982,
+  "confirmationMedianMs": 8918.482333999986,
+  "improvements": [
+    0.32941779218698664,
+    0.31684311524060005
+  ],
+  "demos": [
+    {
+      "name": "demo-default.md",
+      "baselineMedianMs": 984.3601250000029,
+      "candidateMedianMs": 615.6059999999998,
+      "confirmationMedianMs": 617.4976249999963,
+      "regressions": [
+        -0.37461302589842516,
+        -0.37269134606606036
+      ],
+      "sustainedRegression": false
+    },
+    {
+      "name": "demo-eth-report.md",
+      "baselineMedianMs": 2525.074541999995,
+      "candidateMedianMs": 1395.5466670000023,
+      "confirmationMedianMs": 1432.4276670000036,
+      "regressions": [
+        -0.44732456654738817,
+        -0.4327186611031911
+      ],
+      "sustainedRegression": false
+    },
+    {
+      "name": "demo-hipster-cv.md",
+      "baselineMedianMs": 949.7290839999987,
+      "candidateMedianMs": 980.3174169999984,
+      "confirmationMedianMs": 984.2541249999995,
+      "regressions": [
+        0.032207430008534654,
+        0.03635251524002059
+      ],
+      "sustainedRegression": false
+    },
+    {
+      "name": "demo-ludus.md",
+      "baselineMedianMs": 1154.5552500000013,
+      "candidateMedianMs": 716.2371249999997,
+      "confirmationMedianMs": 720.8865420000002,
+      "regressions": [
+        -0.3796423990969693,
+        -0.37561537916873233
+      ],
+      "sustainedRegression": false
+    },
+    {
+      "name": "demo-python-report.md",
+      "baselineMedianMs": 790.512625000003,
+      "candidateMedianMs": 670.3993330000012,
+      "confirmationMedianMs": 683.6275410000017,
+      "regressions": [
+        -0.1519435467586635,
+        -0.1352098380465473
+      ],
+      "sustainedRegression": false
+    },
+    {
+      "name": "demo-rho.md",
+      "baselineMedianMs": 1868.6014580000046,
+      "candidateMedianMs": 1074.2440419999984,
+      "confirmationMedianMs": 1088.612666000001,
+      "regressions": [
+        -0.425107993252997,
+        -0.41741848624844746
+      ],
+      "sustainedRegression": false
+    },
+    {
+      "name": "demo-rmxaa.md",
+      "baselineMedianMs": 2594.4527919999964,
+      "candidateMedianMs": 1301.5085830000025,
+      "confirmationMedianMs": 1304.3929999999964,
+      "regressions": [
+        -0.4983494835546022,
+        -0.4972377204079039
+      ],
+      "sustainedRegression": false
+    },
+    {
+      "name": "demo-tmsce.md",
+      "baselineMedianMs": 750.8717499999984,
+      "candidateMedianMs": 556.0793750000012,
+      "confirmationMedianMs": 564.6351660000073,
+      "regressions": [
+        -0.2594216322561046,
+        -0.2480271551033736
+      ],
+      "sustainedRegression": false
+    },
+    {
+      "name": "demo-tufte-book-vdqi.md",
+      "baselineMedianMs": 660.129666000008,
+      "candidateMedianMs": 692.8864159999939,
+      "confirmationMedianMs": 709.906999999992,
+      "regressions": [
+        0.049621690536152174,
+        0.07540538861342938
+      ],
+      "sustainedRegression": false
+    },
+    {
+      "name": "demo-tufte.md",
+      "baselineMedianMs": 675.2628750000003,
+      "candidateMedianMs": 723.2742080000025,
+      "confirmationMedianMs": 733.8287920000002,
+      "regressions": [
+        0.07110021115850951,
+        0.08673054475266362
+      ],
+      "sustainedRegression": false
+    }
+  ],
+  "failures": [
+    "baseline includes failed, incomplete, or unresolved demo output; no performance waiver is implied."
+  ]
+}

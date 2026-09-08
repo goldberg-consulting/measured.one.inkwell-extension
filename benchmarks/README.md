@@ -30,7 +30,8 @@ unresolved final references, missing expected text, or unsuccessful code runs.
 
 The warning allowlist is empty. Every future exception must name one demo, an
 exact warning pattern, and a reason. First-pass TeX warnings are expected during
-reference convergence; only Pandoc warnings and the final TeX log are judged.
+reference convergence; Pandoc warnings, final TeX warnings, and compiler
+diagnostics for unresolved computed values are judged.
 
 Baseline safety reproductions were run before source edits: six PDF-publication,
 eight runner, three preview, and three Python/scaffold regressions failed. Further
@@ -47,7 +48,49 @@ loading remain separate release gates. To rerun the PDF fixture on a configured
 machine, set `INKWELL_TYPOGRAPHY_PDF=1` and `INKWELL_PDF_PYTHON` to an interpreter
 with PyMuPDF before running `tests/typography-pdf.test.cjs`.
 
-The viewer suite runs the shipped inline client and its minified state module.
+The viewer suite runs the shipped bundled client and its state modules.
 `INKWELL_CHROME_BIN` enables a real headless browser check with a temporary profile
 for PDF fit resizing and reachable page edges at high zoom. It never opens the
 user's normal browser profile or fetches external preview scripts.
+
+## Release measurements
+
+`release-baseline.json` repeats the frozen Phase 0 compiler on the current corpus
+using one unmeasured warmup and five measured iterations. Machine, runtime, source,
+script, and bibliography identities must match subsequent comparisons. Its Python
+report still produces an incomplete PDF, so this baseline cannot silently satisfy
+the release performance gate. The report preserves that failure explicitly.
+
+`scripts/check-demos.cjs --vsix-root=/extracted/extension --vsix=/candidate.vsix`
+uses the packaged compiler and runner in one process. Every extracted archive
+entry is verified before and after the runs. Add `--warmups=1 --repetitions=5` and
+run the experiment twice, without other substantial CPU work. Both reports must
+identify the same VSIX. Environment preparation happens before timing begins.
+The Python fixture environment is copied into the temporary project to obey the
+same containment rules as user projects.
+
+The packaged authoring planner now persists missing block IDs in disposable demo
+copies before execution, matching the editor workflow. Reports retain both the
+original corpus hashes and the prepared-source hashes. Repository documents are
+never modified by the harness.
+
+`phase8-packaged-run1.json`, `phase8-packaged-run2.json`, and
+`phase8-performance.json` are historical diagnostic measurements, not current
+release evidence. Their harness missed unresolved compiler binding warnings and
+did not persist anonymous run IDs. Visual review also found missing exports in
+the seeded scatter example and raw Markdown inside the book's full-width TeX
+example. Correcting these inputs changes the corpus. The original Phase 0 report
+remains unchanged; a valid current performance comparison is still required.
+
+`scripts/check-benchmark-regression.mjs` takes `--baseline=`, `--candidate=`,
+`--confirmation=`, and `--report=` paths. Both corpus medians must improve by at
+least 30 percent. A per-demo regression above 10 percent fails when confirmed on
+both runs. Missing samples, differing machines/runtimes/corpora, incomplete PDFs,
+or mismatched artifacts block the result. A failed baseline needs an explicit
+release decision and follow-up; the comparison never invents a waiver.
+
+Actual editor activation and warm preview responsiveness have a separate harness
+in `scripts/check-extension-host.cjs`. Its report distinguishes synchronous
+callback duration from timer lag. Offline browser counters come from
+`tests/offline-preview.test.cjs`, with `INKWELL_PREVIEW_ASSET_ROOT` set to the
+verified extracted VSIX. These measurements are not substitutes for one another.
