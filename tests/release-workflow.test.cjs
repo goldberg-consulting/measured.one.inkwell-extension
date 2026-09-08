@@ -316,7 +316,9 @@ test('Linux and macOS verify consume one immutable candidate and enforce actual 
   assert.doesNotMatch(commands, /npm run package:vsix/);
   const activation = workflow.jobs.verify.steps.find(step => step.name === 'Activate the exact packaged extension in disposable editor profiles').run;
   assert.match(activation, /editor_path="\$RUNNER_TEMP\/inkwell-editor\/\$EDITOR_BINARY"/);
-  assert.match(activation, /find "\$RUNNER_TEMP\/inkwell-editor" -type f -path '\*\/Contents\/MacOS\/Electron' -print0/);
+  assert.match(activation, /find "\$RUNNER_TEMP\/inkwell-editor" -type d -name '\*\.app' -print0/);
+  assert.match(activation, /Contents\/Resources\/app\/product\.json/);
+  assert.match(activation, /find "\$bundle\/Contents\/MacOS" -mindepth 1 -maxdepth 1 -type f -perm -111 -print0/);
   assert.match(activation, /while IFS= read -r -d '' candidate;/);
   assert.match(activation, /\[ "\$editor_count" -ne 1 \]/);
   assert.match(activation, /\[ ! -x "\$editor_path" \]/);

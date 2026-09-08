@@ -11,6 +11,9 @@ const { spawn, execFileSync } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 
 const repositoryRoot = path.resolve(__dirname, '..');
+// Current VS Code starts some force-enabled builtins roughly 2.5 seconds after
+// extension-host startup even when their manifests were disabled at launch.
+const HOST_SETTLE_MS = 3000;
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const writeJson = (file, value) => fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n');
 function statistics(values) {
@@ -191,8 +194,8 @@ async function main() {
     fixtureHelperSha256: fixtureHelper ? sha256(fs.readFileSync(fixtureHelper)) : null,
     protocol: { samples: opts.samples, warmups: opts.warmups, activationP95LimitMs: 200,
       cache: 'Fresh editor process and empty user profile per iteration; shared OS filesystem cache after warmup.',
-      hostSettleMs: 1000,
-      hostSettleReason: 'Allow unrelated editor builtin startup to settle before activating the still-unloaded Inkwell package.',
+      hostSettleMs: HOST_SETTLE_MS,
+      hostSettleReason: 'Allow delayed force-enabled editor builtin startup to settle before activating the still-unloaded Inkwell package.',
       measuredInterval: 'vscode.Extension.activate() through resolution, including packaged module load.',
       processObservation: 'All Node child_process entrypoints in extension host, from before activate through 300 ms after it resolves; extension stack origins are distinguished from unrelated builtins.',
       editorCleanup: 'Sample editor descendants every 200 ms by parent lineage, retaining PID plus creation-time identities across detached process groups; verify identity before bounded TERM/KILL cleanup on exit, timeout or interrupt.',
@@ -217,7 +220,7 @@ async function main() {
         'inkwell.autoCompile': 'off', 'files.autoSave': 'off' });
       const resultFile = path.join(iteration, 'result.json');
       const configFile = path.join(iteration, 'config.json');
-      writeJson(configFile, { workspace, extensionPath, resultFile, fixtureHelper, fixtureText, previewText, bibliographyText,
+      writeJson(configFile, { workspace, extensionPath, resultFile, fixtureHelper, fixtureText, previewText, bibliographyText, hostSettleMs: HOST_SETTLE_MS,
         fullWorkflow: opts.mode === 'full' && index === opts.warmups + opts.samples - 1,
         warmPreview: opts.mode !== 'activation' && index === opts.warmups + opts.samples - 1 });
       const env = { ...process.env, INKWELL_HOST_TEST_CONFIG: configFile };

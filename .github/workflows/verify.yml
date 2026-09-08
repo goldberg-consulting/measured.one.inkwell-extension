@@ -152,12 +152,16 @@ jobs:
           else
             editor_path=""
             editor_count=0
-            while IFS= read -r -d '' candidate; do
-              editor_path="$candidate"
-              editor_count=$((editor_count + 1))
-            done < <(find "$RUNNER_TEMP/inkwell-editor" -type f -path '*/Contents/MacOS/Electron' -print0)
+            while IFS= read -r -d '' bundle; do
+              [ -f "$bundle/Contents/Resources/app/product.json" ] || continue
+              [ -d "$bundle/Contents/MacOS" ] || continue
+              while IFS= read -r -d '' candidate; do
+                editor_path="$candidate"
+                editor_count=$((editor_count + 1))
+              done < <(find "$bundle/Contents/MacOS" -mindepth 1 -maxdepth 1 -type f -perm -111 -print0)
+            done < <(find "$RUNNER_TEMP/inkwell-editor" -type d -name '*.app' -print0)
             if [ "$editor_count" -ne 1 ]; then
-              printf 'Expected exactly one macOS editor executable, found %s\n' "$editor_count" >&2
+              printf 'Expected exactly one executable in a macOS editor app bundle, found %s\n' "$editor_count" >&2
               exit 1
             fi
           fi
