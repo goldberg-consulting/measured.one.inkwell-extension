@@ -21,6 +21,23 @@ function statistics(values) {
   p95Ms: sorted[Math.ceil(sorted.length * 0.95) - 1], meanMs: mean,
   varianceMs2: values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length };
 }
+function builtinHarnessConfig(editor, platform = process.platform) {
+  const builtinRoot = platform === 'darwin' ? path.resolve(editor, '../../Resources/app/extensions')
+    : platform === 'linux' ? path.resolve(editor, '../resources/app/extensions') : undefined;
+  const disabledBuiltins = [];
+  let editorProduct;
+  if (builtinRoot && fs.existsSync(path.join(builtinRoot, '../product.json'))) {
+    const product = JSON.parse(fs.readFileSync(path.join(builtinRoot, '../product.json'), 'utf8'));
+    editorProduct = { name: product.nameLong, version: product.version, commit: product.commit, date: product.date };
+  }
+  if (builtinRoot && fs.existsSync(builtinRoot)) for (const name of fs.readdirSync(builtinRoot).sort()) {
+    const manifestPath = path.join(builtinRoot, name, 'package.json');
+    if (!fs.existsSync(manifestPath)) continue;
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    if (manifest.main || manifest.browser) disabledBuiltins.push(`${manifest.publisher}.${manifest.name}`);
+  }
+  return { disabledBuiltins, editorProduct };
+}
 function options(argv) {
   const result = { mode: 'full', samples: 5, warmups: 1, timeoutSeconds: 120,
     editor: process.env.INKWELL_EDITOR_BIN || '/Applications/Cursor.app/Contents/MacOS/Cursor' };
@@ -143,20 +160,7 @@ async function main() {
   const entries = readZipEntries(archive);
   const packageJson = JSON.parse(entries.get('extension/package.json'));
   const verified = verifyVsix(archive, { tag: `v${packageJson.version}` });
-  const builtinRoot = process.platform === 'darwin' ? path.resolve(opts.editor, '../../Resources/app/extensions') : undefined;
-  const disabledBuiltins = [];
-  let editorProduct;
-  if (builtinRoot && fs.existsSync(path.join(builtinRoot, '../product.json'))) {
-    const product = JSON.parse(fs.readFileSync(path.join(builtinRoot, '../product.json'), 'utf8'));
-    editorProduct = { name: product.nameLong, version: product.version, commit: product.commit, date: product.date };
-  }
-  if (builtinRoot && fs.existsSync(builtinRoot)) for (const name of fs.readdirSync(builtinRoot).sort()) {
-    const manifestPath = path.join(builtinRoot, name, 'package.json');
-    if (!fs.existsSync(manifestPath)) continue;
-    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    const id = `${manifest.publisher}.${manifest.name}`;
-    if (manifest.main || manifest.browser) disabledBuiltins.push(id);
-  }
+  const { disabledBuiltins, editorProduct } = builtinHarnessConfig(opts.editor);
   // macOS Unix socket paths have a 103-byte limit; the default per-user temp
   // directory is too long once Cursor appends its profile IPC socket name.
   const temporaryRoot = fs.mkdtempSync(path.join(process.platform === 'darwin' ? '/private/tmp' : os.tmpdir(), 'inkwell-host-'));
@@ -252,5 +256,5 @@ async function main() {
     report.error = { message: error.message, stack: error.stack }; process.exitCode = 1; console.error(error.message);
   } finally { report.finishedAt = new Date().toISOString(); writeJson(reportPath, report); }
 }
-module.exports = { trackEditorProcesses };
+module.exports = { trackEditorProcesses, builtinHarnessConfig };
 if (require.main === module) main().catch(error => { console.error(error.stack || error); process.exitCode = 1; });

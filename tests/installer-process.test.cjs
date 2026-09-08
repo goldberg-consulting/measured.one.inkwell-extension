@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { spawn } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const { executeInstallerProcess } = require('../out/installer-process');
 const { RunCancellation } = require('../out/run-process');
 
@@ -25,6 +25,24 @@ function alive(pid) {
 }
 function sandboxDeniesProcessInspection(result) {
   return !process.env.CI && /process-tree inspection failed:.*(?:\bEPERM\b|[Oo]peration not permitted)/.test(result.error || '');
+}
+function canInspectProcessTree() {
+  const probe = spawnSync('/bin/ps', ['-o', 'pid=', '-p', String(process.pid)], { stdio: 'ignore' });
+  return !probe.error && probe.status === 0;
+}
+function processInfo(pid) {
+  const probe = spawnSync('/bin/ps', ['-o', 'ppid=,pgid=,stat=', '-p', String(pid)], { encoding: 'utf8' });
+  if (probe.error || probe.status !== 0) return undefined;
+  const match = probe.stdout.match(/\s*(\d+)\s+(\d+)\s+(\S+)/);
+  return match && { parent: Number(match[1]), group: Number(match[2]), state: match[3] };
+}
+async function waitForReparenting(pid, originalParent) {
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const info = processInfo(pid);
+    if (info && info.parent !== originalParent && !info.state.includes('Z')) return info;
+    await sleep(10);
+  }
+  throw new Error(`Descendant ${pid} never became reparented.`);
 }
 
 test('installer preserves literal argv, environment and the actual process exit status', async t => {
@@ -112,7 +130,10 @@ test('synchronous process inspection failure retains its explicit diagnostic', a
   } finally { childProcess.execFile = originalExecFile; }
 });
 
-test('cancellation also stops a detached descendant in a separate process group', async t => {
+for (const groupKillEperm of [false, true]) test(`cancellation also stops a detached descendant in a separate process group${groupKillEperm ? ' after a denied fallback group signal' : ''}`, async t => {
+  if (groupKillEperm && !canInspectProcessTree()) {
+    t.skip('Local sandbox denies ps; fallback group-signal denial requires observable descendants.'); return;
+  }
   const f = fixture(t), ready = path.join(f.root, 'detached.json'), product = path.join(f.root, 'detached-write');
   const descendant = `process.on('SIGTERM',()=>{});require('node:fs').writeFileSync(${JSON.stringify(ready)},String(process.pid));setTimeout(()=>require('node:fs').writeFileSync(${JSON.stringify(product)},'survived'),1200);setInterval(()=>{},1000);`;
   const parent = `const child=require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(descendant)}],{detached:true,stdio:'ignore'});child.unref();setInterval(()=>{},1000);`;
@@ -120,7 +141,14 @@ test('cancellation also stops a detached descendant in a separate process group'
   const work = executeInstallerProcess(process.execPath, ['-e', parent], f.options, cancellation);
   await waitFor(ready); const pid = Number(fs.readFileSync(ready, 'utf8'));
   t.after(() => { try { process.kill(-pid, 'SIGKILL'); } catch {} });
-  cancellation.cancel(); const result = await work;
+  const originalKill = process.kill;
+  if (groupKillEperm) process.kill = function(target, signal) {
+    if (typeof target === 'number' && target < 0 && signal === 'SIGKILL') { const error = new Error('kill EPERM'); error.code = 'EPERM'; throw error; }
+    return originalKill.call(process, target, signal);
+  };
+  let result;
+  try { cancellation.cancel(); result = await work; }
+  finally { process.kill = originalKill; }
   if (sandboxDeniesProcessInspection(result)) {
     t.skip('Local sandbox denies ps; detached-process cleanup must also pass with normal host permissions.'); return;
   }
@@ -128,6 +156,51 @@ test('cancellation also stops a detached descendant in a separate process group'
   for (let attempt = 0; attempt < 100 && alive(pid); attempt++) await sleep(10);
   assert.equal(alive(pid), false);
   await sleep(1300); assert.equal(fs.existsSync(product), false);
+});
+
+test('a denied installer-group fallback cannot claim success while a reparented group member survives', async t => {
+  if (process.platform === 'win32' || !canInspectProcessTree()) {
+    t.skip('This POSIX process-group regression requires observable process metadata.'); return;
+  }
+  const f = fixture(t), ready = path.join(f.root, 'reparented.json'), product = path.join(f.root, 'reparented-write');
+  const descendant = `process.on('SIGTERM',()=>{});const fs=require('node:fs');fs.writeFileSync(${JSON.stringify(ready)},JSON.stringify({pid:process.pid,parent:process.ppid}));setTimeout(()=>fs.writeFileSync(${JSON.stringify(product)},'survived'),1200);setInterval(()=>{},1000);`;
+  const intermediary = `const fs=require('node:fs'),{spawn}=require('node:child_process');spawn(process.execPath,['-e',${JSON.stringify(descendant)}],{stdio:'ignore'});const timer=setInterval(()=>{if(fs.existsSync(${JSON.stringify(ready)})){clearInterval(timer);process.exit(0)}},5);`;
+  const parent = `const {spawn}=require('node:child_process');spawn(process.execPath,['-e',${JSON.stringify(intermediary)}],{stdio:'ignore'});setInterval(()=>{},1000);`;
+  const cancellation = new RunCancellation();
+  const work = executeInstallerProcess(process.execPath, ['-e', parent], f.options, cancellation);
+  const originalKill = process.kill;
+  let recorded, group;
+  const cleanGroup = () => {
+    const current = recorded && processInfo(recorded.pid);
+    const targetGroup = group || current?.group;
+    try { if (targetGroup && targetGroup !== process.pid) originalKill.call(process, -targetGroup, 'SIGKILL'); } catch {}
+    try { if (recorded?.pid) originalKill.call(process, recorded.pid, 'SIGKILL'); } catch {}
+  };
+  t.after(() => { cancellation.cancel(); cleanGroup(); });
+  await waitFor(ready);
+  recorded = JSON.parse(fs.readFileSync(ready, 'utf8'));
+  const info = await waitForReparenting(recorded.pid, recorded.parent);
+  assert.notEqual(info.group, process.pid, "fixture must use the installer's private process group");
+  group = info.group;
+  process.kill = function(target, signal) {
+    if (typeof target === 'number' && target < 0 && signal === 'SIGKILL') {
+      const error = new Error('kill EPERM'); error.code = 'EPERM'; throw error;
+    }
+    return originalKill.call(process, target, signal);
+  };
+  let result;
+  try { cancellation.cancel(); result = await work; }
+  finally { process.kill = originalKill; }
+  if (sandboxDeniesProcessInspection(result)) {
+    t.skip('Local sandbox denies ps; process-group cleanup must also pass with normal host permissions.'); return;
+  }
+  assert.equal(result.cancelled, true);
+  assert.equal(result.error, undefined);
+  const survivor = processInfo(recorded.pid);
+  assert.ok(!survivor || survivor.state.includes('Z'), 'cleanup must not report success while a reparented installer-group member survives');
+  cleanGroup();
+  await sleep(1300);
+  assert.equal(fs.existsSync(product), false, 'a survivor must be stopped by test cleanup before it can write later');
 });
 
 test('timeout during supervisor startup still stops its private PTY child', async t => {
