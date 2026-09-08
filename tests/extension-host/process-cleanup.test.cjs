@@ -1,9 +1,37 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { once } = require('node:events');
-const { trackEditorProcesses } = require('../../scripts/check-extension-host.cjs');
+const { trackEditorProcesses, builtinHarnessConfig } = require('../../scripts/check-extension-host.cjs');
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+function builtinFixture(t, platform) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'inkwell-linux-editor-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const editor = platform === 'darwin'
+    ? path.join(root, 'Cursor.app', 'Contents', 'MacOS', 'Cursor')
+    : path.join(root, 'VSCode-linux-x64', 'code');
+  const extensions = platform === 'darwin'
+    ? path.join(root, 'Cursor.app', 'Contents', 'Resources', 'app', 'extensions')
+    : path.join(root, 'VSCode-linux-x64', 'resources', 'app', 'extensions');
+  fs.mkdirSync(path.dirname(editor), { recursive: true }); fs.writeFileSync(editor, '');
+  fs.mkdirSync(path.join(extensions, 'json'), { recursive: true });
+  fs.mkdirSync(path.join(extensions, 'markdown'), { recursive: true });
+  fs.writeFileSync(path.join(extensions, '..', 'product.json'), JSON.stringify({ nameLong: 'Code', version: '1.0.0', commit: 'a', date: 'today' }));
+  fs.writeFileSync(path.join(extensions, 'json', 'package.json'), JSON.stringify({ publisher: 'vscode', name: 'json-language-features', main: './server.js' }));
+  fs.writeFileSync(path.join(extensions, 'markdown', 'package.json'), JSON.stringify({ publisher: 'vscode', name: 'markdown-basics' }));
+  return { editor };
+}
+
+for (const [platform, label] of [['linux', 'Linux'], ['darwin', 'macOS']]) test(`${label} host harness disables executable bundled extensions while retaining grammar-only contributions`, t => {
+  const { editor } = builtinFixture(t, platform);
+  const result = builtinHarnessConfig(editor, platform);
+  assert.deepEqual(result.disabledBuiltins, ['vscode.json-language-features']);
+  assert.deepEqual(result.editorProduct, { name: 'Code', version: '1.0.0', commit: 'a', date: 'today' });
+});
 
 async function family(t, { parentExits = false, ignoresTerm = false } = {}) {
   const childCode = `${ignoresTerm ? 'process.on("SIGTERM", () => {});' : ''}setTimeout(() => process.exit(0), 10000);`;

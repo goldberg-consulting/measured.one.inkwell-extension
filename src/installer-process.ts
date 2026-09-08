@@ -91,21 +91,32 @@ export function executeInstallerProcess(command: string, args: string[], options
     } catch (error) { resolve(failure(String(error))); return; }
 
     let stdout = "", stderr = "", control = "", retainedBytes = 0;
-    let error: string | undefined, group: number | undefined;
+    let error: string | undefined, group: number | undefined, cleanupFinished = false;
+    const deferredGroups = new Map<number, string>();
+    const deferredGroupFailure = () => [...new Set(deferredGroups.values())].join("\n");
     let exit: { code: number | null; signal: string | null } | undefined;
     let timedOut = false, maxBufferExceeded = false, stopping = false, killed = false;
     let cleanup: Promise<void> | undefined;
     const limit = options.maxBuffer ?? 50 * 1024 * 1024;
-    const signalGroup = (pid: number | undefined, signal: NodeJS.Signals) => {
+    const signalGroup = (pid: number | undefined, signal: NodeJS.Signals, deferEperm = false) => {
       if (!pid || pid === process.pid) return;
       try { process.kill(-pid, signal); }
-      catch (reason: any) { if (reason.code !== "ESRCH") error ||= `Installer cleanup failed: ${reason.message || String(reason)}`; }
+      catch (reason: any) {
+        if (reason.code === "ESRCH") return;
+        const detail = `Installer cleanup failed: ${reason.message || String(reason)}`;
+        if (deferEperm && reason.code === "EPERM") {
+          deferredGroups.set(pid, detail);
+          if (cleanupFinished) error ||= detail;
+          return;
+        }
+        error ||= detail;
+      }
     };
-    const kill = () => {
+    const kill = (deferGroupEperm = false) => {
       if (killed) return;
       killed = true;
-      signalGroup(group, "SIGKILL");
-      if (!group) signalGroup(launcher.pid, "SIGKILL");
+      signalGroup(group, "SIGKILL", deferGroupEperm);
+      if (!group) signalGroup(launcher.pid, "SIGKILL", deferGroupEperm);
     };
     const stop = () => {
       stopping = true;
@@ -149,19 +160,34 @@ export function executeInstallerProcess(command: string, args: string[], options
             try { process.kill(recorded.pid, "SIGKILL"); } catch {}
           }
         }
-        finally { kill(); }
+        finally { kill(true); }
         // Wait for captured descendants to die even if they moved into another
         // process group (for example a sudo monitor with its own nested PTY).
-        if (captured.size) {
+        // If the final group signal was denied, also terminate and verify every
+        // process still in that private group: a double-fork may have reparented
+        // before the ancestry walk reached it.
+        if (captured.size || deferredGroups.size) {
           for (let attempt = 0; attempt < 100; attempt++) {
             const snapshot = await processes();
-            if (![...captured.values()].some(recorded => { const current = snapshot.get(recorded.pid); return current?.born === recorded.born && !current.state.includes("Z"); })) return;
+            const capturedAlive = [...captured.values()].some(recorded => {
+              const current = snapshot.get(recorded.pid); return current?.born === recorded.born && !current.state.includes("Z");
+            });
+            const groupMembers = [...snapshot.values()].filter(current => deferredGroups.has(current.group) && !current.state.includes("Z"));
+            for (const member of groupMembers) {
+              try { process.kill(member.pid, "SIGKILL"); }
+              catch (reason: any) { if (reason.code === "EPERM") privileged.add(member.pid); else if (reason.code !== "ESRCH") throw reason; }
+            }
+            if (!capturedAlive && !groupMembers.length) {
+              deferredGroups.clear(); return;
+            }
             await delay(10);
           }
           incomplete(privileged.size ? "privileged descendants are still running; use their administrator task terminal to stop them."
+            : deferredGroups.size ? `${deferredGroupFailure()}\nThe installer process group still contains running members after its fallback group signal was denied.`
             : "the process tree still contains running descendants.");
         }
-      })().catch(reason => { error ||= `Installer cleanup could not verify completion: ${String(reason)}`; kill(); });
+      })().catch(reason => { error ||= deferredGroupFailure() || `Installer cleanup could not verify completion: ${String(reason)}`; kill(true); })
+        .finally(() => { cleanupFinished = true; });
     };
     const timer = setTimeout(() => { timedOut = true; stop(); }, options.timeoutMs ?? 3600000);
     const startupTimer = setTimeout(() => {
@@ -189,7 +215,7 @@ export function executeInstallerProcess(command: string, args: string[], options
               && message.pid !== process.pid && (pty || message.pid === launcher.pid)) {
             group = message.pid;
             clearTimeout(startupTimer);
-            if (killed) signalGroup(group, "SIGKILL");
+            if (killed) signalGroup(group, "SIGKILL", stopping);
             else if (stopping) stop();
           } else if (message.type === "exit" && group && !exit && (message.code === null || Number.isInteger(message.code))
               && (message.signal === null || typeof message.signal === "string")) {
