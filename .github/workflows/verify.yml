@@ -65,7 +65,7 @@ jobs:
           - os: macos-14
             platform: macos
             editor_download: darwin-arm64
-            editor_binary: Visual Studio Code.app/Contents/MacOS/Electron
+            editor_binary: ""
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     env:
@@ -147,7 +147,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          command=(node scripts/check-extension-host.cjs --vsix "candidate/$VSIX" --editor "$RUNNER_TEMP/inkwell-editor/$EDITOR_BINARY" --mode activation --samples 5 --warmups 1 --report host.json)
+          if [ "$PLATFORM" = linux ]; then
+            editor_path="$RUNNER_TEMP/inkwell-editor/$EDITOR_BINARY"
+          else
+            editor_path=""
+            editor_count=0
+            while IFS= read -r -d '' candidate; do
+              editor_path="$candidate"
+              editor_count=$((editor_count + 1))
+            done < <(find "$RUNNER_TEMP/inkwell-editor" -type f -path '*/Contents/MacOS/Electron' -print0)
+            if [ "$editor_count" -ne 1 ]; then
+              printf 'Expected exactly one macOS editor executable, found %s\n' "$editor_count" >&2
+              exit 1
+            fi
+          fi
+          if [ ! -x "$editor_path" ]; then
+            printf 'Resolved editor is not executable: %s\n' "$editor_path" >&2
+            exit 1
+          fi
+          command=(node scripts/check-extension-host.cjs --vsix "candidate/$VSIX" --editor "$editor_path" --mode activation --samples 5 --warmups 1 --report host.json)
           if [ "$PLATFORM" = linux ]; then xvfb-run -a "${command[@]}"; else "${command[@]}"; fi
           node scripts/release-evidence.mjs record --candidate candidate/candidate.json --gate "activation-$PLATFORM" --report host.json --output "evidence/activation-$PLATFORM.evidence.json"
       - name: Retain evidence and diagnostics
