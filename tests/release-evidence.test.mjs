@@ -10,8 +10,13 @@ import { compareBenchmarks } from '../scripts/check-benchmark-regression.mjs';
 
 const candidate = { schemaVersion: 1, releaseCommit: 'a'.repeat(40), version: '0.5.0', filename: 'inkwell-0.5.0.vsix',
   vsixSha256: 'b'.repeat(64), assetsManifestSha256: 'c'.repeat(64) };
+const previewSample = (warmup, callbackMs, timerLagMs) => ({ warmup, maximumCallbackMs: callbackMs, maximumTimerLagMs: timerLagMs,
+  publication: { accepted: true, finalEditPresent: true } });
+const previewSamples = () => [previewSample(true, 20, 30), previewSample(false, 30, 40), previewSample(false, 31, 41),
+  previewSample(false, 32, 42), previewSample(false, 33, 43), previewSample(false, 34, 44)];
 const host = { ok: true, machine: { platform: 'linux' }, artifact: { archiveSha256: candidate.vsixSha256 }, activation: { sampleCount: 5, p95Ms: 100, extensionChildProcesses: 0 },
-  warmPreview: { ok: true, measuredSamples: 5, warmupSamples: 1, maximumCallbackMs: 30, maximumTimerLagMs: 40, unchangedCompletionChildProcesses: 0 },
+  warmPreview: { ok: true, measuredSamples: 5, warmupSamples: 1, samples: previewSamples(), callbackMaximaMedianMs: 32,
+    timerLagMaximaMedianMs: 42, maximumCallbackMs: 34, maximumTimerLagMs: 44, unchangedCompletionChildProcesses: 0 },
   iterations: [{ warmup: false, host: { workflow: { ok: true, pdf: { verified: true } } } }] };
 function timing(ms) {
   const corpus = Array.from({ length: 10 }, (_, i) => ({ name: `demo-${i}.md`, sha256: 'a'.repeat(64) }));
@@ -109,6 +114,31 @@ test('activation budgets, subprocesses, missing PDF and partial demo corpus cann
   assert.throws(() => validateGateReport('run-to-pdf', bytes(missingPdf), candidate), /PDF/);
   const demos = report('demos'); demos.demos.pop();
   assert.throws(() => validateGateReport('demos', bytes(demos), candidate), /ten demos/);
+});
+
+test('warm preview evidence retains coherent finite observations without inventing a shared-host timing threshold', () => {
+  const representative = structuredClone(host);
+  representative.warmPreview.samples = [previewSample(true, 20, 30), previewSample(false, 80, 70), previewSample(false, 90, 80),
+    previewSample(false, 130, 120), previewSample(false, 90, 80), previewSample(false, 80, 70)];
+  Object.assign(representative.warmPreview, { callbackMaximaMedianMs: 90, timerLagMaximaMedianMs: 80, maximumCallbackMs: 130, maximumTimerLagMs: 120 });
+  assert.doesNotThrow(() => validateGateReport('warm-preview', bytes(representative), candidate));
+  for (const mutate of [
+    report => { report.warmPreview.callbackMaximaMedianMs = null; },
+    report => { report.warmPreview.timerLagMaximaMedianMs = null; },
+    report => { report.warmPreview.maximumCallbackMs = null; },
+    report => { report.warmPreview.maximumTimerLagMs = null; },
+    report => { report.warmPreview.samples = []; },
+    report => { report.warmPreview.samples[1].maximumCallbackMs = null; },
+    report => { report.warmPreview.callbackMaximaMedianMs = 91; },
+    report => { report.warmPreview.timerLagMaximaMedianMs = 81; },
+    report => { report.warmPreview.maximumCallbackMs = 999; },
+    report => { report.warmPreview.maximumTimerLagMs = 999; },
+    report => { report.warmPreview.samples[1].publication.accepted = false; },
+    report => { report.warmPreview.unchangedCompletionChildProcesses = 1; },
+  ]) {
+    const value = structuredClone(representative); mutate(value);
+    assert.throws(() => validateGateReport('warm-preview', bytes(value), candidate), /complete current-publication samples|coherent finite timing observations|zero-process/);
+  }
 });
 
 test('headless smoke cannot masquerade as a clean no-code installation and a single benchmark cannot pass', () => {

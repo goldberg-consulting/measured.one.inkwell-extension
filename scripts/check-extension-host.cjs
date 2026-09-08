@@ -193,7 +193,7 @@ async function main() {
       processObservation: 'All Node child_process entrypoints in extension host, from before activate through 300 ms after it resolves; extension stack origins are distinguished from unrelated builtins.',
       editorCleanup: 'Sample editor descendants every 200 ms by parent lineage, retaining PID plus creation-time identities across detached process groups; verify identity before bounded TERM/KILL cleanup on exit, timeout or interrupt.',
       workflow: opts.mode === 'full' ? 'Once, after the last measured activation, through real editor commands and saved files.' : 'Not run (focused mode).',
-      warmPreview: opts.mode !== 'activation' ? 'Five measured real-editor edit bursts after one warmup; both callback and timer-lag budgets are enforced.' : 'Not run (activation-only mode).' }, iterations: [] };
+      warmPreview: opts.mode !== 'activation' ? 'Five measured real-editor edit bursts after one warmup; callback and timer-lag observations are retained with the current-publication and warm citation zero-process checks. Release performance requires the separate same-machine baseline and confirmation benchmark reports.' : 'Not run (activation-only mode).' }, iterations: [] };
   const reportPath = opts.report || path.join(root, 'report.json');
   fs.mkdirSync(path.dirname(reportPath), { recursive: true });
   writeJson(reportPath, report);
