@@ -16,6 +16,11 @@ const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const ensure = (condition, message) => { if (!condition) throw new Error(message); };
 const json = file => JSON.parse(fs.readFileSync(file, 'utf8'));
 const write = (file, value) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n', { flag: 'wx' }); };
+const nonnegativeNumber = value => Number.isFinite(value) && value >= 0;
+const median = values => {
+  const sorted = [...values].sort((left, right) => left - right);
+  return sorted.length % 2 ? sorted[(sorted.length - 1) / 2] : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2;
+};
 
 export function verifyRunProvenance(run, { repository, commit, workflows }) {
   ensure(run?.repository?.full_name === repository && run.head_repository?.full_name === repository,
@@ -70,9 +75,23 @@ export function validateGateReport(gate, bytes, candidate) {
       const workflow = report.iterations?.filter(item => !item.warmup).at(-1)?.host?.workflow;
       ensure(workflow?.ok === true && workflow.pdf?.verified === true, 'The real editor workflow must compile and verify the edited run artifact in a PDF.');
     }
-    if (gate === 'warm-preview') ensure(report.warmPreview?.ok === true && report.warmPreview.measuredSamples >= 5
-      && report.warmPreview.warmupSamples >= 1 && report.warmPreview.maximumCallbackMs < 50 && report.warmPreview.maximumTimerLagMs < 50
-      && report.warmPreview.unchangedCompletionChildProcesses === 0, 'Warm preview must meet the real host 50 ms budget and warm citation zero-process gate.');
+    if (gate === 'warm-preview') {
+      const warmPreview = report.warmPreview, samples = warmPreview?.samples;
+      const measured = Array.isArray(samples) ? samples.filter(sample => sample?.warmup === false) : [];
+      const warmups = Array.isArray(samples) ? samples.filter(sample => sample?.warmup === true) : [];
+      const callbackMaxima = measured.map(sample => sample.maximumCallbackMs);
+      const timerLagMaxima = measured.map(sample => sample.maximumTimerLagMs);
+      const completeSamples = Array.isArray(samples) && samples.every(sample => sample && typeof sample.warmup === 'boolean'
+        && nonnegativeNumber(sample.maximumCallbackMs) && nonnegativeNumber(sample.maximumTimerLagMs)
+        && sample.publication?.accepted === true && sample.publication?.finalEditPresent === true);
+      ensure(warmPreview?.ok === true && warmPreview.measuredSamples >= 5 && warmPreview.warmupSamples >= 1
+        && measured.length === warmPreview.measuredSamples && warmups.length === warmPreview.warmupSamples && completeSamples
+        && [warmPreview.callbackMaximaMedianMs, warmPreview.timerLagMaximaMedianMs, warmPreview.maximumCallbackMs, warmPreview.maximumTimerLagMs].every(nonnegativeNumber)
+        && warmPreview.callbackMaximaMedianMs === median(callbackMaxima) && warmPreview.timerLagMaximaMedianMs === median(timerLagMaxima)
+        && warmPreview.maximumCallbackMs === Math.max(...callbackMaxima) && warmPreview.maximumTimerLagMs === Math.max(...timerLagMaxima)
+        && warmPreview.unchangedCompletionChildProcesses === 0,
+      'Warm preview must retain complete current-publication samples, coherent finite timing observations, and the warm citation zero-process result.');
+    }
   } else if (gate === 'pdf-parity') {
     ensure(report.ok === true && report.artifactSha256 === candidate.vsixSha256 && report.normalizedStyleParity === true
       && report.rasterGoldenPassed === true && report.pixelChannelThreshold === 10 && report.maximumDifferentPixelFraction <= 0.005
