@@ -28,43 +28,92 @@ on:
       - "requirements-latex.txt"
       - "examples/**"
       - ".github/workflows/compile-demos.yml"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      candidate_run_id:
+        description: Optional trusted Verify run whose exact VSIX should be reused
+        required: false
+        type: string
+      baseline-artifact:
+        description: Optional same-machine valid baseline artifact retained by that Verify run
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      candidate-artifact:
+        type: string
+        default: ''
+      release-commit:
+        type: string
+        default: ''
+      baseline-artifact:
+        type: string
+        default: ''
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   compile-all-demos:
     name: Compile every demo on TinyTeX
     runs-on: ubuntu-22.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     defaults:
       run:
         shell: bash
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release-commit || github.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install behavioral harness dependencies
         run: npm ci
 
+      - name: Authenticate a separately dispatched candidate source
+        if: inputs.candidate_run_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+        run: node scripts/release-evidence.mjs verify-run --commit "$(git rev-parse HEAD)" --run-id "$CANDIDATE_RUN_ID" --workflow .github/workflows/verify.yml
+
+      - name: Download the already built candidate
+        if: inputs.candidate-artifact != '' || inputs.candidate_run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.candidate-artifact || 'inkwell-candidate' }}
+          path: candidate
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.candidate_run_id || github.run_id }}
+
       - name: Build and verify the actual VSIX
+        env:
+          CANDIDATE_ARTIFACT: ${{ inputs.candidate-artifact || (inputs.candidate_run_id && 'inkwell-candidate') || '' }}
         run: |
           set -euo pipefail
-          npm run package:vsix
           version="$(node -p 'require("./package.json").version')"
-          vsix="inkwell-$version.vsix"
+          if [ -z "$CANDIDATE_ARTIFACT" ]; then
+            npm run package:vsix
+            mkdir candidate
+            mv "inkwell-$version.vsix" candidate/
+            node scripts/release-evidence.mjs init --vsix "candidate/inkwell-$version.vsix" --commit "$(git rev-parse HEAD)" --output candidate/candidate.json
+          fi
+          vsix="$GITHUB_WORKSPACE/candidate/inkwell-$version.vsix"
           node scripts/verify-vsix.mjs "$vsix" --tag "v$version"
+          node scripts/release-evidence.mjs init --vsix "$vsix" --commit "$(git rev-parse HEAD)" --output candidate/rechecked.json
+          cmp candidate/candidate.json candidate/rechecked.json
           artifact_dir="$RUNNER_TEMP/inkwell-demo-artifact"
           mkdir -p "$artifact_dir"
           unzip -q "$vsix" -d "$artifact_dir"
           echo "ARTIFACT_ROOT=$artifact_dir/extension" >> "$GITHUB_ENV"
+          echo "VSIX=$vsix" >> "$GITHUB_ENV"
 
       - name: Install pandoc 3.x and pandoc-crossref
         run: |
@@ -88,7 +137,7 @@ jobs:
           sh "$RUNNER_TEMP/install-tinytex.sh"
           echo "$HOME/.TinyTeX/bin/x86_64-linux" >> "$GITHUB_PATH"
           sudo apt-get update
-          sudo apt-get install -y ghostscript python3-venv
+          sudo apt-get install -y ghostscript python3-venv poppler-utils
 
       - name: Install required LaTeX packages
         run: |
@@ -135,10 +184,43 @@ jobs:
           mkdir -p benchmarks
           node "$ARTIFACT_ROOT/out/doctor-cli.js" --extension-root "$ARTIFACT_ROOT" --full --json --require-tool ghostscript > benchmarks/doctor.json
 
-      - name: Compile every demo
+      - name: Compile every demo through the same packaged runtime twice
         run: |
           set -euo pipefail
-          bash scripts/compile-all-demos.sh --report=benchmarks/current.json
+          npm run compile
+          node scripts/check-demos.cjs --vsix="$VSIX" --vsix-root="$ARTIFACT_ROOT" --warmups=1 --repetitions=5 --report=benchmarks/current.json
+          node scripts/check-demos.cjs --vsix="$VSIX" --vsix-root="$ARTIFACT_ROOT" --warmups=1 --repetitions=5 --report=benchmarks/confirmation.json
+          node scripts/release-evidence.mjs record --candidate candidate/candidate.json --gate demos --report benchmarks/current.json --report benchmarks/confirmation.json --report benchmarks/doctor.json --output evidence/demos.evidence.json
+
+      - name: Download a same-machine valid performance baseline
+        if: inputs.baseline-artifact != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.baseline-artifact }}
+          path: baseline
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.candidate_run_id || github.run_id }}
+
+      - name: Reject sustained benchmark regressions
+        if: inputs.baseline-artifact != ''
+        run: |
+          set -euo pipefail
+          node scripts/check-benchmark-regression.mjs --baseline=baseline/baseline.json --candidate=benchmarks/current.json --confirmation=benchmarks/confirmation.json --report=benchmarks/performance.json
+          node scripts/release-evidence.mjs record --candidate candidate/candidate.json --gate performance --report benchmarks/performance.json --report benchmarks/current.json --report benchmarks/confirmation.json --report baseline/baseline.json --output evidence/performance.evidence.json
+
+      - name: Explain the absent baseline gate
+        if: inputs.baseline-artifact == ''
+        run: echo 'Timing reports are retained; release remains blocked until a valid same-machine baseline passes the sustained comparison gate.' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run, edit, insert and compile in an actual packaged extension host
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/inkwell-editor"
+          curl --fail --location --proto '=https' --retry 3 https://update.code.visualstudio.com/latest/linux-x64/stable --output "$RUNNER_TEMP/editor.tar.gz"
+          tar -xzf "$RUNNER_TEMP/editor.tar.gz" -C "$RUNNER_TEMP/inkwell-editor"
+          xvfb-run -a node scripts/check-extension-host.cjs --vsix "$VSIX" --editor "$RUNNER_TEMP/inkwell-editor/VSCode-linux-x64/code" --mode full --samples 5 --warmups 1 --report benchmarks/run-to-pdf.json
+          node scripts/release-evidence.mjs record --candidate candidate/candidate.json --gate run-to-pdf --report benchmarks/run-to-pdf.json --output evidence/run-to-pdf.evidence.json
+          node scripts/release-evidence.mjs record --candidate candidate/candidate.json --gate warm-preview --report benchmarks/run-to-pdf.json --output evidence/warm-preview.evidence.json
 
       - name: Upload verification reports on success
         if: success()
@@ -146,8 +228,9 @@ jobs:
         with:
           name: demo-validation-report
           path: |
-            benchmarks/current.json
-            benchmarks/doctor.json
+            benchmarks/*.json
+            evidence/
+            candidate/candidate.json
           if-no-files-found: error
 
       - name: Upload diagnostics on failure

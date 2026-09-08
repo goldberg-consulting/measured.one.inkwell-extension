@@ -35,6 +35,20 @@ test('failed release CLI preflight emits no release outputs or secret values', t
   assert.doesNotMatch(mismatch.stdout + mismatch.stderr, /do-not-print-this-secret/);
 });
 
+test('read-only release preflight works before build dependencies are installed', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'inkwell-preflight-without-dependencies-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(root, 'scripts'));
+  for (const name of ['release-contract.mjs', 'verify-vsix.mjs', 'build-asset-manifest.mjs', 'build-preview-assets.mjs']) {
+    fs.copyFileSync(path.join(repo, 'scripts', name), path.join(root, 'scripts', name));
+  }
+  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'inkwell', publisher: 'measure-one', version: '0.5.0' }));
+  const result = spawnSync(process.execPath, [path.join(root, 'scripts/release-contract.mjs'), 'preflight'], {
+    cwd: root, encoding: 'utf8', env: { ...process.env, TAP_TOKEN: 'fixture', RELEASE_TAG: 'v0.5.0', GITHUB_OUTPUT: undefined },
+  });
+  assert.equal(result.status, 0, result.stderr);
+});
+
 test('release checksums are derived from the validated actual file and match the bootstrap format', async t => {
   const { writeReleaseChecksums } = await api;
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'inkwell-release-contract-'));
@@ -58,6 +72,19 @@ test('tap updates change exactly one version and checksum while preserving other
   assert.equal(changed, original.replace('version "0.4.0"', 'version "0.5.0"').replace('a'.repeat(64), 'b'.repeat(64)));
   assert.throws(() => updateTapCask(original + '\nversion "second"', '0.5.0', 'b'.repeat(64)), /exactly one/);
   assert.throws(() => updateTapCask(original, 'bad\nversion', 'b'.repeat(64)), /version/);
+});
+
+test('promotion changes only audited RC metadata and rejects another candidate URL', async () => {
+  const { promoteTapCandidate } = await api;
+  const commit = 'a'.repeat(40), digest = 'b'.repeat(64);
+  const source = `cask "inkwell" do\n  version "0.5.0"\n  sha256 "${'c'.repeat(64)}"\n  url "https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/download/inkwell-rc-${commit}/inkwell-0.5.0.vsix"\n  depends_on cask: "mactex"\nend\n`;
+  const promoted = promoteTapCandidate(source, '0.5.0', digest, commit);
+  assert.match(promoted, /releases\/download\/v#\{version\}\/inkwell-#\{version\}\.vsix/);
+  assert.match(promoted, /depends_on cask: "mactex"/);
+  assert.equal(promoteTapCandidate(promoted, '0.5.0', digest, commit), promoted);
+  const singleQuoted = source.replace(/url "([^"\n]+)"/, "url '$1'");
+  assert.match(promoteTapCandidate(singleQuoted, '0.5.0', digest, commit), /url "https:[^\n]+#\{version\}/);
+  assert.throws(() => promoteTapCandidate(source, '0.5.0', digest, 'd'.repeat(40)), /audited tap URL/);
 });
 
 test('tap release retries reject downgrades using full SemVer precedence', async () => {
@@ -151,7 +178,9 @@ test('release workflow validates credentials and actual content before publishin
   const source = fs.readFileSync(path.join(repo, '.github/workflows/release.yml'), 'utf8');
   const workflow = YAML.parse(source), steps = workflow.jobs['build-and-publish'].steps;
   assert.equal(workflow.on.release, undefined);
-  assert.ok(workflow.on.push.tags.includes('v*'));
+  assert.equal(workflow.on.push, undefined, 'a tag push must not bypass explicit candidate/evidence selection');
+  assert.equal(workflow.on.workflow_dispatch.inputs.candidate_run_id.required, true);
+  assert.equal(workflow.on.workflow_dispatch.inputs.evidence_run_id.required, true);
   assert.match(steps[0].with.ref, /^refs\/tags\//);
   const preflight = steps.findIndex(step => step.run?.includes('release-contract.mjs preflight'));
   const validated = steps.findIndex(step => step.run?.includes('release-contract.mjs checksums'));
@@ -159,12 +188,21 @@ test('release workflow validates credentials and actual content before publishin
   assert.ok(preflight >= 0 && validated > preflight && published > validated);
   assert.ok(steps[preflight].env.TAP_TOKEN.includes('secrets.HOMEBREW_TAP_TOKEN'));
   assert.ok(steps.some(step => step.run?.includes('gh release upload') && step.run.includes('SHA256SUMS')));
+  const evidence = steps.findIndex(step => step.run?.includes('release-evidence.mjs validate') && step.run.includes('--stage publish'));
+  assert.ok(evidence > preflight && evidence < published);
+  assert.match(steps.find(step => step.name === 'Authenticate candidate and evidence producer runs').run, /verify-run/);
+  const tapCheckout = steps.find(step => step.with?.repository === 'goldberg-consulting/homebrew-inkwell');
+  assert.equal(tapCheckout.with.ref, '${{ steps.evidence.outputs.tapCommit }}');
   const tapPrepared = steps.find(step => step.run?.includes('git -C tap commit'));
   assert.ok(tapPrepared.run.indexOf('release-contract.mjs verify-tap') < tapPrepared.run.indexOf('git -C tap commit'));
-  assert.equal(steps.find(step => step.run === 'npm run package:vsix').if, "steps.existing.outputs.public != 'true'");
+  assert.match(tapPrepared.run, /promote-tap/);
+  assert.match(tapPrepared.run, /merge-base --is-ancestor/);
+  assert.equal(steps.some(step => step.run?.includes('npm run package')), false, 'publication must never rebuild the tested VSIX');
   const upload = steps.find(step => step.run?.includes('gh release upload'));
   assert.equal(upload.if, "steps.existing.outputs.public != 'true'");
   assert.match(upload.run, /isDraft.*immutable/s);
+  assert.doesNotMatch(upload.run, /--clobber/);
+  assert.match(upload.run, /cmp.*inkwell-draft-existing/);
   const reused = steps.find(step => step.id === 'existing');
   assert.match(reused.run, /gh release download.*--pattern "\$VSIX".*--pattern SHA256SUMS/);
   assert.match(reused.run, /verify-published/);
@@ -185,6 +223,7 @@ test('the public download precedes the tap push and tap failure leaves visible r
   assert.match(steps[push].run, /set -euo pipefail/);
   assert.doesNotMatch(steps[push].run, /--force|\|\|\s*true/);
   assert.equal(steps[complete].if, undefined, 'completion must retain GitHub Actions success gating');
+  assert.ok(steps[complete].run.indexOf('--stage complete') < steps[complete].run.indexOf('release-contract.mjs notes complete'));
   const failure = steps.find(step => step.if === "failure() && steps.public.outcome == 'success'");
   assert.match(failure.run, /GITHUB_STEP_SUMMARY/);
   assert.match(failure.run, /without rebuilding or overwriting/);
@@ -246,12 +285,58 @@ test('demo provisioning covers every required full Doctor CLI tool with a locked
 });
 
 test('release and demo workflow command blocks pass shell syntax checks without execution', () => {
-  for (const file of ['release.yml', 'compile-demos.yml']) {
+  for (const file of ['release.yml', 'compile-demos.yml', 'verify.yml', 'release-candidate.yml', 'release-evidence.yml', 'macos-installation.yml']) {
     const workflow = YAML.parse(fs.readFileSync(path.join(repo, '.github/workflows', file), 'utf8'));
-    for (const job of Object.values(workflow.jobs)) for (const step of job.steps) {
+    for (const job of Object.values(workflow.jobs)) for (const step of job.steps || []) {
       if (!step.run) continue;
       const result = spawnSync('bash', ['-n'], { input: step.run, encoding: 'utf8' });
       assert.equal(result.status, 0, `${file}: ${step.name}: ${result.stderr}`);
     }
   }
+});
+
+test('Linux and macOS verify consume one immutable candidate and enforce actual packaged preview and host checks', () => {
+  const workflow = YAML.parse(fs.readFileSync(path.join(repo, '.github/workflows/verify.yml'), 'utf8'));
+  assert.equal(workflow.permissions.actions, 'read', 'reusable demo workflow cannot elevate its caller permissions');
+  assert.equal(workflow.jobs.candidate.steps.filter(step => step.run?.includes('npm run package:vsix')).length, 1);
+  assert.equal(workflow.jobs.verify.needs, 'candidate');
+  assert.deepEqual(workflow.jobs.verify.strategy.matrix.include.map(entry => entry.platform).sort(), ['linux', 'macos']);
+  assert.equal(workflow.jobs.verify.env.INKWELL_REQUIRE_BROWSER, 1);
+  const commands = workflow.jobs.verify.steps.map(step => step.run || '').join('\n');
+  assert.match(commands, /INKWELL_PREVIEW_ASSET_ROOT=.*inkwell-artifact\/extension/);
+  assert.match(commands, /cmp candidate\/candidate.json candidate\/rechecked.json/);
+  assert.match(commands, /check-extension-host\.cjs --vsix/);
+  assert.doesNotMatch(commands, /npm run package:vsix/);
+  assert.equal(workflow.jobs.demos.with['candidate-artifact'], 'inkwell-candidate');
+  const demos = YAML.parse(fs.readFileSync(path.join(repo, '.github/workflows/compile-demos.yml'), 'utf8'));
+  const demoCommands = demos.jobs['compile-all-demos'].steps.map(step => step.run || '').join('\n');
+  assert.equal([...demoCommands.matchAll(/check-demos\.cjs --vsix=/g)].length, 2);
+  assert.match(demoCommands, /--vsix-root="\$ARTIFACT_ROOT" --warmups=1 --repetitions=5/);
+  assert.match(demoCommands, /--gate warm-preview/);
+  assert.match(demoCommands, /check-benchmark-regression\.mjs/);
+});
+
+test('RC and final evidence stages never fabricate absent installation or performance results', () => {
+  const rc = fs.readFileSync(path.join(repo, '.github/workflows/release-candidate.yml'), 'utf8');
+  assert.ok(rc.indexOf('--stage rc') < rc.indexOf('gh release create'));
+  assert.doesNotMatch(rc, /--clobber|npm run package/);
+  assert.match(rc, /cmp "candidate\/\$vsix"/);
+  for (const file of ['release.yml', 'release-candidate.yml', 'release-evidence.yml']) {
+    const steps = YAML.parse(fs.readFileSync(path.join(repo, '.github/workflows', file), 'utf8')).jobs;
+    const job = Object.values(steps)[0];
+    assert.ok(job.steps.findIndex(step => step.run?.includes('verify-run')) < job.steps.findIndex(step => step.uses === 'actions/download-artifact@v4'), `${file} must authenticate provenance before fetching artifacts`);
+  }
+  const assembly = YAML.parse(fs.readFileSync(path.join(repo, '.github/workflows/release-evidence.yml'), 'utf8')).jobs.assemble.steps;
+  const supplemental = assembly.find(step => step.with?.path === 'supplemental-source');
+  assert.equal(supplemental.with.pattern, undefined, 'source workflow artifacts use different names and must be selected by validated gate records');
+  assert.match(assembly.find(step => step.run?.includes('release-evidence.mjs select')).run, /--gates performance,pdf-parity,upgrade-from-0.4/);
+  const installer = YAML.parse(fs.readFileSync(path.join(repo, '.github/workflows/macos-installation.yml'), 'utf8'));
+  assert.ok(installer.on.schedule.length);
+  assert.deepEqual(installer.jobs.install.strategy.matrix.profile, ['full-cask', 'existing-tex']);
+  const commands = installer.jobs.install.steps.map(step => step.run || '').join('\n');
+  assert.match(commands, /CANDIDATE_SHA256/);
+  assert.match(commands, /cmp reports\/tex-root-before.txt reports\/tex-root-after.txt/);
+  assert.match(commands, /out\/doctor-cli\.js.*--full.*--editor code/);
+  assert.match(commands, /out\/smoke-cli\.js/);
+  assert.doesNotMatch(commands, /--gate (?:clean-macos-cask|standalone-existing-tex)/, 'headless install is insufficient proof of the still-required no-code UI gate');
 });

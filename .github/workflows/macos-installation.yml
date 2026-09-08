@@ -1,0 +1,157 @@
+name: macOS installation journey
+
+# Scheduled runs use the explicitly pinned repository variables below. Missing
+# inputs fail closed; this job never selects a moving latest release candidate.
+on:
+  workflow_dispatch:
+    inputs:
+      release_commit:
+        description: Exact release commit
+        required: true
+        type: string
+      candidate_url:
+        description: Immutable inkwell-rc-COMMIT VSIX release asset URL
+        required: true
+        type: string
+      candidate_sha256:
+        description: SHA-256 of those candidate VSIX bytes
+        required: true
+        type: string
+      tap_ref:
+        description: Exact tap candidate commit containing the RC URL and checksum
+        required: true
+        type: string
+  schedule:
+    - cron: '19 7 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [full-cask, existing-tex]
+    runs-on: macos-14
+    timeout-minutes: 120
+    env:
+      RELEASE_COMMIT: ${{ inputs.release_commit || vars.INKWELL_RC_COMMIT }}
+      CANDIDATE_URL: ${{ inputs.candidate_url || vars.INKWELL_RC_URL }}
+      CANDIDATE_SHA256: ${{ inputs.candidate_sha256 || vars.INKWELL_RC_SHA256 }}
+      TAP_REF: ${{ inputs.tap_ref || vars.INKWELL_RC_TAP_COMMIT }}
+      PROFILE: ${{ matrix.profile }}
+      HOMEBREW_NO_ANALYTICS: 1
+      HOMEBREW_NO_AUTO_UPDATE: 1
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Require immutable inputs
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_COMMIT" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$TAP_REF" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$CANDIDATE_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          [[ "$CANDIDATE_URL" == "https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/download/inkwell-rc-$RELEASE_COMMIT/inkwell-"*".vsix" ]]
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_commit || vars.INKWELL_RC_COMMIT }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: goldberg-consulting/homebrew-inkwell
+          ref: ${{ inputs.tap_ref || vars.INKWELL_RC_TAP_COMMIT }}
+          path: tap
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - name: Download and verify the exact RC
+        run: |
+          set -euo pipefail
+          mkdir candidate reports
+          node -e 'const u=new URL(process.env.CANDIDATE_URL);const prefix="/goldberg-consulting/measured.one.inkwell-extension/releases/download/inkwell-rc-"+process.env.RELEASE_COMMIT+"/";if(u.search||u.hash||u.username||u.password||!u.pathname.startsWith(prefix)||!/^inkwell-[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?\.vsix$/.test(u.pathname.slice(prefix.length)))throw new Error("Unsafe candidate URL")'
+          curl --fail --location --proto '=https' --retry 3 "$CANDIDATE_URL" --output candidate/artifact.vsix
+          node -e 'const f=require("fs"),c=require("crypto");if(c.createHash("sha256").update(f.readFileSync("candidate/artifact.vsix")).digest("hex")!==process.env.CANDIDATE_SHA256)throw new Error("Candidate SHA-256 mismatch")'
+          curl --fail --location --proto '=https' --retry 3 "${CANDIDATE_URL%/*}/candidate.json" --output candidate/candidate.json
+          node scripts/release-evidence.mjs init --vsix candidate/artifact.vsix --commit "$RELEASE_COMMIT" --output candidate/rechecked.json
+          cmp candidate/candidate.json candidate/rechecked.json
+          unzip -q candidate/artifact.vsix -d candidate/unpacked
+          echo "ARTIFACT_ROOT=$GITHUB_WORKSPACE/candidate/unpacked/extension" >> "$GITHUB_ENV"
+          node -e 'const f=require("fs"),o=require("os");f.writeFileSync("reports/machine.json",JSON.stringify({platform:process.platform,arch:process.arch,node:process.version,release:o.release(),cpu:o.cpus()[0]?.model,image:process.env.ImageVersion,releaseCommit:process.env.RELEASE_COMMIT,vsixSha256:process.env.CANDIDATE_SHA256},null,2))'
+          brew config > reports/homebrew-config.txt
+      - name: Require a clean editor profile and an app-bundle-only CLI
+        run: |
+          set -euo pipefail
+          test ! -d "$HOME/.vscode/extensions"
+          test ! -d "$HOME/.cursor/extensions"
+          if brew list --cask inkwell >/dev/null 2>&1; then echo 'A clean runner must not already have Inkwell installed.' >&2; exit 1; fi
+          if brew list --cask mactex >/dev/null 2>&1; then echo 'A clean runner must not already have the MacTeX cask installed.' >&2; exit 1; fi
+          if command -v code || command -v cursor; then
+            echo 'Use a clean runner without an editor CLI on PATH.' >&2
+            exit 1
+          fi
+          curl --fail --location --proto '=https' --retry 3 https://update.code.visualstudio.com/latest/darwin-arm64/stable --output "$RUNNER_TEMP/editor.zip"
+          sudo ditto -x -k "$RUNNER_TEMP/editor.zip" /Applications
+      - name: Check the tap candidate contract and audit
+        if: matrix.profile == 'full-cask'
+        run: |
+          set -euo pipefail
+          node -e 'const f=require("fs");const text=f.readFileSync("tap/Casks/inkwell.rb","utf8");if(!text.includes(process.env.CANDIDATE_URL)||!text.includes(process.env.CANDIDATE_SHA256))throw new Error("Tap candidate must pin the exact RC URL and SHA-256")'
+          node scripts/release-contract.mjs verify-tap tap 2>&1 | tee reports/tap-lifecycle.log
+          brew style tap/Casks/inkwell.rb 2>&1 | tee reports/tap-style.log
+          brew tap goldberg-consulting/inkwell "$GITHUB_WORKSPACE/tap"
+          brew audit --cask goldberg-consulting/inkwell/inkwell 2>&1 | tee reports/tap-audit.log
+          node -e 'require("fs").writeFileSync("reports/tap.json",JSON.stringify({ok:true,releaseCommit:process.env.RELEASE_COMMIT,vsixSha256:process.env.CANDIDATE_SHA256,tapCommit:process.env.TAP_REF,audit:true,style:true,lifecycle:true}))'
+          node scripts/release-evidence.mjs record --candidate candidate/candidate.json --gate tap-audit --report reports/tap.json --report reports/tap-lifecycle.log --report reports/tap-style.log --report reports/tap-audit.log --output evidence/tap-audit.evidence.json
+      - name: Install the full cask including MacTeX
+        if: matrix.profile == 'full-cask'
+        run: |
+          set -euo pipefail
+          brew install --cask goldberg-consulting/inkwell/inkwell 2>&1 | tee reports/installer.log
+          brew list --cask --versions mactex > reports/mactex.txt
+      - name: Prepare a healthy existing TinyTeX installation
+        if: matrix.profile == 'existing-tex'
+        run: |
+          set -euo pipefail
+          brew install pandoc pandoc-crossref mermaid-cli ghostscript poppler
+          curl --fail --location --proto '=https' --retry 3 https://yihui.org/tinytex/install-bin-unix.sh --output "$RUNNER_TEMP/install-tinytex.sh"
+          sh "$RUNNER_TEMP/install-tinytex.sh"
+          export PATH="$HOME/Library/TinyTeX/bin/universal-darwin:$PATH"
+          echo "$HOME/Library/TinyTeX/bin/universal-darwin" >> "$GITHUB_PATH"
+          tlmgr update --self
+          node -e 'const f=require("fs");const names=f.readFileSync(process.env.ARTIFACT_ROOT+"/requirements-latex.txt","utf8").split(/\r?\n/).map(s=>s.replace(/#.*/,"").trim()).filter(Boolean);if(!names.length||names.some(s=>!/^[-a-z0-9+.]+$/.test(s)))throw new Error("Invalid package list");console.log(names.join("\n"))' > "$RUNNER_TEMP/tex-packages.txt"
+          packages=()
+          while IFS= read -r package; do packages+=("$package"); done < "$RUNNER_TEMP/tex-packages.txt"
+          tlmgr install "${packages[@]}"
+          kpsewhich -var-value TEXMFROOT > reports/tex-root-before.txt
+      - name: Run the standalone installer against existing TeX
+        if: matrix.profile == 'existing-tex'
+        run: |
+          set -euo pipefail
+          node "$ARTIFACT_ROOT/out/install-cli.js" "--vsix=$GITHUB_WORKSPACE/candidate/artifact.vsix" "--artifact-root=$ARTIFACT_ROOT" --editor=all --profile=full --yes "--output-root=$GITHUB_WORKSPACE/reports/installation" 2>&1 | tee reports/installer.log
+          kpsewhich -var-value TEXMFROOT > reports/tex-root-after.txt
+          cmp reports/tex-root-before.txt reports/tex-root-after.txt
+          if brew list --cask mactex >/dev/null 2>&1; then echo 'Standalone existing-TeX setup unexpectedly installed MacTeX.' >&2; exit 1; fi
+      - name: Verify full doctor and a fresh PDF from the installed candidate
+        run: |
+          set -euo pipefail
+          node "$ARTIFACT_ROOT/out/doctor-cli.js" --extension-root "$ARTIFACT_ROOT" --full --editor code --json > reports/doctor.json
+          node "$ARTIFACT_ROOT/out/smoke-cli.js" "$GITHUB_WORKSPACE/reports/smoke" > reports/smoke.json
+          node -e 'const f=require("fs");const result=JSON.parse(f.readFileSync("reports/smoke.json","utf8"));if(!result.success||!result.verified)throw new Error("PDF smoke failed");f.copyFileSync(result.pdfPath,"reports/smoke.pdf");f.copyFileSync(require("path").join(require("path").dirname(result.pdfPath),".inkwell/manifest.json"),"reports/scaffold.json")'
+      - name: Retain the explicit remaining no-code journey gate
+        run: |
+          echo 'System installation, app-bundle editor detection, full Doctor, scaffold and PDF evidence are retained. The clean editor New Project/Preview journey has not been asserted by this headless workflow, so its release gate remains unrecorded until independent UI evidence passes.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload machine, installer, doctor, scaffold and real PDF evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-journey-${{ matrix.profile }}
+          path: |
+            candidate/candidate.json
+            reports/
+            evidence/
+          if-no-files-found: error
+          retention-days: 90

@@ -1,0 +1,96 @@
+name: Publish immutable release candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_commit:
+        description: Exact release commit whose candidate passed the RC gates
+        required: true
+        type: string
+      candidate_run_id:
+        description: Verify run containing the immutable candidate
+        required: true
+        type: string
+      evidence_run_id:
+        description: Evidence assembly run that passed the rc stage
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: inkwell-release-candidate-${{ inputs.release_commit }}
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_commit }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - name: Authenticate candidate and evidence producer runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          EVIDENCE_RUN_ID: ${{ inputs.evidence_run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          commit="$(git rev-parse HEAD)"
+          node scripts/release-evidence.mjs verify-run --commit "$commit" --run-id "$CANDIDATE_RUN_ID" --workflow .github/workflows/verify.yml
+          node scripts/release-evidence.mjs verify-run --commit "$commit" --run-id "$EVIDENCE_RUN_ID" --workflow .github/workflows/release-evidence.yml
+      - uses: actions/download-artifact@v4
+        with:
+          name: inkwell-candidate
+          path: candidate
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.candidate_run_id }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: inkwell-publication-evidence
+          path: evidence
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.evidence_run_id }}
+      - name: Validate the immutable candidate and all pre-installation gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          vsix="$(node -p 'require("./candidate/candidate.json").filename')"
+          node scripts/release-evidence.mjs validate --candidate candidate/candidate.json --vsix "candidate/$vsix" --evidence evidence --stage rc --output candidate/verified-rc.json
+          node scripts/release-contract.mjs checksums "candidate/$vsix" "v$(node -p 'require("./candidate/candidate.json").version')"
+      - name: Publish or verify the same RC bytes without replacement
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          commit="$(git rev-parse HEAD)"
+          tag="inkwell-rc-$commit"
+          vsix="$(node -p 'require("./candidate/candidate.json").filename')"
+          gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$tag" > "$RUNNER_TEMP/rc-tag-refs.json"
+          if node -e 'const refs=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(refs.some(r=>r.ref==="refs/tags/"+process.argv[2])?0:1)' "$RUNNER_TEMP/rc-tag-refs.json" "$tag"; then
+            test "$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)" = "$commit"
+          fi
+          if gh release view "$tag" --json isDraft,isPrerelease,tagName > "$RUNNER_TEMP/rc-release.json"; then
+            node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));if(r.isDraft||!r.isPrerelease)throw new Error("An existing RC must already be a published prerelease")' "$RUNNER_TEMP/rc-release.json"
+            mkdir "$RUNNER_TEMP/existing-rc"
+            gh release download "$tag" --pattern "$vsix" --pattern candidate.json --pattern SHA256SUMS --dir "$RUNNER_TEMP/existing-rc"
+            cmp "candidate/$vsix" "$RUNNER_TEMP/existing-rc/$vsix"
+            cmp candidate/candidate.json "$RUNNER_TEMP/existing-rc/candidate.json"
+            cmp candidate/SHA256SUMS "$RUNNER_TEMP/existing-rc/SHA256SUMS"
+          else
+            gh release create "$tag" --target "$commit" --prerelease --title "Inkwell candidate $commit" --notes 'Immutable candidate for installation verification; final publication is gated separately.' "candidate/$vsix" candidate/candidate.json candidate/SHA256SUMS
+          fi
+          echo "Candidate asset: https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/$vsix" >> "$GITHUB_STEP_SUMMARY"
+          echo 'Prepare the tap candidate on its own review branch using this exact URL and the retained SHA256SUMS, then run the macOS installation workflow.' >> "$GITHUB_STEP_SUMMARY"

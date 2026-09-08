@@ -1,18 +1,25 @@
 name: Release
 
-# Publishing starts here, after preflight, rather than on an already-published release.
+# Only an existing immutable candidate with complete release evidence can publish.
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
     inputs:
       tag:
         description: Exact existing release tag (vX.Y.Z)
         required: true
         type: string
+      candidate_run_id:
+        description: Successful Verify run containing the immutable inkwell-candidate artifact
+        required: true
+        type: string
+      evidence_run_id:
+        description: Run containing the reviewed inkwell-publication-evidence bundle
+        required: true
+        type: string
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: inkwell-release
@@ -23,8 +30,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
     env:
-      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      RELEASE_TAG: ${{ inputs.tag }}
     defaults:
       run:
         shell: bash
@@ -32,13 +40,13 @@ jobs:
       - name: Check out the exact tag
         uses: actions/checkout@v4
         with:
-          ref: refs/tags/${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          ref: refs/tags/${{ inputs.tag }}
           persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Verify release version and tap credentials
@@ -54,8 +62,42 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify
-        run: npm run verify
+      - name: Authenticate candidate and evidence producer runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          EVIDENCE_RUN_ID: ${{ inputs.evidence_run_id }}
+        run: |
+          set -euo pipefail
+          commit="$(git rev-parse HEAD)"
+          node scripts/release-evidence.mjs verify-run --commit "$commit" --run-id "$CANDIDATE_RUN_ID" --workflow .github/workflows/verify.yml
+          node scripts/release-evidence.mjs verify-run --commit "$commit" --run-id "$EVIDENCE_RUN_ID" --workflow .github/workflows/release-evidence.yml
+
+      - name: Download the immutable tested candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: inkwell-candidate
+          path: candidate
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.candidate_run_id }}
+
+      - name: Download complete candidate evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: inkwell-publication-evidence
+          path: evidence
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.evidence_run_id }}
+
+      - name: Block publication unless every required candidate gate passed
+        id: evidence
+        env:
+          VSIX: ${{ steps.version.outputs.filename }}
+        run: |
+          set -euo pipefail
+          node scripts/release-evidence.mjs validate --candidate candidate/candidate.json --vsix "candidate/$VSIX" --evidence evidence --stage publish --output verified-publication.json
+          node -e 'const f=require("fs"),r=require("./verified-publication.json");f.appendFileSync(process.env.GITHUB_OUTPUT,"tapCommit="+r.tapCommit+"\n")'
+          cp "candidate/$VSIX" "$VSIX"
 
       - name: Reuse immutable assets when resuming a public release
         id: existing
@@ -77,10 +119,6 @@ jobs:
             fi
           fi
 
-      - name: Build VSIX
-        if: steps.existing.outputs.public != 'true'
-        run: npm run package:vsix
-
       - name: Validate actual VSIX and prepare release checksum
         id: artifact
         env:
@@ -93,12 +131,14 @@ jobs:
           else
             node scripts/release-contract.mjs checksums "$VSIX" "$RELEASE_TAG"
           fi
+          node scripts/release-evidence.mjs validate --candidate candidate/candidate.json --vsix "$VSIX" --evidence evidence --stage publish
 
       - name: Check out Homebrew tap
         uses: actions/checkout@v4
         with:
           repository: goldberg-consulting/homebrew-inkwell
-          ref: main
+          ref: ${{ steps.evidence.outputs.tapCommit }}
+          fetch-depth: 0
           path: tap
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           persist-credentials: false
@@ -107,16 +147,19 @@ jobs:
         id: tap
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           set -euo pipefail
-          node scripts/release-contract.mjs tap tap/Casks/inkwell.rb "$VERSION" SHA256SUMS
+          node scripts/release-contract.mjs promote-tap tap/Casks/inkwell.rb "$VERSION" SHA256SUMS "$(git rev-parse HEAD)"
           node scripts/release-contract.mjs verify-tap tap
           git -C tap config user.name "github-actions[bot]"
           git -C tap config user.email "github-actions[bot]@users.noreply.github.com"
-          git -C tap add Casks/inkwell.rb
-          if git -C tap diff --cached --quiet; then
+          git -C tap -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch origin main:refs/remotes/origin/main
+          if git -C tap diff --quiet refs/remotes/origin/main; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
+            git -C tap merge-base --is-ancestor refs/remotes/origin/main HEAD
+            git -C tap add Casks/inkwell.rb
             git -C tap commit -m "bump inkwell to $VERSION"
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
@@ -133,7 +176,16 @@ jobs:
           else
             gh release create "$RELEASE_TAG" --verify-tag --draft --title "Inkwell $RELEASE_TAG" --generate-notes
           fi
-          gh release upload "$RELEASE_TAG" "$VSIX" SHA256SUMS --clobber
+          mkdir -p "$RUNNER_TEMP/inkwell-draft-existing"
+          gh release view "$RELEASE_TAG" --json assets > "$RUNNER_TEMP/inkwell-draft-assets.json"
+          for artifact in "$VSIX" SHA256SUMS; do
+            if node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.assets.some(a=>a.name===process.argv[2])?0:1)' "$RUNNER_TEMP/inkwell-draft-assets.json" "$artifact"; then
+              gh release download "$RELEASE_TAG" --pattern "$artifact" --dir "$RUNNER_TEMP/inkwell-draft-existing"
+              cmp "$artifact" "$RUNNER_TEMP/inkwell-draft-existing/$artifact"
+            else
+              gh release upload "$RELEASE_TAG" "$artifact"
+            fi
+          done
 
       - name: Publish verified release with Homebrew visibly pending
         id: public
@@ -158,6 +210,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          node scripts/release-evidence.mjs validate --candidate candidate/candidate.json --vsix "candidate/$(node -p 'require("./candidate/candidate.json").filename')" --evidence evidence --stage complete --output verified-completion.json
           gh release view "$RELEASE_TAG" --json body > "$RUNNER_TEMP/inkwell-release-notes.json"
           node scripts/release-contract.mjs notes complete "$RUNNER_TEMP/inkwell-release-notes.json" "$RELEASE_TAG" "$RUNNER_TEMP/inkwell-complete-notes.md"
           gh release edit "$RELEASE_TAG" --title "Inkwell $RELEASE_TAG" --notes-file "$RUNNER_TEMP/inkwell-complete-notes.md"
@@ -169,4 +222,6 @@ jobs:
           The verified release is public, but Homebrew publication is incomplete. Its title and notes remain marked **Homebrew pending**.
 
           Rerun this failed Release workflow, or dispatch the same exact tag. The workflow downloads and validates the existing public VSIX and SHA256SUMS without rebuilding or overwriting them, then verifies and retries the tap update. Resolve conflicting tap changes in the tap repository before retrying; never force-push or replace the release assets.
+
+          Completion also requires evidence for the public canonical install command, reinstall, and uninstall preservation. Retain the pending state until those gates pass for the same release commit and VSIX SHA-256.
           TEXT

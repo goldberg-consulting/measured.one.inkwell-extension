@@ -1,0 +1,115 @@
+name: Assemble release evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_commit:
+        description: Exact 40-character release commit
+        required: true
+        type: string
+      candidate_run_id:
+        description: Verify run containing the immutable candidate and Linux/macOS evidence
+        required: true
+        type: string
+      installation_run_id:
+        description: macOS installation journey run containing its retained evidence
+        required: false
+        type: string
+      supplemental_run_id:
+        description: Optional run with performance, upgrade or public-install evidence
+        required: false
+        type: string
+      stage:
+        description: Publication or final public-install completion
+        type: choice
+        options: [rc, publish, complete]
+        default: publish
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  assemble:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_commit }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - name: Authenticate all source runs before downloading evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          INSTALLATION_RUN_ID: ${{ inputs.installation_run_id }}
+          SUPPLEMENTAL_RUN_ID: ${{ inputs.supplemental_run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          commit="$(git rev-parse HEAD)"
+          node scripts/release-evidence.mjs verify-run --commit "$commit" --run-id "$CANDIDATE_RUN_ID" --workflow .github/workflows/verify.yml
+          if [ -n "$INSTALLATION_RUN_ID" ]; then
+            node scripts/release-evidence.mjs verify-run --commit "$commit" --run-id "$INSTALLATION_RUN_ID" --workflow .github/workflows/macos-installation.yml
+          fi
+          if [ -n "$SUPPLEMENTAL_RUN_ID" ]; then
+            node scripts/release-evidence.mjs verify-run --commit "$commit" --run-id "$SUPPLEMENTAL_RUN_ID" --workflow .github/workflows/verify.yml,.github/workflows/compile-demos.yml,.github/workflows/macos-installation.yml
+          fi
+      - uses: actions/download-artifact@v4
+        with:
+          name: inkwell-candidate
+          path: candidate
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.candidate_run_id }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: evidence-*
+          path: evidence/verification
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.candidate_run_id }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: demo-validation-report
+          path: evidence/demos
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.candidate_run_id }}
+      - if: inputs.installation_run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          pattern: macos-journey-*
+          path: evidence/installation
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.installation_run_id }}
+      - if: inputs.supplemental_run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          path: supplemental-source
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.supplemental_run_id }}
+      - name: Import supplemental gates without replacing package or platform evidence
+        if: inputs.supplemental_run_id != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/release-evidence.mjs select --candidate candidate/candidate.json --evidence supplemental-source --output evidence/supplemental --gates performance,pdf-parity,upgrade-from-0.4,clean-macos-cask,standalone-existing-tex,public-install,reinstall,uninstall-preservation,public-tap-audit
+      - name: Verify report bytes, identity and every required gate
+        env:
+          STAGE: ${{ inputs.stage }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          vsix="$(node -p 'require("./candidate/candidate.json").filename')"
+          node scripts/release-evidence.mjs validate --candidate candidate/candidate.json --vsix "candidate/$vsix" --evidence evidence --stage "$STAGE" --output evidence/validated.json
+      - name: Publish only a complete coherent evidence bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: inkwell-publication-evidence
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Retain missing-gate diagnostics
+        if: failure()
+        run: echo 'Evidence assembly failed. Final publication remains blocked; inspect the missing or mismatched gate above. No release assets were changed.' >> "$GITHUB_STEP_SUMMARY"
