@@ -119,9 +119,15 @@ test('installed requirements are authoritative and unknown packages have no fall
     assert.equal(f.calls.filter(call => call.name === 'kpsewhich' && !call.args[0].startsWith('-')).length, 0);
   }
   const installed = loadTexRequirements(path.join(__dirname, '..'));
-  assert.equal(installed.packages.length, 103);
+  assert.equal(installed.packages.length, 101);
   assert.ok(!installed.packages.some(pkg => pkg.name === 'fix2col'));
-  assert.deepEqual(installed.packages.find(pkg => pkg.name === 'tools').files, ['array.sty', 'calc.sty', 'longtable.sty', 'multicol.sty']);
+  assert.deepEqual(installed.packages.find(pkg => pkg.name === 'caption').files, ['caption.sty', 'subcaption.sty']);
+  assert.deepEqual(installed.packages.find(pkg => pkg.name === 'tools').files, ['array.sty', 'calc.sty', 'longtable.sty', 'multicol.sty', 'tabularx.sty']);
+  assert.equal(TEX_PACKAGE_FILES.subcaption, undefined);
+  assert.equal(TEX_PACKAGE_FILES.tabularx, undefined);
+  const providers = fixture(t, { requirements: 'caption\ntools\n', execute: (name, args) => name === 'kpsewhich' && ['subcaption.sty', 'tabularx.sty'].includes(args[0]) ? ok('', { exitCode: 1 }) : undefined });
+  const providerResult = await providers.doctor.run({ ...providers.options, mode: 'full' });
+  assert.deepEqual(providerResult.missingPackages, ['caption', 'tools']);
 });
 
 test('bundled templates do not import obsolete fix2col', () => {
