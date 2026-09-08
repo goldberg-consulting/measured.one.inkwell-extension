@@ -11,13 +11,13 @@ function fixture(t, watchMode) {
   const home = path.join(root, 'home'), project = path.join(root, 'project'), builtin = path.join(root, 'templates');
   for (const dir of [home, project, builtin]) fs.mkdirSync(dir);
   fs.writeFileSync(path.join(builtin, 'inkwell.latex'), 'built in');
-  const counts = { readdir: 0, read: 0, open: 0, metadata: 0, watch: 0 }, live = new Set(), watched = [];
-  let directoryHook, openHook, readHook;
+  const counts = { readdir: 0, read: 0, open: 0, metadata: 0, watch: 0, parse: 0 }, live = new Set(), watched = [];
+  let directoryHook, openHook, readHook, statHook;
   const watchedFs = { ...fs,
     readdirSync(...args) { counts.readdir++; directoryHook?.(...args); return fs.readdirSync(...args); },
     readFileSync(...args) { counts.read++; readHook?.(...args); return fs.readFileSync(...args); },
     openSync(...args) { counts.open++; openHook?.(...args); return fs.openSync(...args); },
-    lstatSync(...args) { counts.metadata++; return fs.lstatSync(...args); },
+    lstatSync(...args) { counts.metadata++; const stat = fs.lstatSync(...args); return statHook?.(args[0], stat) || stat; },
     realpathSync(...args) { counts.metadata++; return fs.realpathSync(...args); },
     watch(directory, options, callback) {
       counts.watch++;
@@ -36,6 +36,7 @@ function fixture(t, watchMode) {
     const module = { exports: {} }; modules.set(name, module);
     const code = fs.readFileSync(path.join(__dirname, '..', 'out', name + '.js'), 'utf8');
     vm.runInNewContext(code, { module, exports: module.exports, __dirname: path.join(root, 'out'), process: { env: environment }, Buffer,
+      JSON: { stringify: JSON.stringify, parse(...args) { counts.parse++; return JSON.parse(...args); } },
       require(request) {
         if (request === 'fs') return watchedFs;
         if (request === 'os') return { ...os, homedir: () => home };
@@ -58,14 +59,14 @@ function fixture(t, watchMode) {
     return dir;
   };
   return { root, home, project, builtin, counts, live, watched, cache, config, templates, environment, write, template,
-    onOpen: hook => { openHook = hook; }, onReadFile: hook => { readHook = hook; }, onReadDirectory: hook => { directoryHook = hook; }, uri: source => ({ fsPath: source }), setWorkspace: value => { workspace = value; } };
+    onOpen: hook => { openHook = hook; }, onReadFile: hook => { readHook = hook; }, onReadDirectory: hook => { directoryHook = hook; }, onStat: hook => { statHook = hook; }, uri: source => ({ fsPath: source }), setWorkspace: value => { workspace = value; } };
 }
 
 function list(f, source) { return f.templates.listTemplates(source ? f.uri(source) : undefined); }
 
 test('imports and activation context lookup are passive; first actual resolution starts bounded watchers', t => {
   const f = fixture(t);
-  assert.deepEqual(f.counts, { readdir: 0, read: 0, open: 0, metadata: 0, watch: 0 });
+  assert.deepEqual(f.counts, { readdir: 0, read: 0, open: 0, metadata: 0, watch: 0, parse: 0 });
   const source = f.write(path.join(f.project, 'doc.md'), ''); fs.mkdirSync(path.join(f.project, '.inkwell'));
   assert.equal(f.config.findInkwellRoot(f.uri(source)), f.project);
   assert.equal(f.counts.watch, 0, 'activation context lookup does not start watchers');
@@ -119,7 +120,7 @@ test('root cache rejects marker and workspace symlink escapes immediately', t =>
   assert.equal(f.config.getInkwellProjectRoot(path.join(f.project, 'escape', 'doc.md')), path.join(f.project, 'escape'));
 });
 
-test('warm template calls do not enumerate directories or reread manifests, and callers cannot poison cached values', t => {
+test('warm template calls retain parsed immutable objects with bounded shallow inventory and manifest byte checks', t => {
   const f = fixture(t); f.template(f.builtin, 'paper', 'Paper', { variables: { color: 'blue' }, features: [{ pattern: 'x', syntax: 'x', description: 'X' }] });
   const first = list(f), original = first.get('paper'), counts = { ...f.counts };
   assert.ok(Object.isFrozen(original) && Object.isFrozen(original.manifest) && Object.isFrozen(original.manifest.variables) && Object.isFrozen(original.manifest.features[0]) && Object.isFrozen(original.supportingFiles));
@@ -128,7 +129,9 @@ test('warm template calls do not enumerate directories or reread manifests, and 
   first.clear(); first.set('poison', {});
   const warm = list(f);
   assert.equal(warm.get('paper'), original); assert.equal(warm.has('poison'), false);
-  assert.equal(f.counts.readdir, counts.readdir); assert.equal(f.counts.read, counts.read); assert.equal(f.counts.open, counts.open); assert.equal(f.counts.watch, counts.watch);
+  assert.ok(f.counts.readdir > counts.readdir && f.counts.readdir - counts.readdir <= 3, 'warm guards only check the observed shallow directories');
+  assert.equal(f.counts.read - counts.read, 1, 'only the parsed manifest bytes need a content digest');
+  assert.equal(f.counts.open - counts.open, 1); assert.equal(f.counts.watch, counts.watch); assert.equal(f.counts.parse, counts.parse, 'warm lookup does not parse the manifest again');
 });
 
 test('template sources preserve built-in, global, project and headless precedence without cross-document leakage', t => {
@@ -184,6 +187,58 @@ test('manifest edits and support inventory changes are guarded before asynchrono
   f.write(path.join(dir, 'preferred.latex'), 'latex');
   assert.equal(list(f).get('paper').pandocTemplate, path.join(dir, 'preferred.latex'));
   fs.rmSync(dir, { recursive: true }); assert.equal(list(f).has('paper'), false);
+});
+
+function freezeContentMetadata(f, selected) {
+  const original = new Map();
+  f.onStat((file, stat) => {
+    if (!selected(file, stat)) return stat;
+    if (!original.has(file)) original.set(file, stat);
+    const first = original.get(file);
+    // Model filesystems where rapid changes share the same timestamp tick and
+    // directory allocation size. Preserve real mode/inode/identity guards.
+    return Object.assign(Object.create(Object.getPrototypeOf(stat)), stat,
+      Object.fromEntries(['size', 'mtimeMs', 'ctimeMs', 'birthtimeMs'].map(key => [key, first[key]])));
+  });
+}
+
+test('directory entry guards detect same-clock additions, renames and mid-scan mutations', t => {
+  const f = fixture(t), directory = f.template(f.builtin, 'paper', 'Paper');
+  freezeContentMetadata(f, (_file, stat) => stat.isDirectory());
+  fs.rmSync(path.join(directory, 'template.latex')); f.write(path.join(directory, 'template.tex'), 'tex');
+  const original = list(f).get('paper');
+  const preferred = f.write(path.join(directory, 'preferred.latex'), 'latex');
+  assert.equal(list(f).get('paper').pandocTemplate, preferred);
+  assert.notEqual(list(f).get('paper'), original, 'new candidates invalidate reconstructed template objects');
+  const support = f.write(path.join(directory, 'before.sty'), 'style');
+  assert.deepEqual([...list(f).get('paper').supportingFiles], [support]);
+  const renamed = path.join(directory, 'after.sty'); fs.renameSync(support, renamed);
+  assert.deepEqual([...list(f).get('paper').supportingFiles], [renamed]);
+  for (const options of [{ enabled: false }, { maxDependencies: 0 }, { maxEntries: 0 }]) {
+    const cache = new f.cache.ResolutionCache(options); t.after(() => cache.dispose());
+    let attempt = 0;
+    assert.throws(() => cache.get('same-clock-race', snapshot => {
+      snapshot.directory(directory); snapshot.inspect(directory, false);
+      f.write(path.join(directory, `new-${options.maxEntries}-${options.maxDependencies}-${attempt++}.sty`), 'style');
+      return 'incomplete inventory';
+    }), /resolution changed while reading/);
+    assert.equal(attempt, 2);
+  }
+});
+
+test('same-size same-clock manifest edits and malformed repairs invalidate only the parsed value', t => {
+  const f = fixture(t), directory = f.template(f.builtin, 'paper', 'First'), manifest = path.join(directory, 'template.json');
+  freezeContentMetadata(f, file => file === manifest);
+  const original = list(f).get('paper'), bytes = fs.readFileSync(manifest);
+  fs.writeFileSync(manifest, '{"name":"Other"}');
+  assert.equal(fs.statSync(manifest).size, bytes.length);
+  const changed = list(f).get('paper');
+  assert.equal(changed.manifest.name, 'Other'); assert.notEqual(changed, original);
+  assert.equal(list(f).get('paper'), changed, 'unchanged bytes retain immutable object identity');
+  fs.writeFileSync(manifest, '{"name":'.padEnd(bytes.length, ' '));
+  assert.equal(list(f).get('paper').manifest.name, 'paper', 'malformed input retains the native fallback');
+  fs.writeFileSync(manifest, '{"name":"First"}');
+  assert.equal(list(f).get('paper').manifest.name, 'First', 'repair is observed even when all metadata aliases');
 });
 
 test('cached template paths cannot escape through changed directory, manifest or support symlinks', t => {

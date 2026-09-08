@@ -74,7 +74,9 @@ function readManifest(templateDir: string, fallbackId: string, snapshot: Resolut
   try {
     const descriptor = fs.openSync(manifestPath, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
     try {
-      const parsed = JSON.parse(fs.readFileSync(descriptor, "utf-8"));
+      const contents = fs.readFileSync(descriptor);
+      snapshot.content(manifestPath, contents);
+      const parsed = JSON.parse(contents.toString("utf-8"));
       return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? { ...parsed, name: parsed.name || fallbackId } : { name: fallbackId };
     } finally { fs.closeSync(descriptor); }
   } catch (error) {

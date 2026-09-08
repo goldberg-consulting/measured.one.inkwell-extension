@@ -84,6 +84,11 @@ test('promotion changes only audited RC metadata and rejects another candidate U
   assert.equal(promoteTapCandidate(promoted, '0.5.0', digest, commit), promoted);
   const singleQuoted = source.replace(/url "([^"\n]+)"/, "url '$1'");
   assert.match(promoteTapCandidate(singleQuoted, '0.5.0', digest, commit), /url "https:[^\n]+#\{version\}/);
+  const versioned = source.replace('/inkwell-0.5.0.vsix', '/inkwell-#{version}.vsix');
+  assert.equal(promoteTapCandidate(versioned, '0.5.0', digest, commit), promoted, 'Homebrew version interpolation retains the exact audited URL');
+  assert.throws(() => promoteTapCandidate(versioned.replace(/url "([^"\n]+)"/, "url '$1'"), '0.5.0', digest, commit), /audited tap URL/);
+  assert.throws(() => promoteTapCandidate(versioned.replace('version "0.5.0"', 'version "0.4.0"'), '0.5.0', digest, commit), /audited tap URL/);
+  assert.throws(() => promoteTapCandidate(versioned.replace('#{version}', '#{version.major}'), '0.5.0', digest, commit), /audited tap URL/);
   assert.throws(() => promoteTapCandidate(source, '0.5.0', digest, 'd'.repeat(40)), /audited tap URL/);
 });
 

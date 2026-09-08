@@ -1,7 +1,8 @@
 // Passive caches: construction performs no filesystem work. Watchers only retire
-// entries; synchronous metadata guards close the gap before watch events arrive.
+// entries; synchronous inventory/content guards close the gap before watch events arrive.
 import * as fs from "fs";
 import * as path from "path";
+import * as crypto from "crypto";
 
 interface Observation { signature: string; identitySignature: string; trackContent: boolean; unavailable?: boolean; directory: boolean; realPath?: string; stat?: fs.Stats }
 function observe(file: string, trackContent = true): Observation {
@@ -21,8 +22,23 @@ function observe(file: string, trackContent = true): Observation {
   // A dangling link has an identity of its own. Treating it as an absent
   // ordinary directory would infer containment through the wrong ancestor.
   const identitySignature = [stat.dev, stat.ino, stat.mode, realPath].join(":");
-  return { stat, realPath, trackContent, identitySignature, directory: !!realPath && stat.isDirectory() && !stat.isSymbolicLink(),
-    signature: trackContent ? [identitySignature, stat.size, stat.mtimeMs, stat.ctimeMs, stat.birthtimeMs].join(":") : identitySignature };
+  const directory = !!realPath && stat.isDirectory() && !stat.isSymbolicLink();
+  let inventory: string | undefined, unavailable = false;
+  if (trackContent && directory) {
+    try {
+      // Linux overlay and other coarse clocks can report identical metadata
+      // after a real entry change. Check shallow names/types, not timestamps
+      // alone; parsed manifests and reconstructed template objects stay cached.
+      inventory = JSON.stringify(fs.readdirSync(file, { withFileTypes: true })
+        .map(entry => [entry.name, entry.isDirectory() ? "directory" : entry.isFile() ? "file" : entry.isSymbolicLink() ? "symlink" : "other"])
+        .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0));
+    } catch (error) {
+      unavailable = true;
+      inventory = `unavailable:${(error as NodeJS.ErrnoException).code}`;
+    }
+  }
+  return { stat, realPath, trackContent, identitySignature, directory, unavailable,
+    signature: trackContent ? [identitySignature, stat.size, stat.mtimeMs, stat.ctimeMs, stat.birthtimeMs, inventory].join(":") : identitySignature };
 }
 
 export function isPathWithin(root: string, file: string): boolean {
@@ -32,6 +48,7 @@ export function isPathWithin(root: string, file: string): boolean {
 
 export class ResolutionSnapshot {
   readonly observations = new Map<string, Observation>();
+  private readonly contentDigests = new Map<string, string>();
   cacheable = true;
   private consistent = true;
 
@@ -63,9 +80,27 @@ export class ResolutionSnapshot {
     return !!item.stat?.isFile() && !item.stat.isSymbolicLink() && !!item.realPath && root.directory && !!root.realPath && isPathWithin(root.realPath, item.realPath);
   }
 
+  /** Register the exact bytes consumed by a parser, including invalid input.
+   * Only content-derived values need this guard; font/image paths do not.
+   */
+  content(file: string, bytes: string | Buffer): void {
+    const normalized = path.resolve(file), digest = crypto.createHash("sha256").update(bytes).digest("hex");
+    const previous = this.contentDigests.get(normalized);
+    if (previous !== undefined && previous !== digest) { this.cacheable = false; this.consistent = false; }
+    this.contentDigests.set(normalized, digest);
+  }
+
   matches(): boolean {
     if (!this.consistent) return false;
     try {
+      for (const [file, expected] of this.contentDigests) {
+        const descriptor = fs.openSync(file, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0) | (fs.constants.O_NONBLOCK || 0));
+        try {
+          if (!fs.fstatSync(descriptor).isFile() || crypto.createHash("sha256").update(fs.readFileSync(descriptor)).digest("hex") !== expected) return false;
+        } finally { fs.closeSync(descriptor); }
+      }
+      // Recheck containment/identity after descriptor reads, so a directory
+      // replacement during a manifest read cannot publish its escaping paths.
       for (const [file, expected] of this.observations) if (observe(file, expected.trackContent).signature !== expected.signature) return false;
       return true;
     } catch { return false; }

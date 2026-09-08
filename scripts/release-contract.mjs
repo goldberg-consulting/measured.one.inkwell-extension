@@ -97,8 +97,16 @@ export function promoteTapCandidate(source, version, sha256, releaseCommit) {
   if (!/^[a-f0-9]{40}$/.test(releaseCommit)) throw new Error('The audited candidate needs an exact release commit.');
   const canonical = 'https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/download/v#{version}/inkwell-#{version}.vsix';
   const candidate = `https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/download/inkwell-rc-${releaseCommit}/inkwell-${version}.vsix`;
+  const versionedCandidate = candidate.replace(`/inkwell-${version}.vsix`, '/inkwell-#{version}.vsix');
   const urls = [...source.matchAll(/^(\s*url\s+)(["'])([^"'\r\n]+)\2([^\r\n]*)$/gm)];
-  if (urls.length !== 1 || ![candidate, canonical].includes(urls[0][3])) throw new Error('The audited tap URL does not match this immutable RC or its canonical final URL.');
+  const versions = [...source.matchAll(/^\s*version\s+(["'])([^"'\r\n]+)\1[^\r\n]*$/gm)];
+  const url = urls[0];
+  // Homebrew requires version interpolation even with an immutable commit tag.
+  // Only accept its exact expansion; single-quoted Ruby does not interpolate.
+  const interpolatedCandidate = url?.[2] === '"' && url[3] === versionedCandidate
+    && versions.length === 1 && versions[0][2] === version;
+  const finalUrl = url?.[2] === '"' && url[3] === canonical;
+  if (urls.length !== 1 || !(url[3] === candidate || interpolatedCandidate || finalUrl)) throw new Error('The audited tap URL does not match this immutable RC or its canonical final URL.');
   return updateTapCask(source.replace(urls[0][0], `${urls[0][1]}"${canonical}"${urls[0][4]}`), version, sha256);
 }
 
