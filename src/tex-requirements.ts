@@ -69,7 +69,8 @@ export const TEX_PACKAGE_FILES: Readonly<Record<string, readonly string[]>> = {
     "booktabs.sty"
   ],
   "caption": [
-    "caption.sty"
+    "caption.sty",
+    "subcaption.sty"
   ],
   "microtype": [
     "microtype.sty"
@@ -217,7 +218,8 @@ export const TEX_PACKAGE_FILES: Readonly<Record<string, readonly string[]>> = {
     "array.sty",
     "calc.sty",
     "longtable.sty",
-    "multicol.sty"
+    "multicol.sty",
+    "tabularx.sty"
   ],
   "preprint": [
     "authblk.sty",
@@ -294,12 +296,6 @@ export const TEX_PACKAGE_FILES: Readonly<Record<string, readonly string[]>> = {
   ],
   "textcase": [
     "textcase.sty"
-  ],
-  "subcaption": [
-    "subcaption.sty"
-  ],
-  "tabularx": [
-    "tabularx.sty"
   ],
   "epstopdf-pkg": [
     "epstopdf.sty"
