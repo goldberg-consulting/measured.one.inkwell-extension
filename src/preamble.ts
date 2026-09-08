@@ -129,13 +129,8 @@ export function generatePreamble(style: InkwellStyle): string {
   // Body table styles are applied by semantic-tables.lua around native Tables.
   // Never attach document styling to every tabular/longtable environment.
 
-  if (style["hanging-indent"]) {
-    lines.push("");
-    lines.push("% Inkwell hanging indent for lists");
-    lines.push("\\usepackage{enumitem}");
-    lines.push("\\setlist[enumerate]{leftmargin=2em,labelindent=0pt,itemindent=0pt}");
-    lines.push("\\setlist[itemize]{leftmargin=1.5em,labelindent=0pt}");
-  }
+  // The deprecated hanging-indent alias now applies only to references.
+  // reference-render.lua scopes it to the citeproc bibliography environment.
 
   if (style.columns && style.columns > 1) {
     lines.push("");

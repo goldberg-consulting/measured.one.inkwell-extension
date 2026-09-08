@@ -1,0 +1,41 @@
+{
+  "kind": "actual-pdf-reference-measurements",
+  "templates": [
+    "default",
+    "eth-report"
+  ],
+  "cases": [
+    {
+      "template": "default",
+      "pageBreak": "never",
+      "bodyPage": 1,
+      "referencesPage": 1,
+      "referenceFontSize": 8.966400146484375,
+      "pdfPath": "<isolated-project>/default-never.pdf"
+    },
+    {
+      "template": "default",
+      "pageBreak": "always",
+      "bodyPage": 1,
+      "referencesPage": 2,
+      "referenceFontSize": 8.966400146484375,
+      "pdfPath": "<isolated-project>/default-always.pdf"
+    },
+    {
+      "template": "eth-report",
+      "pageBreak": "never",
+      "bodyPage": 1,
+      "referencesPage": 1,
+      "referenceFontSize": 8.966400146484375,
+      "pdfPath": "<isolated-project>/eth-report-never.pdf"
+    },
+    {
+      "template": "eth-report",
+      "pageBreak": "always",
+      "bodyPage": 1,
+      "referencesPage": 2,
+      "referenceFontSize": 8.966400146484375,
+      "pdfPath": "<isolated-project>/eth-report-always.pdf"
+    }
+  ]
+}

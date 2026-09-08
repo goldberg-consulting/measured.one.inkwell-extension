@@ -11,24 +11,25 @@ explicit stripe or density setting overrides the preset's implied value.
 
 ```yaml
 ---
-tables:
-  preset: grid
-  fontSize: 10pt
-  density: compact
-  headerWeight: bold
-  headerBackground: '#eef3f8'
-  stripe: true
-  stripeColor: '#f5f5fa'
-  ruleColor: '#446688'
-  ruleThickness: 0.5pt
-  paddingHorizontal: 4pt
-  paddingVertical: 2pt
-  alignment: [left, right]
-  numericAlignment: right
-  width: 100%
-  overflow: wrap
-  captionPosition: above
-  captionStyle: normal
+inkwell:
+  tables:
+    preset: grid
+    font-size: 10pt
+    density: compact
+    header-weight: bold
+    header-background: '#eef3f8'
+    stripe: true
+    stripe-color: '#f5f5fa'
+    rule-color: '#446688'
+    rule-thickness: 0.5pt
+    padding-horizontal: 4pt
+    padding-vertical: 2pt
+    alignment: [left, right]
+    numeric-alignment: right
+    width: 100%
+    overflow: wrap
+    caption-position: above
+    caption-style: normal
 ---
 ```
 

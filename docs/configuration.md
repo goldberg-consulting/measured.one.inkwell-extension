@@ -12,16 +12,21 @@ recognized top-level values override `metadata`, which overrides `variables`.
 Template capabilities constrain the result and explain unsupported choices.
 Viewer settings never enter the authoring configuration or its fingerprint.
 
-Existing aliases such as `fontsize`, `mainfont`, `linestretch`, `bibliography`,
-`bibliography-scope`, and `inkwell.code-display` remain readable. Native Pandoc
+Pandoc keys such as `fontsize`, `mainfont`, `linestretch`, and `bibliography`
+remain canonical. New Inkwell options use nested kebab-case names under
+`inkwell.typography`, `inkwell.tables`, `inkwell.references`, and `inkwell.runs`.
+Legacy aliases, including `bibliography-scope` and `inkwell.code-display`, remain
+readable through at least release 0.7. Native Pandoc
 metadata, including `header-includes` and inline CSL `references` lists, is
 preserved. The compiler applies inherited choices to a staged source copy.
 
-A schema 4 project manifest uses this shape:
+A project manifest separates the JSON schema version from the installed scaffold
+content version:
 
 ```json
 {
-  "schemaVersion": 4,
+  "schemaVersion": 1,
+  "scaffoldVersion": 4,
   "template": "default",
   "defaults": {
     "typography": { "bodySize": "11pt" },
@@ -36,10 +41,23 @@ A schema 4 project manifest uses this shape:
 The migration service owns `managedFiles`. Legacy `settings` and
 `documentSettings` are normalized in memory and migrated with unknown JSON keys
 intact. Ordinary rendering does not save this normalization back to disk.
+Legacy schema-only manifests, including the transitional `schemaVersion: 4`
+format, remain readable and migrate to schema 1 / scaffold 4 during setup.
 
-Declared bibliography files are resolved in their written order, followed by
-sorted discovery in the project root, `references/`, and `.inkwell/references/`.
-Duplicates are removed by resolved path. `bibliography: []` disables discovery.
+Setup copies recognized values from project-root `defaults.yaml` into the
+manifest without changing that YAML file. Project values retain precedence.
+Conflicts receive a numbered manifest `.new` proposal; **Compare files** reviews
+the alternative and **Keep my files** retains the project values while copying
+the remaining defaults. Unknown Pandoc metadata stays in `defaults.yaml`, where
+it continues to participate in rendering. Viewer preferences are never copied.
+The final manifest checkpoint records the source hash and migration completion;
+repeating setup performs no writes. If `defaults.yaml` changes during an
+interrupted transaction, migration stops before publishing stale defaults.
+
+An explicit document or project bibliography list replaces discovery, including
+`bibliography: []`. Otherwise Inkwell discovers sorted `.bib` files in the project
+root, `references/`, and `.inkwell/references/`. Earlier files win duplicate-key
+lookup, while every duplicate definition receives a source diagnostic.
 Document declarations are relative to the document, with the project-root
 fallback retained for nested documents using `.inkwell/...` paths. Project and
 `defaults.yaml` declarations are relative to the project root. The same rules

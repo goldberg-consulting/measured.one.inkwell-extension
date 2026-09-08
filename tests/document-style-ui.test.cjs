@@ -72,7 +72,7 @@ test('document style is one undoable editor change with no save or scaffold side
   assert.equal(h.document.isDirty, true); assert.equal(h.counts().saves, 0); assert.equal(h.counts().readinessCalls, 0);
   assert.equal(fs.existsSync(path.dirname(h.manifest)), false);
   assert.equal(fs.readFileSync(h.source, 'utf8'), '# Existing document\n');
-  assert.match(h.text(), /bodySize: 12pt/); assert.equal(refreshed, 1);
+  assert.match(h.text(), /fontsize: 12pt/); assert.equal(refreshed, 1);
 });
 
 for (const answers of [[undefined], ['document', undefined], ['document', 'typography.bodySize', undefined]]) {

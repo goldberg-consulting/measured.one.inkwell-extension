@@ -20,6 +20,8 @@ import { ProjectReadinessGate } from "./project-readiness-ui";
 import { createSetupUI, registerSetupCommands, SetupUI } from "./setup-ui";
 import { invalidateDoctorCache } from "./doctor";
 import { registerDocumentStyleCommand } from "./document-style-ui";
+import { invalidateCitationPandoc } from "./citation-pandoc";
+import { registerBibliographyAuthoring } from "./bibliography-authoring";
 
 let diagnostics: InkwellDiagnostics;
 let autoCompileTimer: ReturnType<typeof setInterval> | undefined;
@@ -39,6 +41,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   const previewProvider = new InkwellPreviewProvider(context);
   registerDocumentStyleCommand(context, () => previewProvider.refresh());
+  registerBibliographyAuthoring(context, () => previewProvider.refresh());
   previewProvider.setDiagnostics(diagnostics);
   previewProvider.ensureReady = (document, allowPrompt) => ensureAuthoringReady(document, allowPrompt);
 
@@ -165,7 +168,7 @@ export function activate(context: vscode.ExtensionContext) {
     }),
 
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration("inkwell") || e.affectsConfiguration("terminal.integrated.env")) invalidateDoctorCache();
+      if (e.affectsConfiguration("inkwell") || e.affectsConfiguration("terminal.integrated.env")) { invalidateDoctorCache(); invalidateCitationPandoc(); }
       if (e.affectsConfiguration("inkwell.autoCompile") ||
           e.affectsConfiguration("inkwell.autoCompileIntervalSeconds")) {
         setupAutoCompileTimer();

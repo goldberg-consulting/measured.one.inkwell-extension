@@ -25,6 +25,7 @@ import { executeRunProcess } from "./run-process";
 import { publishPdf, validatePdf } from "./pdf-publication";
 import { hasTypographyOverride } from "./style-model";
 import { tablePdfOptions } from "./table-model";
+import { bibliographyMetadata, bibliographyService } from "./bibliography-service";
 
 const exec = promisify(execFile);
 
@@ -57,6 +58,8 @@ const SECTION_BIBS_FILTER = path.join(__dirname, "..", "filters", "section-bibli
 const BODY_TYPOGRAPHY_FILTER = path.join(__dirname, "..", "filters", "body-typography.lua");
 const TABLE_DATA_FILTER = path.join(__dirname, "..", "filters", "table-data.lua");
 const SEMANTIC_TABLES_FILTER = path.join(__dirname, "..", "filters", "semantic-tables.lua");
+const REFERENCE_PREPARE_FILTER = path.join(__dirname, "..", "filters", "reference-prepare.lua");
+const REFERENCE_RENDER_FILTER = path.join(__dirname, "..", "filters", "reference-render.lua");
 
 function safeReadFile(file: string): string {
   try {
@@ -647,7 +650,7 @@ async function compilePandoc(
   };
   // Bindings may occur in metadata too, so resolve their injected values before planning Pandoc.
   const documentConfig = getDocumentConfig(injected, sourceFile);
-  const references = getResolvedReferences(documentConfig, sourceFile);
+  const references = await bibliographyService.snapshot(getResolvedReferences(documentConfig, sourceFile));
   const configDiagnostics = [...documentConfig.diagnostics, ...references.diagnostics,
     ...documentConfig.deferredBindings.map(binding => ({
       sourcePath: binding.sourcePath, line: binding.line, column: binding.column,
@@ -656,7 +659,7 @@ async function compilePandoc(
     })),
   ];
   for (const diagnostic of configDiagnostics) pipelineWarnings.push({
-    line: diagnostic.line, message: diagnostic.message, severity: diagnostic.severity,
+    line: diagnostic.sourcePath === sourceFile ? diagnostic.line : undefined, message: diagnostic.sourcePath === sourceFile ? diagnostic.message : `${diagnostic.sourcePath}:${diagnostic.line}: ${diagnostic.message}`, severity: diagnostic.severity,
   });
   if (configDiagnostics.some(diagnostic => diagnostic.severity === "error")) return {
     success: false, pdfPath: undefined, errors: pipelineWarnings,
@@ -764,6 +767,7 @@ async function compilePandoc(
   };
   const tableMetadataFile = path.join(cacheDir, "table-options.json");
   fs.writeFileSync(tableMetadataFile, JSON.stringify({
+    ...bibliographyMetadata(references),
     "inkwell-table-options": `hex:${Buffer.from(JSON.stringify(tableOptions), "utf8").toString("hex")}`,
   }), "utf8");
   pandocArgs.push("--metadata-file", tableMetadataFile, "--lua-filter", TABLE_DATA_FILTER);
@@ -796,12 +800,12 @@ async function compilePandoc(
         severity: "warning",
       });
     }
-    pandocArgs.push("--citeproc");
+    pandocArgs.push("--lua-filter", REFERENCE_PREPARE_FILTER, "--citeproc");
   }
-  pandocArgs.push("--lua-filter", SEMANTIC_TABLES_FILTER);
+  pandocArgs.push("--lua-filter", REFERENCE_RENDER_FILTER, "--lua-filter", SEMANTIC_TABLES_FILTER);
 
   // Preview and PDF consume the same ordered, resolved reference set.
-  const bibFiles = [...references.bibliography];
+  const bibFiles = [...references.bibliography].reverse();
   for (const bib of bibFiles) pandocArgs.push("--bibliography", bib);
   const defaults = findDefaultsYaml(projectRoot);
   if (defaults) {

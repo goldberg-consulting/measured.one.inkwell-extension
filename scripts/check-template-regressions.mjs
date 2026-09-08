@@ -86,7 +86,7 @@ const checks = [
   // The extension and the CI harness must drive the same citation
   // pipeline: bundled CSL default and the section-scope Lua filter.
   {
-    file: "src/config.ts",
+    file: "src/bibliography-service.ts",
     pattern: /inkwell-numeric\.csl/,
     message: "shared reference resolver must provide the bundled numeric CSL default",
   },

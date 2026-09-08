@@ -37,7 +37,7 @@
   typed YAML resolver. Scalar, flow-list, block-list, quoted, and CRLF forms follow
   the same precedence. Diagnostics identify invalid values and template locks.
   `inkwell.defaultCodeDisplay` now supplies the documented authoring default.
-- Manifest schema 4 stores project choices in `defaults.typography`, `tables`,
+- Manifest schema 1 / scaffold 4 stores project choices in `defaults.typography`, `tables`,
   `references`, and `runs`, with hashes and ownership in `managedFiles`. Legacy
   `settings` and `documentSettings` remain readable and migrate without losing
   unknown fields. Rendering never rewrites document frontmatter or the manifest.
@@ -48,8 +48,8 @@
 - Inkwell actions share project readiness. Plain workspaces receive one setup
   action and a persistent Don't ask here choice; background Markdown changes do
   not opt in a workspace. New Project and Setup Workspace use the same migration.
-- Declared bibliographies come before sorted discovered files in both preview
-  and PDF; an explicit empty list disables discovery. Document-relative paths
+- Explicit bibliography lists replace discovery in both preview and PDF. Earlier
+  files win duplicate-key lookup, and every duplicate definition is diagnosed. Document-relative paths
   and project/defaults-relative paths share one resolution rule. Missing files
   now stop compilation with a located diagnostic instead of quietly dropping
   sources.
@@ -70,8 +70,8 @@
   bootstrap supports `auto`, `all`, `cursor`, and `code` editor selection,
   including app-bundle CLIs. It verifies the exact version in each selected editor
   and uses Homebrew Mermaid CLI instead of requiring a global npm installation.
-- Setup reuses functioning TeX installations. Full MacTeX is the missing-TeX
-  default; an explicit lean profile must pass the same full checks. User TinyTeX
+- Standalone setup reuses functioning TeX installations. The full Homebrew cask
+  depends directly on MacTeX and Node, and targets every detected supported editor. User TinyTeX
   uses no sudo, normal system MacTeX ownership is preserved, and requirements come
   from the installed artifact. Obsolete `fix2col` was removed: its fixes have been
   in the LaTeX kernel since 2015 and no bundled template imports it.
@@ -79,6 +79,25 @@
   compiler bundles with an asset hash manifest. Artifact verification checks the
   actual VSIX contents and exact release tag. The separate Homebrew tap draft
   uses supported installer/uninstaller scripts and mocked lifecycle tests.
+
+### Bibliography and canonical configuration (Phase 6)
+
+- Pandoc's citation AST now renders narrative, grouped, suppressed-author, locator,
+  and missing-key cases in preview and PDF. Reference placement and section targets
+  are shared, and fallback preview is explicitly labeled approximate.
+- Configure Bibliography creates or selects files and changes reference formatting
+  with one undoable unsaved edit. Core completion, hover, definition, missing-key,
+  duplicate, and Bibliography Doctor diagnostics use an asynchronous shared index.
+- Canonical frontmatter uses nested Inkwell kebab-case settings and preserves Pandoc
+  top-level keys. CST edits retain all untouched YAML bytes, including comments,
+  quoting, flow punctuation, CRLF, BOM, and document markers.
+- Legacy defaults migration copies all supported values without rewriting the source,
+  records completion transactionally, and retains native inline CSL metadata.
+- Reference spacing accepts physical lengths; hanging indent is bibliography-only.
+  Legacy aliases remain supported through at least 0.7.
+- Reinstalling the exact extension does not write it again. Newer versions produce
+  a partial installer result and stay untouched; cask removal freshly checks the
+  installed version before removing its own release.
 
 ### Typography and viewer controls (Phase 4)
 

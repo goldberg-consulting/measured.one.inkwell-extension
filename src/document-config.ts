@@ -50,13 +50,15 @@ export interface TableConfig {
 }
 export interface ReferenceConfig {
   bibliography: string[]; csl?: string; scope: "document" | "section"; heading: string; links: boolean;
-  hangingIndent: boolean; lineSpacing: number; entrySpacing: number; pageBreak: boolean; nocite: string[];
+  hangingIndent: string; lineSpacing: number; entrySpacing: string; pageBreak: "auto" | "always" | "never"; nocite: string[];
   fontSize?: SizeValue;
 }
 export interface RunConfig {
   display: "output" | "both" | "code" | "none";
   pythonEnv?: string; rEnv?: string; nodeEnv?: string; cache: boolean; timeoutSeconds?: number;
   maxConcurrency: number; inputs: string[]; dependsOn: string[];
+  retentionCount: number; maxStdoutBytes: number; maxStderrBytes: number;
+  maxArtifactBytes: number; maxArtifactTotalBytes: number; maxInputPaths: number; maxInputBytes: number;
   file?: string; id?: string; output?: string; caption?: string; label?: string;
 }
 export interface DocumentConfig {
@@ -240,8 +242,24 @@ const number = (minimum: number, maximum = Infinity, integer = false): Parser =>
 };
 const enumeration = (values: readonly string[]): Parser => (value) => typeof value === "string" && values.includes(value) ? value : undefined;
 const strings: Parser = (value) => typeof value === "string" && value.trim() ? [value] : Array.isArray(value) && value.every((item) => typeof item === "string" && item.trim()) ? [...value] : undefined;
+/** Physical reference spacing. Legacy numbers count extra baselines; booleans
+ * retain the former 1.5em hanging indent without affecting ordinary lists. */
+const referenceLength = (kind: "indent" | "spacing"): Parser => value => {
+  if (kind === "indent" && boolean(value) !== undefined) return boolean(value) ? "1.5em" : "0pt";
+  if (kind === "spacing" && number(0, 20)(value) !== undefined) return `${Number(value) * 1.2}em`;
+  const match = typeof value === "string" && value.trim().match(/^(\d+(?:\.\d+)?)(pt|px|em|rem|%)$/);
+  return match && Number(match[1]) <= 200 ? `${Number(match[1])}${match[2]}` : undefined;
+};
 function field(key: string, legacy: string, aliases: string[], parse: Parser, description: string, block?: string[]): Field {
-  return { key, legacy, aliases: [...new Set([legacy, ...aliases, `inkwell.${key}`, key])], parse, description, block };
+  const kebab = (value: string) => value.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
+  const nested = aliases.filter(value => /^(typography|tables|references|runs)\./.test(value));
+  const canonical = key === "typography.tableSize" ? "tables.font-size"
+    : key === "typography.referenceSize" ? "references.font-size" : kebab(key);
+  const ordered = [legacy, ...aliases, ...nested.flatMap(value => [kebab(value), `inkwell.${kebab(value)}`]),
+    `inkwell.${key}`, key, kebab(key), `inkwell.${canonical}`];
+  // The resolver takes the final candidate. Deduplicate from the strongest
+  // spelling so a compatibility alias cannot shadow the documented key.
+  return { key, legacy, aliases: [...new Set(ordered.reverse())].reverse(), parse, description, block };
 }
 const FIELDS: readonly Field[] = [
   field("template", "template", ["inkwell.template"], string, "a template name"),
@@ -289,10 +307,10 @@ const FIELDS: readonly Field[] = [
   field("references.scope", "bibliography-scope", ["reference-scope", "inkwell.reference-scope"], enumeration(["document", "section"]), "document or section"),
   field("references.heading", "reference-section-title", ["references-heading"], string, "a references heading"),
   field("references.links", "link-citations", ["references.linkCitations"], boolean, "true or false"),
-  field("references.hangingIndent", "hanging-indent", ["references.hanging-indent"], boolean, "true or false"),
+  field("references.hangingIndent", "hanging-indent", ["inkwell.hanging-indent", "references.hanging-indent"], referenceLength("indent"), "a nonnegative length, for example 2em or 0pt"),
   field("references.lineSpacing", "reference-line-spacing", [], number(0.1, 10), "a positive line-spacing multiplier"),
-  field("references.entrySpacing", "reference-entry-spacing", [], number(0, 20), "a nonnegative entry-spacing value"),
-  field("references.pageBreak", "reference-page-break", [], boolean, "true or false"),
+  field("references.entrySpacing", "reference-entry-spacing", [], referenceLength("spacing"), "a nonnegative length, for example 0.4em"),
+  field("references.pageBreak", "reference-page-break", [], value => enumeration(["auto", "always", "never"])(value) ?? (boolean(value) === undefined ? undefined : boolean(value) ? "always" : "never"), "auto, always, or never"),
   field("references.nocite", "nocite", [], strings, "a citation key or a list of keys"),
   field("runs.display", "inkwell.code-display", ["code-display", "defaultCodeDisplay", "inkwell.defaultCodeDisplay", "runs.defaultDisplay"], enumeration(["output", "both", "code", "none"]), "output, both, code, or none", ["display", "code-display"]),
   field("runs.pythonEnv", "inkwell.python-env", ["python-env"], string, "a Python environment or interpreter path"),
@@ -300,7 +318,14 @@ const FIELDS: readonly Field[] = [
   field("runs.nodeEnv", "inkwell.node-env", ["node-env"], string, "a Node interpreter path"),
   field("runs.cache", "inkwell.cache", ["run-cache"], boolean, "true or false", ["cache"]),
   field("runs.timeoutSeconds", "inkwell.run-timeout", ["run-timeout", "runs.timeout"], number(0.001, 86400), "a positive timeout in seconds", ["timeout", "run-timeout"]),
-  field("runs.maxConcurrency", "inkwell.run-concurrency", ["run-concurrency"], number(1, 32, true), "an integer from 1 to 32"),
+  field("runs.maxConcurrency", "inkwell.run-concurrency", ["run-concurrency", "runs.maxParallel"], number(1, 32, true), "an integer from 1 to 32"),
+  field("runs.retentionCount", "inkwell.retention-count", [], number(1, 1000, true), "an integer from 1 to 1000"),
+  field("runs.maxStdoutBytes", "inkwell.max-stdout-bytes", [], number(1, 1073741824, true), "a byte limit from 1 to 1 GiB"),
+  field("runs.maxStderrBytes", "inkwell.max-stderr-bytes", [], number(1, 1073741824, true), "a byte limit from 1 to 1 GiB"),
+  field("runs.maxArtifactBytes", "inkwell.max-artifact-bytes", [], number(1, 17179869184, true), "a byte limit from 1 to 16 GiB"),
+  field("runs.maxArtifactTotalBytes", "inkwell.max-artifact-total-bytes", [], number(1, 17179869184, true), "a byte limit from 1 to 16 GiB"),
+  field("runs.maxInputPaths", "inkwell.max-input-paths", [], number(1, 100000, true), "an integer from 1 to 100000"),
+  field("runs.maxInputBytes", "inkwell.max-input-bytes", [], number(1, 17179869184, true), "a byte limit from 1 to 16 GiB"),
   field("runs.inputs", "inkwell.inputs", ["inputs"], strings, "an input path or list of paths", ["inputs"]),
   field("runs.dependsOn", "inkwell.depends-on", ["depends-on", "runs.depends-on"], strings, "a block ID or list of IDs", ["depends-on"]),
   field("runs.file", "inkwell.run-file", [], string, "a script path", ["file"]),
@@ -314,8 +339,11 @@ const BUILTIN: Metadata = {
   template: "default", engine: "xelatex", columns: 1,
   typography: { codeSize: "small" },
   tables: { preset: "booktabs", stripe: false, density: "normal", captionPosition: "above" },
-  references: { bibliography: [], scope: "document", heading: "References", links: true, hangingIndent: true, lineSpacing: 1, entrySpacing: 0, pageBreak: false, nocite: [] },
-  runs: { display: "output", cache: true, maxConcurrency: 2, inputs: [], dependsOn: [] },
+  references: { bibliography: [], scope: "document", heading: "References", links: true, hangingIndent: "2em", lineSpacing: 1, entrySpacing: "0.4em", pageBreak: "auto", nocite: [] },
+  runs: { display: "output", cache: true, timeoutSeconds: 300, maxConcurrency: 1,
+    retentionCount: 10, maxStdoutBytes: 10485760, maxStderrBytes: 10485760,
+    maxArtifactBytes: 524288000, maxArtifactTotalBytes: 2147483648,
+    maxInputPaths: 1000, maxInputBytes: 2147483648, inputs: [], dependsOn: [] },
 };
 interface Layer { values: Metadata; source: ConfigSource; sourcePath: string; locations?: Record<string, SourceLocation> }
 interface Candidate { value: unknown; provenance: ConfigProvenance; deferred?: boolean }
@@ -340,6 +368,10 @@ function candidates(field: Field, layer: Layer, diagnostics: ConfigDiagnostic[])
     // The modern inkwell.tables mapping shares a legacy scalar key.
     if (field.key === "tables.preset" && key === "inkwell.tables" && mapping(raw)) continue;
     const provenance = location(layer, key);
+    if (key === "inkwell.hanging-indent" && field.key === "references.hangingIndent") diagnostics.push({
+      ...provenance, code: "deprecated-reference-alias", severity: "warning", key: field.key,
+      message: "inkwell.hanging-indent is deprecated until at least 0.7. Use inkwell.references.hanging-indent; it controls bibliography entries and leaves ordinary lists unchanged.",
+    });
     if (bindingTokens(raw).length) {
       const executionSetting = field.key.startsWith("runs.") && !["runs.caption", "runs.label"].includes(field.key);
       if (executionSetting || field.key === "template" || field.key === "engine") {
@@ -551,6 +583,12 @@ export function resolveDocumentConfig(input: ResolveDocumentConfigInput): Docume
   if (input.blockAttributes) layers.push({ values: input.blockAttributes, source: "block", sourcePath });
   const { values, selected } = resolveFields(layers, capabilities, diagnostics);
   const metadata = merge(...layers.filter((layer) => explicit(layer.source) && layer.source !== "block").map((layer) => authorMetadata(layer.values)));
+  // Pandoc owns native reference records, while project mappings at the same
+  // key configure Inkwell's bibliography. A project override must not erase
+  // records inherited from defaults; a document array still replaces them.
+  const nativeReferences = layers.filter(layer => layer.source === "defaults" || layer.source === "document")
+    .map(layer => layer.values.references).filter(Array.isArray).at(-1);
+  if (nativeReferences !== undefined) metadata.references = copy(nativeReferences);
   return resultFrom(values, selected, metadata, parsed, sourcePath, capabilities, diagnostics);
 }
 

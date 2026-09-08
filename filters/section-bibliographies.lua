@@ -14,6 +14,8 @@
 -- numbering restarts per segment, the standard convention for
 -- per-chapter bibliographies.
 
+local common=dofile(PANDOC_SCRIPT_FILE:match('(.*/)')..'reference-common.lua')
+
 local function split_level(meta)
   local lvl = meta["section-bibs-level"]
   if lvl then
@@ -52,7 +54,7 @@ function Pandoc(doc)
 
   local out = pandoc.List()
   for i, seg in ipairs(segments) do
-    local segdoc = pandoc.utils.citeproc(pandoc.Pandoc(seg, doc.meta))
+    local segdoc = pandoc.utils.citeproc(common.prepare(pandoc.Pandoc(seg, doc.meta)))
     -- citeproc emits its list in a div with identifier "refs"; several
     -- of those in one document would produce duplicate LaTeX
     -- hypertargets, so make each one unique.
@@ -61,7 +63,22 @@ function Pandoc(doc)
         if div.identifier == "refs" then
           div.identifier = "refs-" .. tostring(i)
           return div
+        elseif div.identifier:match('^ref%-') then
+          div.identifier='ref-inkwell-section-'..i..':'..div.identifier:sub(5)
+          return div
         end
+      end,
+      Link=function(link)
+        if link.target:match('^#ref%-') then link.target='#ref-inkwell-section-'..i..':'..link.target:sub(6);return link end
+      end,
+      Cite=function(cite)
+        if FORMAT:match('latex') then
+          for _,citation in ipairs(cite.citations) do citation.id='inkwell-section-'..i..':'..citation.id end
+          return cite
+        end
+      end,
+      Header=function(header)
+        if header.classes:includes('inkwell-reference-heading') then header.identifier='inkwell-references-heading-'..i;return header end
       end,
     })
     out:extend(segdoc.blocks)

@@ -138,6 +138,6 @@ export function buildTypographyPreamble(config: DocumentConfig): string {
   }
   if (explicit("captionSize")) lines.push("% Inkwell figure and body-table caption sizing", `\\DeclareCaptionFont{inkwellcaption}{${fontCommand(effective.captionSizePt)}}`, "\\captionsetup[figure]{font=inkwellcaption}", "\\captionsetup[table]{font=inkwellcaption}");
   if (explicit("tableSize")) lines.push("% Used only by body-typography.lua around Pandoc Table nodes", `\\newcommand{\\inkwellbodytablesize}{${fontCommand(effective.tableSizePt)}}`);
-  if (explicit("referenceSize")) lines.push("% Inkwell citeproc bibliography sizing", "\\usepackage{etoolbox}", `\\AtBeginEnvironment{CSLReferences}{${fontCommand(effective.referenceSizePt)}}`);
+  // reference-render.lua applies reference size and spacing in one local scope.
   return lines.join("\n");
 }

@@ -44,7 +44,7 @@ function fixture(t, mode, behavior) {
     os: { ...os, tmpdir: () => path.join(dir, 'cache') },
     './config': { getInkwellProjectRoot: () => dir, findDefaultsYaml: () => undefined,
       getDocumentConfig: (text, sourcePath) => resolveDocumentConfig({ text, sourcePath }),
-      getResolvedReferences: config => ({ bibliography: [], csl: undefined, scope: config.references.scope, linkCitations: config.references.linkCitations, diagnostics: [] }),
+      getResolvedReferences: config => require('../out/bibliography-service').resolveBibliographyConfiguration(config, source, dir),
     },
     './templates': { getTemplateForDocument: () => template, copySupportingFiles() {}, collectAllFeatures: () => [] },
     './inject': { prepareForCompilation: (text) => ({ injected: text, unresolvedVars: [] }) },

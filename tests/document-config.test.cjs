@@ -126,6 +126,23 @@ test('native CSL arrays in Pandoc defaults are preserved while configuration sec
   assert.ok(canonical.diagnostics.some((entry) => entry.code === 'config-section-type' && entry.key === 'references'));
 });
 
+for (const [name, yaml, expected] of [
+  ['project options', '', [{ id: 'source', type: 'book', title: 'Native' }]],
+  ['document options', 'references: {heading: Local heading}', [{ id: 'source', type: 'book', title: 'Native' }]],
+  ['document records', 'references: [{id: local, type: book, title: Local}]', [{ id: 'local', type: 'book', title: 'Local' }]],
+  ['document empty list', 'references: []', []],
+]) test(`native CSL defaults survive bibliography configuration with correct precedence (${name})`, () => {
+  const result = resolveDocumentConfig({ text: document(yaml),
+    defaultsYaml: 'references: [{id: source, type: book, title: Native}]',
+    manifest: { defaults: { references: { heading: 'Project heading', lineSpacing: 1.5 } } } });
+  assert.equal(result.diagnostics.length, 0);
+  assert.deepEqual(result.compatibility.references, expected);
+  assert.deepEqual(result.metadata.references, expected);
+  assert.deepEqual(applyBlockOverrides(result, { display: 'both' }).compatibility.references, expected);
+  assert.equal(result.references.lineSpacing, 1.5);
+  assert.equal(result.references.heading, name === 'document options' ? 'Local heading' : 'Project heading');
+});
+
 test('presentation bindings survive raw validation and compatibility serialization until injection', () => {
   const text = document('fontsize: "{{size}}pt"\nlinestretch: "{{spacing}}"\ninkwell:\n  tables: "{{table_style}}"');
   const result = resolveDocumentConfig({ text, sourcePath: '/p/bindings.md' });

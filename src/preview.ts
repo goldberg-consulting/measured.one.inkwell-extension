@@ -400,6 +400,7 @@ export class InkwellPreviewProvider {
       });
       if (!this.isCurrent(request)) return;
       body = citeResult.body;
+      if (citeResult.approximate) body = '<aside class="citation-preview-notice">Approximate citation preview: Pandoc is unavailable or could not render this bibliography. The active CSL style is not applied.</aside>\n\n' + body;
       this.reportCitationStatus(citeResult, request);
 
       // If the author marked a references slot with Pandoc's fenced-div
@@ -507,7 +508,7 @@ export class InkwellPreviewProvider {
       // in that case), synthesize a stub that lists the unresolved
       // keys so the reader still sees a visible References section and
       // knows which entries the bibliography is missing.
-      const referencesHtml = buildReferencesSection(citeResult);
+      const referencesHtml = citeResult.referencesEmbedded ? "" : buildReferencesSection(citeResult);
       if (referencesHtml) {
         if (refsSlotInjected && htmlBody.includes(refsPlaceholder)) {
           htmlBody = htmlBody.replace(refsPlaceholder, referencesHtml);

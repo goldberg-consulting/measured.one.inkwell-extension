@@ -37,6 +37,16 @@
   "contributes": {
     "commands": [
       {
+        "command": "inkwell.configureBibliography",
+        "title": "Configure Bibliography",
+        "category": "Inkwell"
+      },
+      {
+        "command": "inkwell.bibliographyDoctor",
+        "title": "Bibliography Doctor",
+        "category": "Inkwell"
+      },
+      {
         "command": "inkwell.preview",
         "title": "Inkwell: Open Preview",
         "category": "Inkwell",

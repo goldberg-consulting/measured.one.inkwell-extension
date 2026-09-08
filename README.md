@@ -43,8 +43,9 @@ Cursor and VS Code in PATH, Homebrew locations, `/Applications`, and
 verifies the exact release in every detected editor. Mermaid CLI comes from
 Homebrew. No global npm installation is required.
 
-A functioning existing TeX distribution is reused. With no TeX distribution,
-full MacTeX is the default. Missing packages are installed from the requirements
+The cask includes full MacTeX and Node as direct dependencies. The standalone
+installer and Setup / Repair reuse a functioning existing TeX distribution and
+install MacTeX when none exists. Missing packages come from the requirements
 inside the release artifact. User-owned TinyTeX uses its own package manager;
 system MacTeX uses administrator permission when needed. Inkwell never changes
 the ownership of a TeX tree.
@@ -56,20 +57,22 @@ Reload an already-running editor after an upgrade. Use **Inkwell: Setup / Repair
 for a later repair; the same workflow resumes interrupted setup.
 
 From a checkout of the matching release, the versioned bootstrap script also
-supports editor selection and a lean profile. It downloads that release's VSIX
+supports editor selection. It downloads that release's VSIX
 and verifies its published checksum:
 
 ```bash
 ./scripts/install-inkwell-macos.sh --editor=cursor
 ./scripts/install-inkwell-macos.sh --editor=code
 ./scripts/install-inkwell-macos.sh --editor=all
-./scripts/install-inkwell-macos.sh --profile=lean
 ```
 
 `auto` and `all` select every detected supported editor. `cursor` and `code`
-narrow the selection. The lean profile uses BasicTeX only when no working TeX
-exists and must pass the same full doctor. It may require many additional font
-and template packages. Existing TinyTeX is supported without replacing it.
+narrow the selection; the cask always installs into every detected editor.
+Matching extension versions are verified without reinstalling. Newer versions
+are preserved and reported as partial installations. A deliberate downgrade
+requires the standalone installer with both `--allow-downgrade` and `--yes`.
+Existing TinyTeX is supported without replacing it by the standalone installer.
+The 0.5 release has no lean installer profile.
 The repository Brewfile is an optional tools-only bundle; it does not install
 an extension from a different distribution channel.
 
@@ -318,7 +321,9 @@ Cite with standard Pandoc syntax: `[@knuth1984]`, `[@harris2020; @hunter2007]`. 
 
 **Section-level or document-level bibliographies.** The default is one reference list for the whole document. Set `bibliography-scope: section` and every top-level section (chapters in book templates) gets its own reference list at its end — place a `## References` heading at the end of each citing chapter, exactly like the document-level convention. Citation numbers restart per section. `section-bibs-level: 2` moves the split to a deeper heading level. See the [Tufte Book demo](examples/demo-tufte-book-vdqi.md) for a working per-chapter setup.
 
-The declared `bibliography:` (one file or a list) resolves against the document's directory, then the project root, and is always honored — Inkwell also auto-discovers `.bib` files in the project root, `references/`, and `.inkwell/references/` and passes everything to Pandoc together, so nested documents with their own bibliographies work. A declared file that doesn't exist raises a compile warning naming the path instead of leaving citations silently unresolved.
+An explicit `bibliography:` list replaces automatic discovery, and the first file wins when citation keys overlap. Every duplicate definition is diagnosed. Without a declared list, Inkwell discovers sorted `.bib` files in the project root, `references/`, and `.inkwell/references/`. Missing files stop compilation with a located diagnostic.
+
+Use **Inkwell: Configure Bibliography** to choose or create files, select CSL, and change reference styling. The command makes one undoable unsaved frontmatter edit. Type `@` for suggestions, hover for source details, or run **Bibliography Doctor** to open reported problems. See the [bibliography guide](docs/references.md) for canonical settings and compatibility.
 
 ### Table of contents, list of figures, list of tables
 

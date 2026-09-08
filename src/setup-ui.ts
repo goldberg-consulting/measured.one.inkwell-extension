@@ -4,6 +4,7 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { createHash, randomUUID } from "node:crypto";
 import { createDoctor, DoctorReport, runDoctor, invalidateDoctorCache } from "./doctor";
+import { invalidateCitationPandoc } from "./citation-pandoc";
 import { createFileSetupStore, createSetupOrchestrator, InstallPlan, SetupDependencies, SetupProcessOutcome, SetupState, SETUP_STAGES } from "./setup-orchestrator";
 import { asSetupPlan, doctorToInstallationPlan, probeRequestedPackage, requestedPackagePlan, validateRequestedPackage } from "./setup-adapters";
 import { ensureProjectReadyWithUI } from "./project-readiness-ui";
@@ -146,6 +147,7 @@ export function createSetupUI(context: vscode.ExtensionContext, overrides: Parti
         } finally { subscription.dispose(); }
       });
       invalidateDoctorCache();
+      invalidateCitationPandoc();
       await vscode.commands.executeCommand("setContext", "inkwell.setupVerified", state.status === "complete");
       if (state.status === "complete" && state.warnings?.length) {
         const choice = await vscode.window.showWarningMessage("Inkwell is ready. Some optional checks need attention; tools, project files and PDF compilation are verified.", "Show diagnostics");

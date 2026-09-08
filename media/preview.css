@@ -355,6 +355,9 @@ em { font-style: italic; }
 .references ol { padding-left: 1.5em; }
 .references li { margin-bottom: 0.75em; line-height: 1.5; }
 .references a { color: var(--accent); text-decoration: none; }
+.inkwell-document .csl-bib-body .csl-entry { margin-bottom: var(--inkwell-reference-entry-space, 0); }
+.inkwell-document .csl-bib-body.hanging-indent .csl-entry { margin-left: var(--inkwell-reference-indent, 2em); text-indent: calc(-1 * var(--inkwell-reference-indent, 2em)); }
+.citation-preview-notice { font: 12px var(--vscode-font-family, sans-serif); border-left: 3px solid var(--accent); padding: .6em 1em; }
 
 /* Pandoc citeproc emits .csl-entry, .csl-left-margin, .csl-right-inline */
 .csl-entry {

@@ -1,11 +1,13 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
+import { parseDocument } from "yaml";
 import { BUNDLED_ASSET_PATHS, resolveContainedPath, validateBundledAssets, AssetDiagnostic } from "./bundled-assets";
 import { DEFAULT_REQUIREMENTS, GITIGNORE, STARTER_BIB, SINE_PLOT_PY, SCATTER_PY, CONVERGENCE_TABLE_PY } from "./scaffold-assets";
-import { normalizeManifestDefaults } from "./document-config";
+import { normalizeManifestDefaults, resolveDocumentConfig, stripResolvedConfigFields } from "./document-config";
 
 export const SCAFFOLD_VERSION = 4;
+export const MANIFEST_SCHEMA_VERSION = 1;
 export interface MigrationOperation {
   kind: "write" | "proposal" | "backup";
   path: string;
@@ -13,7 +15,7 @@ export interface MigrationOperation {
   expectedHash: string | null;
   contentHash: string;
 }
-export interface MigrationConflict { path: string; message: string; proposalPath?: string }
+export interface MigrationConflict { path: string; message: string; proposalPath?: string; kind?: "defaults" }
 export interface MigrationPlan {
   root: string;
   realRoot: string;
@@ -28,6 +30,7 @@ export interface MigrationPlan {
   blocked: boolean;
   manifestBefore: string | null;
   observedPaths: string[];
+  inputHashes?: Record<string, string>;
   resumed?: boolean;
 }
 export interface MigrationResult {
@@ -42,6 +45,88 @@ const MANIFEST = ".inkwell/manifest.json";
 const JOURNALS = ".inkwell/.migrations";
 const hash = (value: string | Buffer): string => crypto.createHash("sha256").update(value).digest("hex");
 const isObject = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === "object" && !Array.isArray(value));
+
+function mergeObjects(...values: Record<string, unknown>[]): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const value of values) for (const [key, item] of Object.entries(value)) {
+    // defineProperty also preserves unknown JSON keys without prototype setters.
+    Object.defineProperty(result, key, { value: isObject(item) ? mergeObjects(isObject(result[key]) ? result[key] : {}, item) : item,
+      enumerable: true, configurable: true, writable: true });
+  }
+  return result;
+}
+
+function compareDefaults(legacy: Record<string, unknown>, current: Record<string, unknown>, prefix = ""): string[] {
+  const conflicts: string[] = [];
+  for (const [key, value] of Object.entries(legacy)) {
+    if (!Object.hasOwn(current, key)) continue;
+    const fullKey = prefix ? `${prefix}.${key}` : key;
+    if (isObject(value) && isObject(current[key])) conflicts.push(...compareDefaults(value, current[key], fullKey));
+    else if (JSON.stringify(value) !== JSON.stringify(current[key])) conflicts.push(fullKey);
+  }
+  return conflicts;
+}
+
+function supportedDifference(values: Record<string, unknown>, unsupported: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(values)) {
+    if (!Object.hasOwn(unsupported, key)) Object.defineProperty(result, key, { value, enumerable: true });
+    else if (isObject(value) && isObject(unsupported[key])) {
+      const nested = supportedDifference(value, unsupported[key]);
+      if (Object.keys(nested).length) Object.defineProperty(result, key, { value: nested, enumerable: true });
+    }
+  }
+  return result;
+}
+
+function normalizeSupportedDefaults(manifest: Record<string, unknown>): ReturnType<typeof normalizeManifestDefaults> {
+  const normalized = normalizeManifestDefaults(manifest);
+  // Migration must retain requested values before template capability locks.
+  // Provenance and compatibility come from the same resolver used at runtime;
+  // subtracting unsupported metadata also excludes viewer state and builtins.
+  const resolved = resolveDocumentConfig({ text: "", manifest: { ...manifest, template: undefined }, templateCapabilities: {
+    id: "scaffold-migration", name: "Scaffold migration", engine: "xelatex", columns: 1, options: {}, defaults: {},
+  } });
+  const supported = Object.values(resolved.provenance).some(value => value.source === "project")
+    ? supportedDifference(resolved.compatibility, stripResolvedConfigFields(resolved.compatibility)) : {};
+  return { defaults: mergeObjects(supported, normalized.defaults), diagnostics: resolved.diagnostics };
+}
+
+function validateInputs(plan: MigrationPlan): void {
+  for (const [relative, expectedHash] of Object.entries(plan.inputHashes || {})) {
+    if (relative !== "defaults.yaml" || !/^[a-f0-9]{64}$/.test(expectedHash)) throw new Error("Invalid migration input checkpoint.");
+    if (currentHash(plan.root, relative) !== expectedHash) {
+      throw new Error(`${relative} changed during scaffold migration. Its original bytes are preserved; restore the reviewed version before resuming the recorded migration.`);
+    }
+  }
+}
+
+function readLegacyDefaults(root: string, plan: MigrationPlan): { defaults: Record<string, unknown>; sourceHash: string } | undefined {
+  const relative = "defaults.yaml";
+  plan.observedPaths.push(relative);
+  const file = resolveContainedPath(root, relative);
+  if (!fs.existsSync(file)) return undefined;
+  if (fs.lstatSync(file).isSymbolicLink() || !fs.statSync(file).isFile()) throw new Error("defaults.yaml must be a regular project file.");
+  if (fs.statSync(file).size > 16 * 1024 * 1024) throw new Error("defaults.yaml exceeds the 16 MiB configuration limit.");
+  const bytes = fs.readFileSync(file);
+  const sourceHash = hash(bytes);
+  const yaml = parseDocument(bytes.toString("utf8"), { uniqueKeys: true, version: "1.2", prettyErrors: false });
+  if (yaml.errors.length) throw new Error(`Cannot migrate defaults.yaml: ${yaml.errors.map(error => error.message).join("; ")}. Correct the original YAML before setup.`);
+  const values: unknown = yaml.toJS({ maxAliasCount: 100 });
+  if (!isObject(values)) throw new Error("defaults.yaml must contain a YAML mapping before its supported settings can be migrated.");
+  const flattened = mergeObjects(isObject(values.variables) ? values.variables : {}, isObject(values.metadata) ? values.metadata : {}, values);
+  // Pandoc's native CSL records are metadata, not Inkwell reference options.
+  // They stay in the original defaults file and must not acquire project-layer
+  // mapping validation merely because setup copies other supported settings.
+  if (Array.isArray(flattened.references)) delete flattened.references;
+  // Passing settings rather than defaults copies only recognized configuration
+  // fields. Unknown Pandoc metadata stays in the original user-owned YAML.
+  const normalized = normalizeSupportedDefaults({ settings: flattened });
+  for (const diagnostic of normalized.diagnostics) plan.diagnostics.push({ path: relative,
+    severity: diagnostic.severity, message: diagnostic.message });
+  plan.inputHashes = { ...plan.inputHashes, [relative]: sourceHash };
+  return { defaults: normalized.defaults, sourceHash };
+}
 
 function currentHash(root: string, relative: string): string | null {
   const file = resolveContainedPath(root, relative);
@@ -83,7 +168,7 @@ function validateManifest(value: unknown): asserts value is Record<string, unkno
       throw new Error(`${key} must be a supported version from 0 to 4.`);
     }
   }
-  for (const key of ["defaults", "settings", "documentSettings", "managedFiles"]) {
+  for (const key of ["defaults", "settings", "documentSettings", "managedFiles", "legacyDefaultsMigration"]) {
     if (value[key] !== undefined && !isObject(value[key])) throw new Error(`${key} must be a JSON object.`);
   }
   if (value.template !== undefined && typeof value.template !== "string") throw new Error("template must be a string.");
@@ -109,10 +194,12 @@ function readPendingPlan(root: string, assetRoot: string): MigrationPlan | undef
   if (!fs.existsSync(journalDir)) return undefined;
   for (const name of fs.readdirSync(journalDir).filter((value) => /^v4-[a-f0-9]+\.json$/.test(value)).sort()) {
     const file = resolveContainedPath(root, `${JOURNALS}/${name}`);
+    currentHash(root, `${JOURNALS}/${name}`);
     const journal = JSON.parse(fs.readFileSync(file, "utf8")) as MigrationJournal;
     if (journal.state === "complete") continue;
     if (journal.schemaVersion !== 1 || journal.state !== "applying" || journal.plan?.root !== root ||
         journal.plan.realRoot !== fs.realpathSync(root) || !Array.isArray(journal.plan.operations)) throw new Error(`Invalid migration journal: ${file}`);
+    validateInputs(journal.plan);
     for (const operation of journal.plan.operations) validateOperation(root, operation);
     const resumed: MigrationPlan = { ...journal.plan, assetRoot, resumed: true,
       operations: [], conflicts: [...journal.plan.conflicts], observedPaths: [...journal.plan.observedPaths] };
@@ -181,10 +268,16 @@ export function planMigration(rootInput: string, assetRootInput = path.join(__di
       plan.blocked = true;
       return finalizePlan(plan);
     }
-    const normalized = normalizeManifestDefaults(manifest);
+    const normalized = normalizeSupportedDefaults(manifest);
     for (const diagnostic of normalized.diagnostics) {
       plan.diagnostics.push({ path: MANIFEST, severity: diagnostic.severity === "error" ? "error" : "warning", message: diagnostic.message });
     }
+    const completedDefaults = isObject(manifest.legacyDefaultsMigration) && manifest.legacyDefaultsMigration.schemaVersion === 1 &&
+      manifest.legacyDefaultsMigration.state === "complete";
+    // Keep the source observed after completion, so readiness notices any later
+    // user change while ordinary resolution still reads unsupported metadata.
+    plan.observedPaths.push("defaults.yaml");
+    const legacy = completedDefaults ? undefined : readLegacyDefaults(root, plan);
     if (plan.diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
       plan.blocked = true;
       return finalizePlan(plan);
@@ -217,8 +310,24 @@ export function planMigration(rootInput: string, assetRootInput = path.join(__di
     const missingIgnores = requiredIgnores.filter((line) => !ignoreLines.has(line));
     if (missingIgnores.length) add(".gitignore", existingIgnore + (existingIgnore && !existingIgnore.endsWith("\n") ? "\n" : "") + missingIgnores.join("\n") + "\n");
     else plan.observedPaths.push(".gitignore");
-    const next = { ...manifest, schemaVersion: 4, scaffoldVersion: 4, template: manifest.template ?? options.template ?? "default",
-      defaults: { typography: {}, tables: {}, references: {}, runs: {}, ...normalized.defaults }, managedFiles: managed };
+    const defaults = mergeObjects({ typography: {}, tables: {}, references: {}, runs: {} }, legacy?.defaults || {}, normalized.defaults);
+    const next = { ...manifest, schemaVersion: MANIFEST_SCHEMA_VERSION, scaffoldVersion: SCAFFOLD_VERSION,
+      template: manifest.template ?? normalized.defaults.template ?? options.template ?? legacy?.defaults.template ?? "default", defaults, managedFiles: managed,
+      ...(legacy ? { legacyDefaultsMigration: { ...(isObject(manifest.legacyDefaultsMigration) ? manifest.legacyDefaultsMigration : {}),
+        schemaVersion: 1, state: "complete", sourcePath: "defaults.yaml", sourceHash: legacy.sourceHash,
+        copiedKeys: Object.entries(legacy.defaults).flatMap(([section, values]) => isObject(values) ? Object.keys(values).map(key => `${section}.${key}`) : [section]).sort() } } : {}) };
+    if (legacy) {
+      const conflictingKeys = compareDefaults(legacy.defaults, mergeObjects(normalized.defaults,
+        manifest.template === undefined ? {} : { template: manifest.template }));
+      if (conflictingKeys.length) {
+        const proposed = JSON.stringify({ ...next, defaults: mergeObjects(defaults, legacy.defaults),
+          ...(legacy.defaults.template === undefined ? {} : { template: legacy.defaults.template }) }, null, 2) + "\n";
+        const proposalPath = numberedProposal(root, MANIFEST, hash(proposed));
+        add(proposalPath, proposed, "proposal");
+        plan.conflicts.push({ path: MANIFEST, kind: "defaults", proposalPath,
+          message: `defaults.yaml conflicts with project values for ${conflictingKeys.join(", ")}. Compare the proposed manifest; Keep my files retains the current project values and copies the remaining supported defaults.` });
+      }
+    }
     // Manifest is the last operation and the only version checkpoint.
     add(MANIFEST, JSON.stringify(next, null, 2) + "\n");
   } catch (error: any) {
@@ -260,7 +369,7 @@ export function createScaffoldDocument(root: string, name: string, content: stri
 
 function finalizePlan(plan: MigrationPlan): MigrationPlan {
   plan.observedPaths = [...new Set(plan.observedPaths)].sort();
-  plan.planId = hash(JSON.stringify({ root: plan.root, fromVersion: plan.fromVersion, operations: plan.operations, conflicts: plan.conflicts })).slice(0, 24);
+  plan.planId = hash(JSON.stringify({ root: plan.root, fromVersion: plan.fromVersion, operations: plan.operations, conflicts: plan.conflicts, inputHashes: plan.inputHashes })).slice(0, 24);
   return plan;
 }
 
@@ -288,7 +397,7 @@ export function applyMigration(
 ): MigrationResult {
   if (options.resolveConflicts === "keep-user-files" && !plan.blocked && plan.conflicts.length) {
     try {
-      const conflictedPaths = new Set(plan.conflicts.map((conflict) => conflict.path));
+      const conflictedPaths = new Set(plan.conflicts.filter(conflict => conflict.kind !== "defaults").map((conflict) => conflict.path));
       const resolved: MigrationPlan = { ...plan, conflicts: [], operations: plan.operations
         .filter((operation) => !conflictedPaths.has(operation.path)).map((operation) => ({ ...operation })) };
       const manifestOperation = resolved.operations.find((operation) => operation.path === MANIFEST);
@@ -297,6 +406,7 @@ export function applyMigration(
       validateManifest(manifest);
       const managed = { ...(manifest.managedFiles as Record<string, unknown> || {}) };
       for (const conflict of plan.conflicts) {
+        if (conflict.kind === "defaults") continue;
         const previous = managed[conflict.path];
         managed[conflict.path] = { ...(isObject(previous) ? previous : {}), ownership: "user" };
       }
@@ -321,6 +431,7 @@ export function applyMigration(
   const journalPath = `${JOURNALS}/v4-${plan.planId}.json`;
   try {
     if (!plan.realRoot || fs.realpathSync(plan.root) !== plan.realRoot) throw new Error("The project root changed after migration planning.");
+    validateInputs(plan);
     for (const operation of plan.operations) validateOperation(plan.root, operation);
     const operations = plan.blocked ? plan.operations.filter((operation) => operation.kind === "backup") :
       plan.conflicts.length ? plan.operations.filter((operation) => operation.kind === "proposal") : plan.operations;
@@ -355,6 +466,7 @@ export function applyMigration(
     }
     for (const operation of operations) {
       options.checkpoint?.("before-file", operation.path);
+      validateInputs(plan);
       const actual = currentHash(plan.root, operation.path);
       if (actual !== operation.contentHash) {
         if (actual !== operation.expectedHash) throw new Error(`File changed during migration: ${operation.path}`);
@@ -370,6 +482,7 @@ export function applyMigration(
     }
     if (journal) {
       options.checkpoint?.("before-complete");
+      validateInputs(plan);
       journal.state = "complete";
       writeAtomic(plan.root, journalPath, JSON.stringify(journal, null, 2) + "\n");
     }

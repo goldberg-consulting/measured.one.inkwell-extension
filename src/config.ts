@@ -8,6 +8,8 @@ import * as path from "path";
 import * as fs from "fs";
 import * as crypto from "crypto";
 import { DocumentConfig, resolveDocumentConfig } from "./document-config";
+import { ResolvedReferences, resolveBibliographyConfiguration } from "./bibliography-service";
+export type { ResolvedReferences } from "./bibliography-service";
 
 export interface InkwellManifest {
   [key: string]: unknown;
@@ -245,57 +247,7 @@ export function getDocumentConfig(text: string, sourceFile: string): DocumentCon
   }] };
 }
 
-export interface ResolvedReferences {
-  readonly bibliography: readonly string[];
-  readonly csl?: string;
-  readonly scope: "document" | "section";
-  readonly linkCitations: boolean;
-  readonly referencesHeading?: string;
-  readonly diagnostics: readonly { code: string; severity: "error" | "warning"; message: string; sourcePath: string; line: number; column: number }[];
-}
-
-/** Declared files first, then sorted project discovery; explicit [] disables discovery. */
+/** Compatibility boundary shared by preview and compiler. */
 export function getResolvedReferences(config: DocumentConfig, sourceFile: string): ResolvedReferences {
-  const root = getInkwellProjectRoot(sourceFile);
-  const metadata = config.compatibility;
-  const declared = metadata.bibliography;
-  const paths = typeof declared === "string" ? [declared] : Array.isArray(declared) ? declared.filter((p): p is string => typeof p === "string") : [];
-  const diagnostics: { code: string; severity: "error" | "warning"; message: string; sourcePath: string; line: number; column: number }[] = [];
-  const resolve = (file: string, documentDeclared: boolean): string => {
-    if (path.isAbsolute(file)) return path.normalize(file);
-    const fromDocument = path.resolve(path.dirname(sourceFile), file);
-    if (documentDeclared && fs.existsSync(fromDocument)) return fromDocument;
-    const fromProject = path.resolve(root, file);
-    if (fs.existsSync(fromProject) || !documentDeclared) return fromProject;
-    return fromDocument;
-  };
-  // An explicit document key is the authoritative path context. Project/defaults
-  // declarations resolve from the project even for nested source documents.
-  const bibliographySource = config.provenance["references.bibliography"];
-  const documentDeclared = bibliographySource?.source === "document" || Object.hasOwn(config.documentMetadata, "bibliography");
-  const bibliography = [...new Set([
-    ...paths.map(file => resolve(file, documentDeclared)),
-    ...(Array.isArray(declared) && declared.length === 0 ? [] : findBibFiles(root)),
-  ])];
-  for (const file of bibliography) if (!fs.existsSync(file)) diagnostics.push({
-    code: "bibliography-missing", severity: "error", message: `Bibliography file is missing: ${file}`,
-    sourcePath: bibliographySource?.sourcePath || sourceFile, line: bibliographySource?.line || 1, column: bibliographySource?.column || 1,
-  });
-  let csl: string | undefined;
-  if (typeof metadata.csl === "string") {
-    csl = resolve(metadata.csl, config.provenance["references.csl"]?.source === "document" || Object.hasOwn(config.documentMetadata, "csl"));
-    if (!fs.existsSync(csl)) csl = findCslFile(root, metadata.csl) || csl;
-    if (!fs.existsSync(csl)) {
-      const source = config.provenance["references.csl"];
-      diagnostics.push({ code: "csl-missing", severity: "error", message: `CSL style is missing: ${csl}`, sourcePath: source?.sourcePath || sourceFile, line: source?.line || 1, column: source?.column || 1 });
-    }
-  } else {
-    csl = path.join(__dirname, "..", "csl", "inkwell-numeric.csl");
-  }
-  return Object.freeze({ bibliography: Object.freeze(bibliography), csl,
-    scope: config.references.scope,
-    linkCitations: metadata["link-citations"] !== false,
-    referencesHeading: typeof metadata["reference-section-title"] === "string" ? metadata["reference-section-title"] : undefined,
-    diagnostics: Object.freeze(diagnostics),
-  });
+  return resolveBibliographyConfiguration(config, sourceFile, getInkwellProjectRoot(sourceFile));
 }

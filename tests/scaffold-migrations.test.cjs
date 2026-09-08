@@ -119,7 +119,7 @@ for (const version of [0, 1, 2, 3, 4]) {
     const result = migration().applyMigration(plan);
     assert.equal(result.success, true, JSON.stringify(result));
     const manifest = JSON.parse(fs.readFileSync(path.join(f.root, '.inkwell/manifest.json')));
-    assert.equal(manifest.schemaVersion, 4);
+    assert.equal(manifest.schemaVersion, 1);
     assert.equal(manifest.scaffoldVersion, 4);
     assert.equal(manifest.template, 'rho');
     assert.deepEqual(manifest.custom, original.custom);
@@ -136,6 +136,202 @@ for (const version of [0, 1, 2, 3, 4]) {
     assert.deepEqual(tree(f.root), settled, 'second setup changes neither bytes nor mtimes');
   });
 }
+
+for (const original of [
+  { schemaVersion: 3 },
+  { schemaVersion: 4 },
+  { schemaVersion: 4, scaffoldVersion: 4 },
+  { schemaVersion: 1, scaffoldVersion: 3 },
+]) {
+  test(`legacy manifest ${JSON.stringify(original)} separates JSON schema from scaffold content`, t => {
+    const f = fixture(t);
+    write(f.root, '.inkwell/manifest.json', JSON.stringify({ ...original, unknown: { retain: [false, 'user data'] } }));
+    const plan = migration().planMigration(f.root, f.assets);
+    assert.equal(plan.fromVersion, original.scaffoldVersion ?? original.schemaVersion);
+    assert.equal(migration().applyMigration(plan).success, true);
+    const manifest = JSON.parse(fs.readFileSync(path.join(f.root, '.inkwell/manifest.json')));
+    assert.equal(manifest.schemaVersion, 1);
+    assert.equal(manifest.scaffoldVersion, 4);
+    assert.deepEqual(manifest.unknown, { retain: [false, 'user data'] });
+    assert.equal(migration().applyMigration(migration().planMigration(f.root, f.assets)).writes.length, 0);
+  });
+}
+
+test('legacy defaults migrate supported values with exact precedence and preserve all source bytes', t => {
+  const f = fixture(t);
+  const source = '# User comments and CRLF stay exact\r\nvariables:\r\n  fontsize: 9pt\r\n  mainfont: "TeX Gyre Pagella"\r\nmetadata:\r\n  fontsize: 10pt\r\n  linestretch: 1.3\r\nfontsize: 12pt\r\nbibliography: ["refs.bib", ".inkwell/references/more.bib"]\r\ninkwell:\r\n  tables:\r\n    preset: grid\r\n  runs:\r\n    timeout-seconds: 45\r\nheader-includes: "UserTeX"\r\ncustom-field: keep\r\n';
+  write(f.root, 'defaults.yaml', source);
+  write(f.root, '.inkwell/manifest.json', '{"scaffoldVersion":3,"future":{"preserved":true}}');
+  const before = fs.statSync(path.join(f.root, 'defaults.yaml'));
+  const plan = migration().planMigration(f.root, f.assets);
+  assert.equal(plan.blocked, false, JSON.stringify(plan.diagnostics));
+  assert.equal(migration().applyMigration(plan).success, true);
+  const manifest = JSON.parse(fs.readFileSync(path.join(f.root, '.inkwell/manifest.json')));
+  assert.deepEqual(manifest.defaults.typography, { bodyFont: 'TeX Gyre Pagella', bodySize: '12pt', lineSpacing: 1.3 });
+  assert.deepEqual(manifest.defaults.references.bibliography, ['refs.bib', '.inkwell/references/more.bib']);
+  assert.equal(manifest.defaults.tables.preset, 'grid');
+  assert.equal(manifest.defaults.runs.timeoutSeconds, 45);
+  assert.equal(manifest.defaults['custom-field'], undefined);
+  assert.equal(manifest.defaults['header-includes'], undefined);
+  assert.deepEqual(manifest.future, { preserved: true });
+  assert.equal(manifest.legacyDefaultsMigration.state, 'complete');
+  assert.equal(manifest.legacyDefaultsMigration.sourcePath, 'defaults.yaml');
+  assert.match(manifest.legacyDefaultsMigration.sourceHash, /^[a-f0-9]{64}$/);
+  assert.ok(manifest.legacyDefaultsMigration.copiedKeys.includes('references.bibliography'));
+  assert.equal(fs.readFileSync(path.join(f.root, 'defaults.yaml'), 'utf8'), source);
+  assert.equal(fs.statSync(path.join(f.root, 'defaults.yaml')).mtimeMs, before.mtimeMs);
+  const settled = tree(f.root);
+  assert.equal(migration().applyMigration(migration().planMigration(f.root, f.assets)).writes.length, 0);
+  assert.deepEqual(tree(f.root), settled);
+});
+
+for (const [name, source] of [
+  ['flow', '# Keep the native record\r\nfontsize: 12pt\r\nreferences: [{id: source, type: book, title: "Native"}]\r\ninkwell:\r\n  references:\r\n    heading: Works cited\r\n'],
+  ['metadata block', 'metadata:\n  fontsize: 12pt\n  references:\n    - id: source\n      type: book\n      title: Native\ninkwell:\n  references:\n    heading: Works cited\n'],
+]) test(`legacy defaults preserve native CSL records (${name}) while migrating supported settings`, t => {
+  const f = fixture(t);
+  const { resolveDocumentConfig } = require('../out/document-config');
+  write(f.root, 'defaults.yaml', source);
+  const before = resolveDocumentConfig({ text: '', defaultsYaml: source });
+  assert.equal(before.diagnostics.length, 0);
+  const plan = migration().planMigration(f.root, f.assets);
+  assert.equal(plan.blocked, false, JSON.stringify(plan.diagnostics));
+  assert.equal(migration().applyMigration(plan).success, true);
+  const manifest = JSON.parse(fs.readFileSync(path.join(f.root, '.inkwell/manifest.json')));
+  const after = resolveDocumentConfig({ text: '', defaultsYaml: source, manifest });
+  assert.equal(after.diagnostics.length, 0);
+  assert.deepEqual(after.compatibility.references, before.compatibility.references);
+  assert.equal(manifest.defaults.typography.bodySize, '12pt');
+  assert.equal(after.references.heading, 'Works cited');
+  assert.deepEqual(manifest.defaults.references, { heading: 'Works cited' });
+  assert.equal(fs.readFileSync(path.join(f.root, 'defaults.yaml'), 'utf8'), source);
+  assert.equal(migration().applyMigration(migration().planMigration(f.root, f.assets)).writes.length, 0);
+});
+
+test('legacy defaults conflicts require comparison and keep-current preserves project precedence', t => {
+  const f = fixture(t);
+  const original = '{"scaffoldVersion":3,"settings":{"fontsize":"11pt"},"defaults":{"typography":{"bodyFont":"Project Font"}},"future":42}';
+  write(f.root, '.inkwell/manifest.json', original);
+  write(f.root, 'defaults.yaml', 'fontsize: 12pt\nmainfont: Legacy Font\nlinestretch: 1.4\n');
+  const plan = migration().planMigration(f.root, f.assets);
+  assert.equal(plan.conflicts.length, 1);
+  assert.equal(plan.conflicts[0].kind, 'defaults');
+  assert.match(plan.conflicts[0].message, /typography.bodySize/);
+  assert.equal(migration().applyMigration(plan).status, 'conflict');
+  assert.equal(fs.readFileSync(path.join(f.root, '.inkwell/manifest.json'), 'utf8'), original);
+  const proposalFile = path.join(f.root, plan.conflicts[0].proposalPath);
+  const proposed = JSON.parse(fs.readFileSync(proposalFile));
+  assert.equal(proposed.defaults.typography.bodySize, '12pt');
+  fs.writeFileSync(proposalFile, 'My edited proposal');
+  const retry = migration().planMigration(f.root, f.assets);
+  assert.notEqual(retry.conflicts[0].proposalPath, plan.conflicts[0].proposalPath);
+  const result = migration().applyMigration(retry, { resolveConflicts: 'keep-user-files' });
+  assert.equal(result.success, true, JSON.stringify(result));
+  const manifest = JSON.parse(fs.readFileSync(path.join(f.root, '.inkwell/manifest.json')));
+  assert.deepEqual(manifest.defaults.typography, { bodySize: '11pt', bodyFont: 'Project Font', lineSpacing: 1.4 });
+  assert.equal(manifest.managedFiles['.inkwell/manifest.json'], undefined);
+  assert.equal(manifest.legacyDefaultsMigration.state, 'complete');
+  assert.equal(fs.readFileSync(proposalFile, 'utf8'), 'My edited proposal');
+  assert.equal(migration().applyMigration(migration().planMigration(f.root, f.assets)).writes.length, 0);
+});
+
+test('legacy migration includes tool, template, document, and presentation options while excluding viewer state', t => {
+  const f = fixture(t);
+  const source = 'template: eth-report\npdf-engine: lualatex\ncolumns: 2\npapersize: a4\ngeometry: [margin=1in, landscape]\ndocumentclass: report\ntop-level-division: chapter\npagestyle: plain\ninkwell:\n  section-numbering: legal\n  code-bg: "#abcdef"\n  code-border: true\n  code-rounded: false\n  mermaid-max-width: 80%\n  preview:\n    fontScale: 160\nfontScale: 150\nzoom: 120\nselectedTab: pdf\n';
+  write(f.root, 'defaults.yaml', source);
+  const { resolveDocumentConfig } = require('../out/document-config');
+  const before = resolveDocumentConfig({ text: '', defaultsYaml: source });
+  assert.equal(migration().applyMigration(migration().planMigration(f.root, f.assets)).success, true);
+  const manifest = JSON.parse(fs.readFileSync(path.join(f.root, '.inkwell/manifest.json')));
+  const after = resolveDocumentConfig({ text: '', defaultsYaml: source, manifest });
+  for (const field of ['template', 'engine', 'columns', 'typography', 'tables', 'references', 'runs']) assert.deepEqual(after[field], before[field], field);
+  assert.equal(manifest.template, 'eth-report');
+  const requested = { 'pdf-engine': 'lualatex', geometry: ['margin=1in', 'landscape'], papersize: 'a4', documentclass: 'report', pagestyle: 'plain', 'top-level-division': 'chapter' };
+  for (const [field, value] of Object.entries(requested)) assert.deepEqual(manifest.defaults[field], value, field);
+  assert.equal(manifest.defaults.inkwell['code-bg'], '#abcdef');
+  assert.equal(manifest.defaults.inkwell['code-border'], true);
+  assert.equal(manifest.defaults.inkwell['code-rounded'], false);
+  for (const field of ['fontScale', 'zoom', 'selectedTab', 'preview']) assert.equal(manifest.defaults[field], undefined);
+  assert.equal(manifest.defaults.inkwell.preview, undefined);
+  assert.ok(manifest.legacyDefaultsMigration.copiedKeys.includes('pdf-engine'));
+  assert.equal(migration().applyMigration(migration().planMigration(f.root, f.assets)).writes.length, 0);
+});
+
+test('root manifest template wins a legacy conflict and the proposal shows the alternative', t => {
+  const f = fixture(t);
+  write(f.root, '.inkwell/manifest.json', '{"schemaVersion":3,"template":"rho"}');
+  write(f.root, 'defaults.yaml', 'template: default\n');
+  const plan = migration().planMigration(f.root, f.assets);
+  assert.equal(plan.conflicts[0].kind, 'defaults');
+  assert.equal(migration().applyMigration(plan).status, 'conflict');
+  const proposed = JSON.parse(fs.readFileSync(path.join(f.root, plan.conflicts[0].proposalPath)));
+  assert.equal(proposed.template, 'default');
+  assert.equal(migration().applyMigration(plan, { resolveConflicts: 'keep-user-files' }).success, true);
+  const manifest = JSON.parse(fs.readFileSync(path.join(f.root, '.inkwell/manifest.json')));
+  assert.equal(manifest.template, 'rho');
+  assert.equal(migration().applyMigration(migration().planMigration(f.root, f.assets)).writes.length, 0);
+});
+
+for (const source of ['fontsize: [invalid\n', 'fontsize: false\n', '- not-a-mapping\n']) {
+  test(`invalid legacy defaults ${JSON.stringify(source)} block before migration completion`, t => {
+    const f = fixture(t);
+    write(f.root, 'defaults.yaml', source);
+    const before = tree(f.root);
+    const plan = migration().planMigration(f.root, f.assets);
+    assert.equal(plan.blocked, true);
+    assert.equal(migration().applyMigration(plan).success, false);
+    assert.deepEqual(tree(f.root), before);
+  });
+}
+
+test('legacy defaults completion rolls back on interruption and resumes atomically', t => {
+  const f = fixture(t);
+  const original = '{"scaffoldVersion":3,"custom":"keep"}';
+  write(f.root, '.inkwell/manifest.json', original);
+  write(f.root, 'defaults.yaml', 'fontsize: 12pt\n');
+  const plan = migration().planMigration(f.root, f.assets);
+  const failed = migration().applyMigration(plan, { checkpoint(name) { if (name === 'before-complete') throw new Error('Interrupted'); } });
+  assert.equal(failed.success, false);
+  assert.equal(fs.readFileSync(path.join(f.root, '.inkwell/manifest.json'), 'utf8'), original);
+  const resumed = migration().planMigration(f.root, f.assets);
+  assert.equal(resumed.resumed, true);
+  assert.equal(migration().applyMigration(resumed).success, true);
+  const manifest = JSON.parse(fs.readFileSync(path.join(f.root, '.inkwell/manifest.json')));
+  assert.equal(manifest.legacyDefaultsMigration.state, 'complete');
+  assert.equal(manifest.defaults.typography.bodySize, '12pt');
+});
+
+test('changed legacy defaults prevent both publication and stale transaction resumption', t => {
+  const f = fixture(t);
+  const original = '{"scaffoldVersion":3,"custom":"keep"}';
+  write(f.root, '.inkwell/manifest.json', original);
+  write(f.root, 'defaults.yaml', 'fontsize: 12pt\n');
+  const plan = migration().planMigration(f.root, f.assets);
+  const failed = migration().applyMigration(plan, { checkpoint(name, relative) {
+    if (name === 'before-file' && relative === '.inkwell/manifest.json') write(f.root, 'defaults.yaml', 'fontsize: 14pt\n');
+  } });
+  assert.equal(failed.success, false);
+  assert.equal(fs.readFileSync(path.join(f.root, '.inkwell/manifest.json'), 'utf8'), original);
+  assert.match(failed.diagnostics.at(-1).message, /defaults.yaml changed/);
+  const resumed = migration().planMigration(f.root, f.assets);
+  assert.equal(resumed.blocked, true);
+  assert.equal(migration().applyMigration(resumed).success, false);
+  assert.equal(fs.readFileSync(path.join(f.root, 'defaults.yaml'), 'utf8'), 'fontsize: 14pt\n');
+  write(f.root, 'defaults.yaml', 'fontsize: 12pt\n');
+  assert.equal(migration().applyMigration(migration().planMigration(f.root, f.assets)).success, true);
+});
+
+test('completed legacy defaults are not silently imported again after a user changes them', t => {
+  const f = fixture(t);
+  write(f.root, 'defaults.yaml', 'fontsize: 12pt\n');
+  assert.equal(migration().applyMigration(migration().planMigration(f.root, f.assets)).success, true);
+  write(f.root, 'defaults.yaml', 'fontsize: 14pt\nmainfont: Newly added font\n');
+  const settled = tree(f.root);
+  const second = migration().applyMigration(migration().planMigration(f.root, f.assets));
+  assert.equal(second.status, 'up-to-date');
+  assert.equal(second.writes.length, 0);
+  assert.deepEqual(tree(f.root), settled);
+});
 
 test('edited user files and local templates survive and version stays unchanged on conflicts', (t) => {
   const f = fixture(t);
@@ -254,7 +450,7 @@ for (const checkpoint of ['journal-created', 'file-written', 'manifest-written',
     assert.equal(resumed.resumed, true);
     const result = migration().applyMigration(resumed);
     assert.equal(result.success, true, JSON.stringify(result));
-    assert.equal(JSON.parse(fs.readFileSync(path.join(f.root, '.inkwell/manifest.json'))).schemaVersion, 4);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(f.root, '.inkwell/manifest.json'))).schemaVersion, 1);
     assert.equal(migration().applyMigration(migration().planMigration(f.root, f.assets)).writes.length, 0);
   });
 }

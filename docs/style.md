@@ -18,9 +18,11 @@ The command writes canonical typography keys. For example:
 ```yaml
 ---
 title: My document
-typography:
-  bodySize: 11pt
-  lineSpacing: 1.4
+fontsize: 11pt
+linestretch: 1.4
+inkwell:
+  typography:
+    heading-scale: 1.2
 ---
 ```
 
@@ -28,7 +30,8 @@ The equivalent project defaults live under `defaults` in the manifest:
 
 ```json
 {
-  "schemaVersion": 4,
+  "schemaVersion": 1,
+  "scaffoldVersion": 4,
   "defaults": {
     "typography": {
       "bodySize": "11pt",
@@ -40,7 +43,7 @@ The equivalent project defaults live under `defaults` in the manifest:
 
 These examples show the relevant settings only. Inkwell preserves the other manifest fields, including managed-file records and fields added by a newer version.
 
-Legacy keys such as `fontsize`, `mainfont`, `sansfont`, `monofont`, `heading-*`, `code-font-size`, `table-font-size`, and `caption-font-size` remain readable. The command preserves existing legacy values and writes the canonical setting that takes precedence over them. It also preserves YAML comments, the document's line endings and byte-order mark, unknown metadata, and the document body. A canonical dotted key already present in YAML is updated directly. Shared YAML maps can be overridden without changing other metadata that references the same anchor; a scalar anchor must be edited directly.
+Pandoc keys `fontsize`, `mainfont`, `sansfont`, `monofont`, and `linestretch` remain canonical. Legacy Inkwell keys such as `heading-*`, `code-font-size`, `table-font-size`, and `caption-font-size` remain readable through at least 0.7. The command writes the documented setting and updates an existing stronger spelling of that same option when necessary. It also preserves YAML comments, the document's line endings and byte-order mark, unknown metadata, and the document body. A canonical dotted key already present in YAML is updated directly. Shared YAML maps can be overridden without changing other metadata that references the same anchor; a scalar anchor must be edited directly.
 
 Sizes have explicit units. The shared configuration reader understands points, CSS lengths, and named LaTeX sizes such as `small` and `footnotesize`; each template exposes only the values its PDF adapter can reproduce. Relative `em`, `rem`, and percentage sizes refer to the document body, independently of the editor UI and viewer zoom. Physical conversion accounts for the slight difference between TeX points and CSS/PDF points. For a standard body size, use the supported 10 pt, 11 pt, or 12 pt choice. The same template rules apply to manual frontmatter and project defaults.
 

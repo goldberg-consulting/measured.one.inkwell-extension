@@ -11,8 +11,10 @@ const repo = path.resolve(__dirname, '..');
 const options = Object.fromEntries(process.argv.slice(2).map(arg => arg.replace(/^--/, '').split(/=(.*)/s).slice(0, 2)));
 const implementation = path.resolve(options.implementation || repo);
 const repetitions = Number(options.repetitions || 1);
+const warmups = Number(options.warmups || 0);
 const baseline = Object.hasOwn(options, 'baseline');
 if (!Number.isInteger(repetitions) || repetitions < 1 || repetitions > 20) throw new Error('Invalid repetitions');
+if (!Number.isInteger(warmups) || warmups < 0 || warmups > 5) throw new Error('Invalid warmup count');
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'inkwell-demos-'));
 const project = path.join(work, 'project');
 const disposable = () => ({ dispose() {} });
@@ -65,11 +67,19 @@ cp.spawn = function(binary, argv, opts) {
   return child;
 };
 const hash = text => crypto.createHash('sha256').update(text).digest('hex');
+const statistics = values => {
+  const sorted = [...values].sort((a, b) => a - b), n = sorted.length;
+  if (!n) return undefined;
+  const mean = sorted.reduce((a, b) => a + b, 0) / n;
+  return { sampleCount: n, median: n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2,
+    p95: sorted[Math.ceil(n * .95) - 1], variance: sorted.reduce((sum, value) => sum + (value - mean) ** 2, 0) / n };
+};
 const result = { schemaVersion: 1, timestamp: new Date().toISOString(), baseline,
   corpusSource: Object.hasOwn(options, 'committed-examples') ? 'HEAD examples (preserve local edits)' : 'working examples',
   implementation: options.implementation ? 'frozen baseline' : 'working tree',
-  machine: { platform: process.platform, arch: process.arch, cpu: os.cpus()[0]?.model, node: process.version },
-  repetitions, corpus: [], phases: {}, demos: [], limitations: [
+  machine: { platform: process.platform, arch: process.arch, cpu: os.cpus()[0]?.model, node: process.version, osRelease: os.release(), memoryBytes: os.totalmem() },
+  repetitions, warmups, cacheState: warmups ? 'warm after unmeasured full-corpus warmup' : 'first repetition cold; later repetitions warm',
+  corpus: [], phases: {}, demos: [], limitations: [
     'Activation is module-load time only; a real extension-host activation budget remains a release gate.',
     'PDF transfer measures the existing asynchronous read/base64 payload cost, not browser page painting.',
     'Compile planning is compiler wall time less observed child-process wall time; includes staging and publication.',
@@ -81,7 +91,9 @@ async function main() {
   fs.mkdirSync(path.join(project, '.inkwell/references'), { recursive: true });
   const seeds = require(path.join(repo, 'out/scaffold-assets.js'));
   const seed = seeds.STARTER_BIB;
-  const bib = baseline ? seed.replace(/(?:^|\n)@book\{fourier1822,[\s\S]*?\n\}\n/, '\n') : seed;
+  // Benchmark the same inputs on both implementations. Known baseline defects
+  // remain covered by separate safety fixtures; do not manufacture a new corpus.
+  const bib = seed;
   fs.writeFileSync(path.join(project, '.inkwell/references/refs.bib'), bib);
   fs.writeFileSync(path.join(project, '.inkwell/manifest.json'), '{"template":"default"}\n');
   for (const [relative, content] of Object.entries(seeds.SCAFFOLD_SEED_FILES)) {
@@ -99,6 +111,12 @@ async function main() {
     result.corpus.push({ name, sha256: hash(text) });
   }
   const python = process.env.INKWELL_TEST_PYTHON || 'python3';
+  result.runtime = {};
+  for (const [name, binary, args] of [['pandoc', 'pandoc', ['--version']], ['xelatex', 'xelatex', ['--version']], ['pdflatex', 'pdflatex', ['--version']], ['python', python, ['--version']]]) {
+    try { result.runtime[name] = cp.execFileSync(binary, args, { encoding: 'utf8' }).split(/\r?\n/)[0]; }
+    catch { result.runtime[name] = 'unavailable'; }
+  }
+  result.corpusHash = hash(JSON.stringify({ sources: result.corpus, bibliography: hash(bib), scripts: Object.fromEntries(Object.entries(seeds.SCAFFOLD_SEED_FILES).filter(([name]) => name.startsWith('.inkwell/scripts/')).map(([name, text]) => [name, hash(text)])) }));
   process.env.MPLCONFIGDIR = path.join(work, 'matplotlib');
   if (path.isAbsolute(python) && path.basename(path.dirname(python)) === 'bin') {
     fs.symlinkSync(path.dirname(path.dirname(python)), path.join(project, 'venv'), 'dir');
@@ -132,7 +150,7 @@ async function main() {
   await new Promise((resolve, reject) => cp.execFile(process.execPath, ['-e', 'console.log("inkwell benchmark")'], { cwd: project }, err => err ? reject(err) : resolve()));
   result.phases.codeProcessMs = performance.now() - runStart;
 
-  for (let repetition = 0; repetition < repetitions; repetition++) {
+  for (let repetition = -warmups; repetition < repetitions; repetition++) {
     for (const name of examples) {
       const source = path.join(project, name);
       const document = { uri: uri(source), fileName: source, languageId: 'markdown', version: 1, getText: () => fs.readFileSync(source, 'utf8') };
@@ -151,7 +169,7 @@ async function main() {
       const finalLog = compiled.log.split('\n').filter(line => /\[WARNING\]/.test(line)).join('\n') + '\n' +
         (engineLogPath && fs.existsSync(engineLogPath) ? fs.readFileSync(engineLogPath, 'utf8') : compiled.log);
       const warnings = checkWarnings(finalLog, name, policy);
-      const record = { name, repetition, success: compiled.success, totalMs,
+      const record = { name, repetition, measured: repetition >= 0, cacheState: repetition === -warmups ? 'cold' : 'warm', success: compiled.success, totalMs,
         runMs, runProcesses: processes.slice(offset, compileOffset).map(p => ({ binary: p.binary, milliseconds: p.milliseconds, exitCode: p.exitCode })),
         runFailures: runs.filter(run => run.exitCode !== 0).map(run => ({ index: run.block.index, exitCode: run.exitCode, stderr: run.stderr })),
         compilePlanningMs: Math.max(0, totalMs - observed.reduce((sum, p) => sum + p.milliseconds, 0)),
@@ -177,6 +195,8 @@ async function main() {
     }
   }
   result.success = result.demos.every(d => d.success && d.expectedText && !d.unresolved.length && !d.runFailures.length);
+  result.statistics = Object.fromEntries(examples.map(name => [name, Object.fromEntries(['totalMs', 'runMs', 'compilePlanningMs', 'pdfTransferMs'].map(metric => [metric, statistics(result.demos.filter(d => d.name === name && d.measured).map(d => d[metric]).filter(Number.isFinite))]))]));
+  result.statistics.corpusCompileMs = statistics(Array.from({ length: repetitions }, (_, repetition) => result.demos.filter(d => d.repetition === repetition).reduce((total, demo) => total + demo.totalMs, 0)));
   console.log(`Reports and isolated outputs: ${work}`);
   const report = path.resolve(options.report || path.join(work, 'report.json'));
   fs.mkdirSync(path.dirname(report), { recursive: true });
