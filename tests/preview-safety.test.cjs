@@ -68,6 +68,31 @@ test('generated table cells cannot collide with math restoration or become math 
   assert.match(html, /class="inkwell-table-literal"[^>]*>\$x\$ &lt;b&gt;literal&lt;\/b&gt;<\/td>/);
 });
 
+test('preview marks real math while preserving currency and escaped dollar signs in draft and final HTML', async t => {
+  const h = host(t);
+  const document = h.document('currency-math.md', [
+    'Inline math: $x^2$.',
+    '$$a^2 + b^2 = c^2$$',
+    'Prices start at $20 and rise to $30.',
+    '| Option | Price |\n| --- | --- |\n| A | **$20 at closing + up to $30 in milestones** |\n| B | $5 upfront + $1–$2 annual minimum |',
+    'Escaped source dollars: \\$x\\$.',
+    'See @reference for context.',
+  ].join('\n\n'));
+  h.provider.currentDocument = document;
+  await h.provider.sendContentUpdate(document);
+  for (const type of ['draftContent', 'updateContent']) {
+    const html = h.messages.find(message => message.type === type).html;
+    assert.equal((html.match(/data-inkwell-math=/g) || []).length, 2, type + ': only real math is marked');
+    assert.match(html, /<span data-inkwell-math="\d+">\$x\^2\$<\/span>/);
+    assert.match(html, /<div class="math-display" data-inkwell-math="\d+">\$\$a\^2 \+ b\^2 = c\^2\$\$<\/div>/);
+    assert.match(html, /Prices start at \$20 and rise to \$30\./);
+    assert.match(html, /<strong>\$20 at closing \+ up to \$30 in milestones<\/strong>/);
+    assert.match(html, /\$5 upfront \+ \$1–\$2 annual minimum/);
+    assert.match(html, /Escaped source dollars: \$x\$\./);
+    assert.doesNotMatch(html, /INKWELLMATHPLACEHOLDER/);
+  }
+});
+
 // A small DOM adapter runs the actual shipped webview program. No repository
 // project data, browser process, PDF engine, or external resource is loaded.
 function client(provider, webview, globals = {}) {

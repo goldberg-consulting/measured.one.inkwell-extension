@@ -160,11 +160,40 @@ test('real bundled preview renders math, Mermaid, code and bounded PDF pages wit
   const send = data => connection.evaluate(`window.dispatchEvent(new MessageEvent('message',{data:${JSON.stringify(data)}}))`);
   const base = { documentUri: 'file:///offline.md', sourceVersion: 1, revision: 1 };
   const html = '<h1>Offline rendering</h1><p><span data-inkwell-math="0">$x^2 + y^2 = z^2$</span></p>' +
+    '<div class="math-display" data-inkwell-math="1">$$a^2 + b^2 = c^2$$</div>' +
+    '<p><span data-inkwell-math="2">\\(x + y\\)</span></p><div class="math-display" data-inkwell-math="3">\\[z = 2\\]</div>' +
+    '<p class="currency-prose">Prices start at $20 and rise to $30.</p>' +
+    '<table><tbody><tr><td class="currency-cell"><strong>$20 at closing + up to $30 in milestones</strong></td></tr>' +
+    '<tr><td class="currency-cell">$5 upfront + $1–$2 annual minimum</td></tr>' +
+    '<tr><td class="inkwell-table-literal">$x$ and $20</td></tr></tbody></table>' +
+    '<p class="escaped-dollars">Escaped source dollars: $x$.</p><p><code class="literal-code">$x$ and $20</code></p>' +
     '<pre><code class="language-python">def answer():\n    return 42</code></pre><pre><code class="language-mermaid">graph TD; A[Local] --> B[Offline]</code></pre>';
   await connection.evaluate("document.querySelector('[data-tab=print]').click()");
   await send({ ...base, type: 'updateContent', html, pdfUri: resourceOrigin + '/fixture.pdf', title: 'Offline rendering' });
   await waitFor(() => connection.evaluate("!!document.querySelector('.katex') && !!document.querySelector('.mermaid svg') && !!document.querySelector('code.hljs .hljs-keyword')"));
   await waitFor(() => connection.evaluate("!!document.querySelector('#print-page-stage .katex') && !!document.querySelector('#print-page-stage .mermaid svg') && !!document.querySelector('#print-page-stage code.hljs .hljs-keyword')"));
+  for (const pane of ['#article-content', '#print-page-stage']) {
+    const math = await connection.evaluate(`(()=>{const root=document.querySelector(${JSON.stringify(pane)});return {
+      marked:root.querySelectorAll('[data-inkwell-math] .katex').length,
+      display:root.querySelectorAll('[data-inkwell-math] .katex-display').length,
+      unexpected:root.querySelectorAll('.currency-prose .katex,.currency-cell .katex,.escaped-dollars .katex,.literal-code .katex,.inkwell-table-literal .katex').length,
+      currency:root.querySelector('.currency-prose').textContent,
+      cells:[...root.querySelectorAll('.currency-cell')].map(cell=>cell.textContent),
+      bold:root.querySelector('.currency-cell strong')?.textContent,
+      escaped:root.querySelector('.escaped-dollars').textContent,
+      code:root.querySelector('.literal-code').textContent,
+      literal:root.querySelector('.inkwell-table-literal').textContent
+    };})()`);
+    assert.equal(math.marked, 4, pane + ': all supported marked math delimiters render');
+    assert.equal(math.display, 2, pane + ': both display math forms remain display math');
+    assert.equal(math.unexpected, 0, pane + ': dollars outside validated math remain literal');
+    assert.equal(math.currency, 'Prices start at $20 and rise to $30.');
+    assert.deepEqual(math.cells, ['$20 at closing + up to $30 in milestones', '$5 upfront + $1–$2 annual minimum']);
+    assert.equal(math.bold, '$20 at closing + up to $30 in milestones');
+    assert.equal(math.escaped, 'Escaped source dollars: $x$.');
+    assert.equal(math.code, '$x$ and $20');
+    assert.equal(math.literal, '$x$ and $20');
+  }
   assert.equal(requests.some(url => url.includes('pdfjs/')), false, 'PDF engine stays unloaded until the PDF tab opens');
   await connection.evaluate("document.querySelector('[data-tab=pdf]').click()");
   await waitFor(() => connection.evaluate('window.inkwellPreviewMetrics.renderedPages >= 6'));
