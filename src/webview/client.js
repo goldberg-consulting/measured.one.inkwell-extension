@@ -443,7 +443,7 @@ export function startPreview(initial) {
       try { renderMathInElement = await assets.math(); } catch (error) { featureError("Math", error, generation); return; }
       if (generation !== articleGeneration) return;
       if (renderMathInElement) {
-        renderMathInElement(articleEl, {
+        var options = {
           ignoredClasses: ["inkwell-table-literal"],
           delimiters: [
             { left: "$$", right: "$$", display: true },
@@ -452,6 +452,15 @@ export function startPreview(initial) {
             { left: "\\(", right: "\\)", display: false }
           ],
           throwOnError: false
+        };
+        // The Markdown pass has already identified math using Pandoc's
+        // delimiter rules. Scanning the whole article again would turn
+        // ordinary currency into math as soon as any real formula is present.
+        articleEl.querySelectorAll("[data-inkwell-math]").forEach(function (element) {
+          // Auto-render's ignored tags/classes normally apply while walking
+          // descendants. Preserve those exclusions when starting at a wrapper.
+          if (element.closest("script, noscript, style, textarea, pre, code, option, .inkwell-table-literal")) return;
+          renderMathInElement(element, options);
         });
       }
     }
