@@ -150,6 +150,24 @@ test('non-sty package files use explicit fonts, encoding and script coverage', a
   assert.ok(f.calls.some(call => call.args[0] === 'ly1enc.def'));
 });
 
+test('host-rewritten package.json metadata does not fail asset verification', async t => {
+  const f = fixture(t);
+  const packaged = JSON.parse(fs.readFileSync(path.join(f.extensionRoot, 'package.json'), 'utf8'));
+  write(path.join(f.extensionRoot, 'package.json'), JSON.stringify({ ...packaged, __metadata: { installedTimestamp: 1, targetPlatform: 'undefined', size: 99 } }, null, '\t'));
+  const result = await f.doctor.run(f.options);
+  assert.equal(check(result, 'assets').status, 'ok');
+  assert.equal(result.ready, true);
+});
+
+test('host-rewritten package.json still detects identity tampering', async t => {
+  const f = fixture(t);
+  const packaged = JSON.parse(fs.readFileSync(path.join(f.extensionRoot, 'package.json'), 'utf8'));
+  write(path.join(f.extensionRoot, 'package.json'), JSON.stringify({ ...packaged, version: '9.9.9', __metadata: { installedTimestamp: 1 } }, null, '\t'));
+  const result = await f.doctor.run(f.options);
+  assert.equal(check(result, 'assets').status, 'error');
+  assert.equal(result.ready, false);
+});
+
 test('packaged hash mismatch and omitted mandatory asset block readiness', async t => {
   const f = fixture(t);
   await f.doctor.run(f.options);

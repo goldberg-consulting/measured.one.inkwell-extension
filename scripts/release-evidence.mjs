@@ -249,12 +249,23 @@ function args(argv) {
   return values;
 }
 
+/** Host hook environments set GIT_DIR; inspect the requested checkout, not the caller repository. */
+function spawnGit(gitArgs, cwd = process.cwd()) {
+  const env = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (key === "GIT_DIR" || key === "GIT_WORK_TREE" || key === "GIT_INDEX_FILE"
+      || key === "GIT_OBJECT_DIRECTORY" || key === "GIT_ALTERNATE_OBJECT_DIRECTORIES"
+      || key === "GIT_COMMON_DIR" || key === "GIT_QUARANTINE_PATH") delete env[key];
+  }
+  return spawnSync("git", gitArgs, { cwd, encoding: "utf8", env });
+}
+
 export function assertCleanReleaseCheckout(root = process.cwd()) {
   for (const args of [['diff', '--quiet'], ['diff', '--cached', '--quiet']]) {
-    const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+    const result = spawnGit(args, root);
     ensure(result.status === 0, 'Release identity requires a clean tracked checkout; commit or isolate changes before creating evidence.');
   }
-  const files = spawnSync('git', ['ls-files', '--others', '--exclude-standard', '-z'], { cwd: root, encoding: 'utf8' });
+  const files = spawnGit(['ls-files', '--others', '--exclude-standard', '-z'], root);
   ensure(files.status === 0, 'Cannot inspect untracked release inputs.');
   const unknown = files.stdout.split('\0').filter(name => /^(?:src|templates|filters|csl|media|schemas|examples|scripts|tests|benchmarks|\.github)\//.test(name)
     || /^(?:package(?:-lock)?\.json|requirements-latex\.txt|tsconfig\.json|\.vscodeignore)$/.test(name));
@@ -265,7 +276,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const [command, ...argv] = process.argv.slice(2), options = args(argv);
     const candidate = options.candidate ? json(options.candidate) : undefined;
     const commit = options.commit || candidate?.releaseCommit;
-    const head = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' });
+    const head = spawnGit(['rev-parse', 'HEAD']);
     ensure(head.status === 0 && head.stdout.trim() === commit, 'Run the release harness from the exact candidate commit checkout.');
     if (command === 'init') assertCleanReleaseCheckout();
     let result;

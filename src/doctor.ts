@@ -154,15 +154,35 @@ function readAssets(options: DoctorOptions, expectedVersion: string): { manifest
   }
 }
 
+/** VS Code / Cursor rewrite package.json on VSIX install (tabs + __metadata). */
+function packageJsonDigestCandidates(contents: Buffer): Buffer[] {
+  const candidates = [contents];
+  try {
+    const parsed = JSON.parse(contents.toString("utf8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || !Object.hasOwn(parsed, "__metadata")) return candidates;
+    const packaged = { ...parsed };
+    delete packaged.__metadata;
+    candidates.push(Buffer.from(JSON.stringify(packaged)));
+    candidates.push(Buffer.from(`${JSON.stringify(packaged, null, 2)}\n`));
+    candidates.push(Buffer.from(`${JSON.stringify(packaged, null, "\t")}\n`));
+  } catch {}
+  return candidates;
+}
+
+function assetMatchesManifest(relative: string, contents: Buffer, expected: { sha256: string; size?: number }): void {
+  const candidates = relative === "package.json" ? packageJsonDigestCandidates(contents) : [contents];
+  if (candidates.some(bytes => digest(bytes) === expected.sha256 && (expected.size === undefined || bytes.length === expected.size))) return;
+  if (expected.size !== undefined && candidates.every(bytes => bytes.length !== expected.size)) throw new Error("size mismatch");
+  throw new Error("SHA-256 mismatch");
+}
+
 function verifyAssetHashes(extensionRoot: string, manifest: DoctorAssetsManifest): DoctorCheck {
   const failures: string[] = [];
   for (const [relative, expected] of Object.entries(manifest.files)) {
     try {
       const file = resolveContainedPath(extensionRoot, relative);
       if (!fs.statSync(file).isFile()) throw new Error("not a regular file");
-      const contents = fs.readFileSync(file);
-      if (expected.size !== undefined && contents.length !== expected.size) throw new Error("size mismatch");
-      if (digest(contents) !== expected.sha256) throw new Error("SHA-256 mismatch");
+      assetMatchesManifest(relative, fs.readFileSync(file), expected);
     } catch (error: any) { failures.push(`${relative}: ${error.message || String(error)}`); }
   }
   return { id: "assets", status: failures.length ? "error" : "ok", required: true,
