@@ -356,3 +356,40 @@ test('RC and final evidence stages never fabricate absent installation or perfor
   assert.match(commands, /out\/smoke-cli\.js/);
   assert.doesNotMatch(commands, /--gate (?:clean-macos-cask|standalone-existing-tex)/, 'headless install is insufficient proof of the still-required no-code UI gate');
 });
+
+test('scheduled installation skips only an entirely unconfigured candidate and rejects bad inputs', t => {
+  const workflow = YAML.parse(fs.readFileSync(path.join(repo, '.github/workflows/macos-installation.yml'), 'utf8'));
+  assert.equal(workflow.jobs.install.needs, 'configuration');
+  assert.equal(workflow.jobs.install.if, "needs.configuration.outputs.enabled == 'true'");
+  const script = workflow.jobs.configuration.steps.find(step => step.id === 'inputs').run;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'inkwell-schedule-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const output = path.join(root, 'output'), summary = path.join(root, 'summary');
+  const valid = { RELEASE_COMMIT: 'a'.repeat(40), TAP_REF: 'b'.repeat(40), CANDIDATE_SHA256: 'c'.repeat(64),
+    CANDIDATE_URL: `https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/download/inkwell-rc-${'a'.repeat(40)}/inkwell-0.5.0.vsix` };
+  function run(event, inputs = {}) {
+    fs.writeFileSync(output, ''); fs.writeFileSync(summary, '');
+    const result = spawnSync('bash', ['-c', script], { encoding: 'utf8', env: { ...process.env,
+      EVENT_NAME: event, RELEASE_COMMIT: '', TAP_REF: '', CANDIDATE_SHA256: '', CANDIDATE_URL: '',
+      ...inputs, GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: summary } });
+    return { ...result, output: fs.readFileSync(output, 'utf8'), summary: fs.readFileSync(summary, 'utf8') };
+  }
+  const idle = run('schedule');
+  assert.equal(idle.status, 0, idle.stderr);
+  assert.equal(idle.output, 'enabled=false\n');
+  assert.match(idle.summary, /No installation evidence was produced/);
+  for (const event of ['schedule', 'workflow_dispatch']) {
+    const ready = run(event, valid);
+    assert.equal(ready.status, 0, ready.stderr);
+    assert.equal(ready.output, 'enabled=true\n');
+    for (const key of Object.keys(valid)) {
+      for (const value of ['', 'invalid']) {
+        const rejected = run(event, { ...valid, [key]: value });
+        assert.notEqual(rejected.status, 0, `${event}: ${key}=${value}`);
+        assert.doesNotMatch(rejected.output, /enabled=true/);
+        assert.match(rejected.stdout, /::error::/);
+      }
+    }
+  }
+  assert.notEqual(run('workflow_dispatch').status, 0);
+});

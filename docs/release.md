@@ -17,7 +17,7 @@ Use `scripts/release-evidence.mjs record` only after the named probe succeeds. P
 
 Run **Assemble release evidence** with stage `rc`, then **Publish immutable release candidate**, selecting the successful candidate and evidence run IDs. The RC URL uses the full release commit in its tag. Existing assets must compare byte-for-byte; replacement is prohibited.
 
-Create the Homebrew candidate in its own review branch. Its cask must contain the exact immutable RC URL and checksum. Run **macOS installation journey** with that tap commit, release commit, RC URL and SHA-256. Scheduled runs require the corresponding `INKWELL_RC_COMMIT`, `INKWELL_RC_URL`, `INKWELL_RC_SHA256` and `INKWELL_RC_TAP_COMMIT` repository variables.
+Create the Homebrew candidate in its own review branch. Its cask must contain the exact immutable RC URL and checksum. Run **macOS installation journey** with that tap commit, release commit, RC URL and SHA-256. Scheduled runs skip explicitly, without producing installation evidence, when all four candidate variables are absent. Partial or invalid configuration fails before allocating macOS runners. To enable scheduled runs, set the corresponding `INKWELL_RC_COMMIT`, `INKWELL_RC_URL`, `INKWELL_RC_SHA256` and `INKWELL_RC_TAP_COMMIT` repository variables.
 
 The installation workflow retains machine details, installer output, full doctor JSON, scaffold manifest and a real PDF for full MacTeX cask installation and standalone setup using existing TinyTeX. It verifies that standalone setup preserves the TeX root. It intentionally does not label its headless smoke as proof of the clean editor New Project/Preview journey. That independent UI evidence remains mandatory, along with 0.4 upgrade and file-preservation checks.
 

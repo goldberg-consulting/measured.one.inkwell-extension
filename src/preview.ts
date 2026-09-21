@@ -8,7 +8,8 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 import { randomBytes } from "crypto";
-import MarkdownIt from "markdown-it";
+import type MarkdownIt from "markdown-it";
+import { createMarkdownParser } from "./markdown-parser";
 import { installSafeHtmlRendering } from "./html-safety";
 import { compile, detectMode, isCompilable, readLastSuccessfulOutput } from "./compiler";
 import { InkwellDiagnostics } from "./diagnostics";
@@ -25,12 +26,14 @@ import { resolveTableStyle, buildTableCss } from "./table-model";
 import { TABLE_ATTRIBUTE_SCHEMA } from "./table-values";
 import { ViewerState, FontScaleAction, normalizeFontScale, changeFontScale, readViewerState } from "./viewer-state";
 
-const md = new MarkdownIt({
-  html: true,
-  linkify: true,
-  typographer: true,
-});
-installSafeHtmlRendering(md);
+let markdown: MarkdownIt | undefined;
+function previewMarkdown(): MarkdownIt {
+  if (!markdown) {
+    markdown = createMarkdownParser({ html: true, linkify: true, typographer: true });
+    installSafeHtmlRendering(markdown);
+  }
+  return markdown;
+}
 
 export class InkwellPreviewProvider {
   private panel: vscode.WebviewPanel | undefined;
@@ -398,7 +401,7 @@ export class InkwellPreviewProvider {
       const projectRoot = getInkwellProjectRoot(sourceFile);
       if (/(?:^|[^\\\w])@[-\w:.]+|^nocite\s*:/m.test(text)) {
         const quickMath = shieldMathForMarkdown(body);
-        const quickHtml = this.convertLocalImages(quickMath.restore(md.render(quickMath.shielded)), document);
+        const quickHtml = this.convertLocalImages(quickMath.restore(previewMarkdown().render(quickMath.shielded)), document);
         this.postMessage({ type: "draftContent", html: quickHtml, title: fm.title || "", featureStatus: "Resolving references…" }, request);
       }
       const citeResult = await renderCitations(body, {
@@ -466,7 +469,7 @@ export class InkwellPreviewProvider {
       // restore the raw LaTeX so KaTeX auto-render sees it intact.
       const { shielded, restore } = shieldMathForMarkdown(body);
 
-      let rendered = tables.render(md, shielded, attributes => {
+      let rendered = tables.render(previewMarkdown(), shielded, attributes => {
         const result = resolveTableStyle(config, attributes);
         return { preset: result.style.preset, captionPosition: result.style.captionPosition,
           alignment: result.style.alignment, alignmentIsLocal: TABLE_ATTRIBUTE_SCHEMA.find(rule => rule.field === "alignment")!.aliases.some(key => attributes[key] !== undefined),
@@ -503,7 +506,7 @@ export class InkwellPreviewProvider {
         htmlBody = `<header class="title-block">${parts.join("\n")}</header>` + htmlBody;
       }
       if (fm.abstract) {
-        const abstractHtml = md.render(fm.abstract);
+        const abstractHtml = previewMarkdown().render(fm.abstract);
         const abstractBlock = `<div class="abstract-block"><p class="abstract-title">Abstract</p>${abstractHtml}</div>`;
         if (parts.length) {
           htmlBody = htmlBody.replace(
