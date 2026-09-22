@@ -184,6 +184,8 @@ export function parseCodeBlocks(markdown: string): CodeBlock[] {
 
 /** The python binary inside a venv directory, preferring python3. */
 export function venvPythonBin(venvDir: string): string | undefined {
+  const windows = path.join(venvDir, "Scripts", "python.exe");
+  if (fs.existsSync(windows)) return windows;
   const p3 = path.join(venvDir, "bin", "python3");
   const p = path.join(venvDir, "bin", "python");
   return fs.existsSync(p3) ? p3 : fs.existsSync(p) ? p : undefined;
@@ -229,7 +231,7 @@ export function resolveInterpreter(
   const [defaultCmd, ...defaultArgs] = defaults;
 
   const envSpec = envPath
-    || (langKey.startsWith("python") ? runConfig.pythonEnv : undefined)
+    || (langKey.startsWith("python") ? runConfig.pythonEnv || (venvPythonBin(path.join(projectRoot, ".venv")) ? "./.venv" : undefined) : undefined)
     || (langKey === "r" ? runConfig.rEnv : undefined)
     || (langKey === "node" || langKey === "javascript" ? runConfig.nodeEnv : undefined);
 
@@ -269,7 +271,7 @@ export function resolveInterpreter(
         args: defaultArgs,
         envVars: {
           VIRTUAL_ENV: resolved,
-          PATH: path.join(resolved, "bin") + ":" + (process.env.PATH || ""),
+          PATH: path.dirname(interpreter) + path.delimiter + (process.env.PATH || ""),
         },
         label: `${envSpec} (${interpreter})`,
       };
@@ -417,6 +419,7 @@ export async function runAllBlocks(
   markdown: string, sourceFile: string, cancel?: RunCancellation,
   onProgress?: (progress: BlockProgress) => void,
   selectedIndices?: number[],
+  options: { force?: boolean } = {},
 ): Promise<BlockResult[]> {
   const runConfig = parseRunConfig(markdown, sourceFile);
   const blocks = applyRunDefaults(parseCodeBlocks(markdown), runConfig); if (!blocks.length) return [];
@@ -471,7 +474,7 @@ export async function runAllBlocks(
       report("failed", result); visiting.delete(block.index); results.set(block.index, result); return result;
     }
     if (Object.values(fingerprint.inputs).some(hash => hash === "missing")) dependencyError = "A declared input is missing. Check the block inputs attribute.";
-    let result = !block.noCache && !cancel?.cancelled && !dependencyError ? store.current(block, ids[block.index], fingerprint) : undefined;
+    let result = !options.force && !block.noCache && !cancel?.cancelled && !dependencyError ? store.current(block, ids[block.index], fingerprint) : undefined;
     if (result) report("cached", result);
     else {
       const attempt = store.begin(ids[block.index], Boolean(block.id || block.label)); report("running");

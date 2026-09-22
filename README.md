@@ -10,10 +10,7 @@ shell, or JavaScript when you need figures and results.
 
 [Install](#install) · [Your first PDF](#your-first-pdf) · [Controls](#everyday-controls) · [Examples](docs/examples.md) · [Syntax guide](guide.md)
 
-> **Version note:** This page describes **0.5 on `main`**. The latest published
-> release and Homebrew cask are **0.4.0**; their interface and setup differ.
-> Use the source-build instructions below to try 0.5. Its release VSIX and
-> matching Homebrew checksum are not published yet.
+> **Version 0.5.1:** Download the VSIX from [GitHub Releases](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.5.1) and use **Extensions: Install from VSIX…** in Cursor or VS Code, then reload the window. The Homebrew cask still points to 0.4.0 until its checksum is updated.
 
 ## Install
 
@@ -48,11 +45,11 @@ cd measured.one.inkwell-extension
 npm ci
 npm run verify
 npm run package:vsix
-node scripts/verify-vsix.mjs inkwell-0.5.0.vsix --tag v0.5.0
+node scripts/verify-vsix.mjs inkwell-0.5.1.vsix --tag v0.5.1
 ```
 
 In your editor, choose **Extensions: Install from VSIX...**, select
-`inkwell-0.5.0.vsix`, and reload the window. Then run **Inkwell: Setup / Repair**.
+`inkwell-0.5.1.vsix`, and reload the window. Then run **Inkwell: Setup / Repair**.
 It checks your tools, offers any needed repairs, prepares the project, and
 verifies setup by building a real PDF. On macOS, it can reuse a working TeX
 installation or install missing tools after you approve the plan.
@@ -213,3 +210,27 @@ Contributing? Run `npm run verify` before opening a PR. To build a distributable
 extension, use `npm run package:vsix`; see [release verification](docs/release.md).
 
 [License](LICENSE)
+
+
+### measured.one consulting report
+
+Choose **measured.one Report (US Letter)** when creating a project, or open the
+bundled `demo-measured-report.md` example after Setup Workspace. It includes a
+Goldberg Consulting cover with original commercially usable vector artwork,
+numbered chapters, and lettered appendix chapters. The template is original;
+Daan Zwaneveld’s noncommercial TU Delft template and photograph are not included.
+
+The starter combines two Python files and two Observable Plot JavaScript files.
+Setup / Repair offers a project `.venv`; Python uses it automatically unless the
+document specifies another environment. Setup Python Env also updates the current
+document’s environment setting. Install the example’s pinned JavaScript packages
+once with `npm ci --prefix .inkwell/scripts/mixed-report`, then run its code blocks
+and compile the PDF. Node.js is required for Observable Plot. Setup installs no
+JavaScript packages automatically.
+
+**Run Code Blocks** and **Run This Block** explicitly execute again (including
+required upstream blocks). **Run Changed Blocks** reuses verified current results.
+Save script and data edits before running, and declare imported helpers/data with
+`inputs` so their content participates in cache checks. PDF compilation consumes
+verified results without executing code; when auto-compile is set to On Save,
+a completed run also requests an updated PDF.

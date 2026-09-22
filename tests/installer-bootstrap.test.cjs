@@ -5,6 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const cp = require('node:child_process');
 const crypto = require('node:crypto');
+const releaseVersion = require('../package.json').version;
 const script = path.resolve(__dirname, '../scripts/install-inkwell-macos.sh');
 const quote = value => `'${value.replaceAll("'", "'\\''")}'`;
 
@@ -22,7 +23,7 @@ if(name==='uname')process.stdout.write('Darwin\\n');
 else if(name==='brew'){if(args[0]==='--prefix')process.stdout.write(root+'\\n');}
 else if(name==='curl'){
  const target=args[args.indexOf('--output')+1];
- fs.writeFileSync(target,target.endsWith('SHA256SUMS')?(process.env.INKWELL_BAD_SUMS?'missing':'${crypto.createHash('sha256').update('release-fixture').digest('hex')}  inkwell-0.5.0.vsix\\n'):'release-fixture');
+ fs.writeFileSync(target,target.endsWith('SHA256SUMS')?(process.env.INKWELL_BAD_SUMS?'missing':'${crypto.createHash('sha256').update('release-fixture').digest('hex')}  inkwell-${releaseVersion}.vsix\\n'):'release-fixture');
 }else if(name==='unzip'){
  const out=path.join(args[args.indexOf('-d')+1],'extension','out');fs.mkdirSync(out,{recursive:true});
  if(!process.env.INKWELL_NO_INSTALLER)fs.writeFileSync(path.join(out,'install-cli.js'),'fixture');

@@ -1,6 +1,7 @@
 // Workspace commands delegate all scaffold writes to the shared migration service.
 import * as vscode from "vscode";
 import * as path from "path";
+import * as fs from "fs";
 import { selectTemplateCommand } from "./templates";
 import { setupPythonEnvironment } from "./python-setup";
 import { getInkwellOutputChannel } from "./inkwell-output";
@@ -61,14 +62,14 @@ export async function initProject(prepare: ScaffoldPreparation = prepareScaffold
   const template = await selectTemplateCommand();
   if (!(await prepare(root, template)).ready) return;
   const python = await vscode.window.showQuickPick([
-    { label: "Yes", detail: "Create a Python venv and install requirements.txt" },
+    { label: "Yes", detail: "Create a project .venv and install requirements.txt" },
     { label: "No", detail: "Skip Python setup" },
   ], { placeHolder: "Set up a Python virtual environment?" });
   let frontmatter = DEFAULT_FRONTMATTER.replace('"Untitled"', JSON.stringify(name.trim()));
   const templateStub = template && TEMPLATE_FRONTMATTER[template];
   if (templateStub) frontmatter = frontmatter.replace("---\n\n", `${templateStub}---\n\n`);
   else if (template) frontmatter = frontmatter.replace("---\n\n", `template: ${JSON.stringify(template)}\n---\n\n`);
-  if (python?.label === "Yes") frontmatter = frontmatter.replace("  code-display: output", "  code-display: output\n  python-env: ./venv");
+  if (python?.label === "Yes") frontmatter = frontmatter.replace("  code-display: output", "  code-display: output\n  python-env: ./.venv");
   const body = `# Introduction
 
 Write your content here. Cite sources with [@knuth1984] and use inline math like $x^2$.
@@ -83,7 +84,11 @@ Write your content here. Cite sources with [@knuth1984] and use inline math like
 
 ## References
 `;
-  const documentPath = createScaffoldDocument(root, name.trim(), frontmatter + body);
+  const content = template === "measured-report"
+    ? fs.readFileSync(path.join(root, ".inkwell/examples/demo-measured-report.md"), "utf8")
+      .replace('title: "Evidence into action"', () => `title: ${JSON.stringify(name.trim())}`)
+    : frontmatter + body;
+  const documentPath = createScaffoldDocument(root, name.trim(), content);
   if (python?.label === "Yes" && !await setupScaffoldPython(root)) return;
   const document = await vscode.workspace.openTextDocument(documentPath);
   await vscode.window.showTextDocument(document);
@@ -97,7 +102,7 @@ export async function setupWorkspace(prepare: ScaffoldPreparation = prepareScaff
   const readiness = await prepare(root);
   if (!readiness.ready) return;
   const python = await vscode.window.showQuickPick([
-    { label: "Yes", detail: "Create a Python venv and install requirements.txt" },
+    { label: "Yes", detail: "Create a project .venv and install requirements.txt" },
     { label: "No", detail: "Skip Python setup" },
   ], { placeHolder: "Set up a Python virtual environment?" });
   if (python?.label === "Yes" && !await setupScaffoldPython(root)) return;
@@ -112,7 +117,7 @@ async function setupScaffoldPython(projectDir: string): Promise<boolean> {
     title: "Setting up the Python environment",
   }, () => setupPythonEnvironment({
     projectDir,
-    environmentDir: path.join(projectDir, "venv"),
+    environmentDir: path.join(projectDir, ".venv"),
     requirementsFile: path.join(projectDir, "requirements.txt"),
   }));
   const output = getInkwellOutputChannel();

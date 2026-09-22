@@ -11,7 +11,7 @@ Module._load = function (request, ...args) {
     window: { createOutputChannel: () => ({ appendLine() {} }) } };
   return originalLoad.call(this, request, ...args);
 };
-const { runAllBlocks, readCurrentRunResults } = require('../out/runner');
+const { runAllBlocks, readCurrentRunResults, resolveInterpreter, venvPythonBin } = require('../out/runner');
 const { RunStore } = require('../out/run-store');
 Module._load = originalLoad;
 function fixture(t) {
@@ -95,4 +95,42 @@ test('failure to verify a completed result never emits done and restores last su
   assert.equal(failed.artifacts.size, 0);
   assert.equal(statuses.includes('done'), false);
   assert.equal(new RunStore(root, source).currentDetails('result').manifest.runId, first.runId);
+});
+
+
+test('explicit rerun bypasses cache; changed-only runs reuse it; saved Python edits invalidate it', async t => {
+  const { root, source } = fixture(t);
+  const script = path.join(root, 'analysis.py');
+  fs.writeFileSync(script, 'print("first")\n');
+  const text = fence('python', 'analysis', '', 'file="analysis.py"');
+  const [first] = await runAllBlocks(text, source);
+  assert.equal(first.exitCode, 0, first.stderr);
+  const [cached] = await runAllBlocks(text, source);
+  assert.equal(cached.cached, true);
+  const [rerun] = await runAllBlocks(text, source, undefined, undefined, [0], { force: true });
+  assert.equal(rerun.exitCode, 0, rerun.stderr);
+  assert.equal(rerun.cached, false);
+  assert.notEqual(rerun.runId, first.runId);
+  const old = fs.statSync(script);
+  fs.writeFileSync(script, 'print("other")\n');
+  fs.utimesSync(script, old.atime, old.mtime);
+  assert.equal(readCurrentRunResults(text, source)[0].cacheStatus, 'miss');
+  const [edited] = await runAllBlocks(text, source);
+  assert.equal(edited.cached, false);
+  assert.match(edited.stdout, /other/);
+});
+
+test('project .venv is selected by default while explicit environments retain priority', t => {
+  const { root } = fixture(t);
+  const bin = path.join(root, '.venv', 'bin');
+  fs.mkdirSync(bin, { recursive: true });
+  fs.writeFileSync(path.join(bin, 'python3'), 'fixture');
+  const auto = resolveInterpreter('python', undefined, {}, root, root);
+  assert.equal(auto.cmd, path.join(bin, 'python3'));
+  assert.equal(auto.envVars.VIRTUAL_ENV, path.join(root, '.venv'));
+  assert.equal(resolveInterpreter('python', undefined, { pythonEnv: 'custom' }, root, root).cmd, 'python3');
+  const windows = path.join(root, 'windows', 'Scripts');
+  fs.mkdirSync(windows, { recursive: true });
+  fs.writeFileSync(path.join(windows, 'python.exe'), 'fixture');
+  assert.equal(venvPythonBin(path.dirname(windows)), path.join(windows, 'python.exe'));
 });

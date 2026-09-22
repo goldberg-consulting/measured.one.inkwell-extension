@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.1 — September 22, 2026
+
+- Fixed an installed-extension integrity check that incorrectly rejected Cursor/VS Code installation metadata and blocked preview/setup; actual manifest changes are still rejected.
+- Explicit Run Code Blocks and Run This Block actions now execute again; Run Changed Blocks retains verified caching. Completed runs invalidate compiled output, and On Save mode rebuilds the PDF.
+- Setup offers a project `.venv`. Python selects it by default; Setup Python Env records the chosen environment in document settings. Windows virtual-environment interpreters are recognized.
+- Added the measured.one US Letter consulting report, with original commercially usable vector cover art, numbered chapters, and appendix chapters.
+- Added a complete example with two Python and two Observable Plot scripts sharing declared CSV inputs, with pinned JavaScript dependencies.
+- Includes the reliability and preview fixes already on main, including currency dollar-sign rendering.
+- Built and verified locally; GitHub Actions were not used for this release.
+
 ## Unreleased — 0.5 reliability work
 
 ### Output safety

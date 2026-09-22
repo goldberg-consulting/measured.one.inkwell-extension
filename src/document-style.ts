@@ -225,7 +225,7 @@ export function planFrontmatterSettingsEdit(text: string, changes: readonly { ke
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
   let raw = parsed.rawYaml;
   for (const change of changes) {
-    if (!/^(?:typography|tables|references)\.[a-zA-Z][a-zA-Z0-9]*$/.test(change.key)) throw new Error("Unknown document setting.");
+    if (change.key !== "runs.pythonEnv" && !/^(?:typography|tables|references)\.[a-zA-Z][a-zA-Z0-9]*$/.test(change.key)) throw new Error("Unknown document setting.");
     const canonical = documentSettingPath(change.key);
     // Keep legacy resolver precedence. If an existing stronger spelling shadows
     // a Pandoc key, update that setting too without touching any other metadata.

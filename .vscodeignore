@@ -7,6 +7,7 @@ tests/**
 benchmarks/**
 INKWELL_0.5_IMPLEMENTATION_BRIEF.md
 node_modules/**
+**/node_modules/**
 venv/**
 tsconfig.json
 eslint.config.mjs

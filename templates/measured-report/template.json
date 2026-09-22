@@ -1,0 +1,7 @@
+{
+  "name": "measured.one Report (US Letter)",
+  "description": "Goldberg Consulting research and advisory report. Original signal-field cover, US Letter pages, numbered chapters and lettered appendices.",
+  "author": "Goldberg Consulting LLC",
+  "engine": "xelatex",
+  "documentclass": "report"
+}

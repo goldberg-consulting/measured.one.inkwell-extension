@@ -106,6 +106,7 @@ function capabilities(
 /** Every shipped template has an explicit entry; custom classes opt in separately. */
 export const TEMPLATE_CAPABILITIES: Readonly<Record<string, TemplateCapabilities>> = Object.freeze({
   default: capabilities("default", "Default", "xelatex", 1, "11pt", true, 1.4),
+  "measured-report": capabilities("measured-report", "measured.one Report", "xelatex", 1, "11pt", false, 1.18),
   "eth-report": capabilities("eth-report", "ETH Report", "xelatex", 1, "12pt", true, 1.5),
   "hipster-cv": capabilities("hipster-cv", "Hipster CV", "pdflatex", 2, "10pt", false, undefined),
   "kth-letter": capabilities("kth-letter", "KTH Letter", "pdflatex", 1, "11pt", false, undefined),

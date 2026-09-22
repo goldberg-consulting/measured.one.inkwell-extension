@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Bootstrap the authoritative release VSIX. All installation, exact-editor
 # verification and full health checks live in that versioned artifact.
-INKWELL_RELEASE_VERSION="0.5.0"
+INKWELL_RELEASE_VERSION="0.5.1"
 INKWELL_EDITOR="auto"
 INKWELL_PROFILE="full"
 INKWELL_VSIX=""

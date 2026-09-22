@@ -158,6 +158,9 @@ function seedFiles(assetRoot: string): Array<{ path: string; content: string; us
   for (const relative of BUNDLED_ASSET_PATHS.filter((value) => /^examples\/.*\.md$/.test(value)).sort()) {
     seeds.push({ path: `.inkwell/${relative}`, content: fs.readFileSync(resolveContainedPath(assetRoot, relative), "utf8") });
   }
+  for (const relative of BUNDLED_ASSET_PATHS.filter(value => value.startsWith("examples/mixed-report/"))) {
+    seeds.push({ path: relative.replace("examples/", ".inkwell/scripts/"), content: fs.readFileSync(resolveContainedPath(assetRoot, relative), "utf8") });
+  }
   return seeds;
 }
 

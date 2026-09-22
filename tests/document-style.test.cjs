@@ -307,3 +307,14 @@ test('block scalar and null setting edits retain their original comments', () =>
     if (nullValue.includes('#')) assert.ok(changed.after.includes('# keep'));
   }
 });
+
+
+test('Python setup setting overrides legacy environment without losing document text', () => {
+  const { planFrontmatterSettingsEdit } = require('../out/document-style');
+  const { resolveDocumentConfig } = require('../out/document-config');
+  const text = '---\ntitle: Keep me # title comment\ninkwell:\n  python-env: ./venv # previous environment\n---\nBody stays here.\n';
+  const edit = planFrontmatterSettingsEdit(text, [{key: 'runs.pythonEnv', value: './.venv'}], '/project/doc.md');
+  assert.equal(resolveDocumentConfig({text: edit.after, sourcePath: '/project/doc.md'}).runs.pythonEnv, './.venv');
+  assert.match(edit.after, /title comment/);
+  assert.match(edit.after, /Body stays here\.\n$/);
+});

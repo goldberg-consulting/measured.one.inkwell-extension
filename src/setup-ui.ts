@@ -11,6 +11,7 @@ import { ensureProjectReadyWithUI } from "./project-readiness-ui";
 import { getInkwellOutputChannel } from "./inkwell-output";
 import { buildTexInvocationPath } from "./shell-env";
 import { executeRunProcess, RunCancellation } from "./run-process";
+import { setupPythonEnvironment } from "./python-setup";
 import { runSmokeBuild } from "./smoke-build";
 
 const taskSuccess = (): SetupProcessOutcome => ({ exitCode: 0, rawExitCode: 0, signal: null, cancelled: false });
@@ -80,7 +81,7 @@ export async function runInstallationTasks(plan: InstallPlan, options: {
 }
 
 export interface SetupUI {
-  run(root?: string, template?: string): Promise<SetupState | undefined>;
+  run(root?: string, template?: string, options?: { offerPython?: boolean }): Promise<SetupState | undefined>;
   installPackage(name: string, root?: string): Promise<void>;
   checkLight(cachedOnly?: boolean, root?: string): Promise<DoctorReport>;
 }
@@ -101,7 +102,7 @@ export function createSetupUI(context: vscode.ExtensionContext, overrides: Parti
   const output = getInkwellOutputChannel();
   const environment = () => ({ ...process.env, PATH: buildTexInvocationPath() });
   const checkLight = (cachedOnly = false, root?: string) => runDoctor({ extensionRoot: context.extensionPath, mode: "light", cachedOnly, workspaceRoot: root, env: environment() });
-  const run = async (providedRoot?: string, template?: string, requestedPackage?: string): Promise<SetupState | undefined> => {
+  const run = async (providedRoot?: string, template?: string, options: { offerPython?: boolean } = {}, requestedPackage?: string): Promise<SetupState | undefined> => {
     if (vscode.workspace.isTrusted === false) { await vscode.window.showErrorMessage("Trust this workspace before running Setup / Repair."); return undefined; }
     const root = await chooseRoot(providedRoot); if (!root) return undefined;
     const controller = new AbortController();
@@ -146,6 +147,26 @@ export function createSetupUI(context: vscode.ExtensionContext, overrides: Parti
           } });
         } finally { subscription.dispose(); }
       });
+      if (state.status === "complete" && options.offerPython !== false && !requestedPackage && !fs.existsSync(path.join(root, ".venv"))) {
+        const choice = await vscode.window.showInformationMessage(
+          "Create a project .venv for Python code and figures?", "Create .venv", "Skip Python");
+        if (choice === "Create .venv" && vscode.workspace.isTrusted) {
+          const requirements = path.join(root, "requirements.txt");
+          const result = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification,
+            title: "Inkwell: Creating .venv", cancellable: true }, async (_progress, token) => {
+            const cancel = new RunCancellation();
+            const subscription = token.onCancellationRequested(() => cancel.cancel());
+            try { return await setupPythonEnvironment({ projectDir: root, environmentDir: ".venv",
+              requirementsFile: fs.existsSync(requirements) ? requirements : undefined, env, cancel }); }
+            finally { subscription.dispose(); }
+          });
+          output.appendLine(result.log);
+          if (!result.success) {
+            output.show(true);
+            await vscode.window.showErrorMessage(`PDF setup is ready, but Python setup failed: ${result.message}`);
+          }
+        }
+      }
       invalidateDoctorCache();
       invalidateCitationPandoc();
       await vscode.commands.executeCommand("setContext", "inkwell.setupVerified", state.status === "complete");
@@ -161,7 +182,7 @@ export function createSetupUI(context: vscode.ExtensionContext, overrides: Parti
         const action = state.actions.find(candidate => candidate.label === choice);
         if (choice === "Show diagnostics" || action?.id === "show-setup-log") output.show(true);
         else if (action?.id === "compare" && action.path && action.proposedPath) await vscode.commands.executeCommand("vscode.diff", vscode.Uri.file(action.path), vscode.Uri.file(action.proposedPath), "Inkwell proposed update");
-        else if (action?.id === "resume-setup") return await run(root, template, requestedPackage);
+        else if (action?.id === "resume-setup") return await run(root, template, options, requestedPackage);
       }
       return state;
     } catch (error) {
@@ -170,6 +191,6 @@ export function createSetupUI(context: vscode.ExtensionContext, overrides: Parti
       return undefined;
     }
   };
-  return { run, checkLight, installPackage: async (name, root) => { try { await run(root, undefined, validateRequestedPackage(name)); }
+  return { run, checkLight, installPackage: async (name, root) => { try { await run(root, undefined, {}, validateRequestedPackage(name)); }
     catch (error) { await vscode.window.showErrorMessage(error instanceof Error ? error.message : String(error)); } } };
 }

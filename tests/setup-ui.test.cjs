@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const Module = require('node:module');
 
 function fixture() {
+  const pythonSetups = [];
   const listeners = new Set(), endings = new Set(), executions = [], commands = new Map(), contexts = [];
   const disposable = set => listener => { set.add(listener); return { dispose: () => set.delete(listener) }; };
   const vscode = {
@@ -23,11 +24,11 @@ function fixture() {
     },
   };
   const original = Module._load;
-  Module._load = function(request, ...rest) { if (request === 'vscode') return vscode; return original.call(this, request, ...rest); };
+  Module._load = function(request, ...rest) { if (request === './python-setup') return { setupPythonEnvironment: async options => { pythonSetups.push(options); return { success: true, log: 'Verified fixture environment' }; } }; if (request === 'vscode') return vscode; return original.call(this, request, ...rest); };
   let api;
   try { delete require.cache[require.resolve('../out/setup-ui')]; api = require('../out/setup-ui'); } finally { Module._load = original; }
   const end = (exitCode, execution = executions.at(-1)) => { for (const listener of listeners) listener({ execution, exitCode }); };
-  return { api, vscode, executions, commands, end, listeners, endings, contexts };
+  return { api, vscode, executions, commands, end, listeners, endings, contexts, pythonSetups };
 }
 const plan = { id: 'install', title: 'Install one tool', steps: [{ id: 'pandoc', label: 'Install Pandoc',
   command: '/path with spaces/brew', args: ['install', 'pandoc'], cwd: '/project with spaces', verificationIds: ['tool:pandoc'] }] };
@@ -159,4 +160,30 @@ test('untrusted UI setup cannot start probes, installation or scaffold work', as
   });
   assert.equal(await ui.run('/tmp/isolated-project'), undefined);
   assert.equal(probes, 0); assert.equal(h.executions.length, 0);
+});
+
+
+for (const choice of ['Create .venv', 'Skip Python']) test(`verified setup offers a project .venv: ${choice}`, async () => {
+  const h = fixture(), prompts = [];
+  h.vscode.window.showInformationMessage = async (message, ...choices) => {
+    prompts.push({ message, choices });
+    return choices.includes(choice) ? choice : undefined;
+  };
+  const ui = h.api.createSetupUI({ extensionPath: '/tmp/isolated-extension', globalStorageUri: { fsPath: '/tmp/isolated-state' } }, {
+    store: { load: async () => undefined, save: async () => {} },
+    doctor: async () => ({ mode: 'full', ready: true, status: 'ok', fingerprint: 'fixture', checks: [{ id: 'tool:pandoc', required: true, status: 'ok', message: 'Present' }] }),
+    plan: () => ({ id: 'none', title: 'Ready', steps: [] }),
+    readiness: async () => ({ ready: true }), smoke: async () => ({ success: true, verified: true }),
+  });
+  const state = await ui.run('/tmp/inkwell-python-prompt-fixture');
+  assert.equal(state.status, 'complete');
+  assert.equal(prompts.filter(p => p.choices.includes('Create .venv')).length, 1);
+  assert.equal(h.pythonSetups.length, choice === 'Create .venv' ? 1 : 0);
+  if (h.pythonSetups.length) {
+    assert.equal(h.pythonSetups[0].projectDir, '/tmp/inkwell-python-prompt-fixture');
+    assert.equal(h.pythonSetups[0].environmentDir, '.venv');
+  }
+  prompts.length = 0;
+  await ui.run('/tmp/inkwell-python-prompt-fixture', undefined, { offerPython: false });
+  assert.equal(prompts.filter(p => p.choices.includes('Create .venv')).length, 0);
 });

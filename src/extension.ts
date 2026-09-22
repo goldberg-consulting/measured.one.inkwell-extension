@@ -15,6 +15,8 @@ import { setupWorkspace, initProject } from "./scaffold";
 import * as path from "path";
 import * as fs from "fs";
 import * as crypto from "crypto";
+import { planFrontmatterSettingsEdit } from "./document-style";
+import { containedRunPath } from "./run-paths";
 import { setupPythonEnvironment } from "./python-setup";
 import { getInkwellOutputChannel } from "./inkwell-output";
 import { ProjectReadinessGate } from "./project-readiness-ui";
@@ -195,11 +197,11 @@ export function activate(context: vscode.ExtensionContext) {
     }),
 
     vscode.commands.registerCommand("inkwell.initProject", async () => {
-      await initProject(async (root, template) => ({ ready: (await setup.run(root, template))?.status === "complete" }));
+      await initProject(async (root, template) => ({ ready: (await setup.run(root, template, { offerPython: false }))?.status === "complete" }));
     }),
 
     vscode.commands.registerCommand("inkwell.setupWorkspace", async () => {
-      await setupWorkspace(async (root, template) => ({ ready: (await setup.run(root, template))?.status === "complete" }));
+      await setupWorkspace(async (root, template) => ({ ready: (await setup.run(root, template, { offerPython: false }))?.status === "complete" }));
     }),
 
     vscode.workspace.onDidSaveTextDocument(async (document) => {
@@ -349,7 +351,7 @@ async function runCodeBlocksWithProgress(
       if (p.interpreter && p.status === "running") {
         previewProvider.sendLogEntry("info", `Block ${p.index + 1}: using ${p.interpreter}`, undefined, previewRequest);
       }
-    }, selectedIndices);
+    }, selectedIndices, { force: prepared.mode !== "changed" });
   } catch (err) {
     threw = true;
     previewProvider.sendLogEntry("error", "Run failed unexpectedly", String(err), previewRequest);
@@ -379,7 +381,13 @@ async function runCodeBlocksWithProgress(
       previewProvider.sendRunComplete("done", ran, cached.length, 0, 0, previewRequest);
     }
 
+    // Explicit invalidation also covers delayed/coalesced filesystem events.
+    compileInputs.invalidate();
     await previewProvider.notifyBlocksRan(snapshot, previewRequest);
+    if (!threw && !cancel.cancelled && !failed.length && document.version === sourceVersion
+        && vscode.workspace.getConfiguration("inkwell").get<string>("autoCompile") === "onSave") {
+      await runCompile(document, false);
+    }
   }
 }
 
@@ -389,7 +397,8 @@ async function setupPythonEnv(document: vscode.TextDocument): Promise<void> {
   const projectRoot = getInkwellProjectRoot(document.uri.fsPath);
 
   const envOptions = [
-    { label: "./venv", detail: "Create venv in document directory" },
+    { label: "./.venv", detail: "Recommended: create .venv in the project root" },
+    { label: "./venv", detail: "Use the legacy venv directory" },
     { label: "./.inkwell/venv", detail: "Create venv under project .inkwell/ (workspace root)" },
     { label: "Custom path...", detail: "Specify a custom venv location" },
   ];
@@ -403,7 +412,7 @@ async function setupPythonEnv(document: vscode.TextDocument): Promise<void> {
   if (pick.label === "Custom path...") {
     const input = await vscode.window.showInputBox({
       prompt: "Path for the virtual environment (relative to document or absolute)",
-      value: "./venv",
+      value: "./.venv",
     });
     if (!input) return;
     envPath = input;
@@ -416,12 +425,15 @@ async function setupPythonEnv(document: vscode.TextDocument): Promise<void> {
     resolved = envPath;
   } else {
     const rel = envPath.replace(/\\/g, "/").replace(/^\.\//, "");
-    if (rel.startsWith(".inkwell/")) {
+    if (rel === ".venv" || rel.startsWith(".inkwell/")) {
       resolved = path.normalize(path.join(projectRoot, rel));
     } else {
       resolved = path.resolve(docDir, envPath);
     }
   }
+
+  try { containedRunPath(projectRoot, resolved, true); }
+  catch { await vscode.window.showErrorMessage("Choose a Python environment inside this project so its code blocks can use it."); return; }
 
   const reqFile = [path.join(docDir, "requirements.txt"), path.join(projectRoot, "requirements.txt")].find((p) =>
     fs.existsSync(p)
@@ -434,6 +446,7 @@ async function setupPythonEnv(document: vscode.TextDocument): Promise<void> {
     });
     packages = input?.trim().split(/\s+/).filter(Boolean) || [];
   }
+  if (!vscode.workspace.isTrusted) return;
   const cancellation = new RunCancellation();
   const result = await vscode.window.withProgress({
     location: vscode.ProgressLocation.Notification,
@@ -451,6 +464,15 @@ async function setupPythonEnv(document: vscode.TextDocument): Promise<void> {
   const output = getInkwellOutputChannel();
   output.appendLine(result.log);
   if (result.success) {
+    const editor = await vscode.window.showTextDocument(document, { preserveFocus: true });
+    const edit = planFrontmatterSettingsEdit(document.getText(), [
+      { key: "runs.pythonEnv", value: "./" + path.relative(projectRoot, resolved).split(path.sep).join("/") },
+    ], document.uri.fsPath);
+    if (!await editor.edit(builder => builder.replace(new vscode.Range(document.positionAt(edit.start), document.positionAt(edit.end)), edit.replacement))) {
+      await vscode.window.showWarningMessage("Python is ready, but the document changed before its environment setting could be updated. Run Setup Python Env again to select it.");
+      return;
+    }
+    compileInputs.invalidate();
     await vscode.window.showInformationMessage(`Inkwell: Python ${result.pythonVersion} environment verified at ${resolved}.`);
   } else {
     output.show(true);

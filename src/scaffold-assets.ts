@@ -181,6 +181,15 @@ export const SCAFFOLD_SEED_FILES: Readonly<Record<string, string>> = {
 };
 
 export const TEMPLATE_FRONTMATTER: Record<string, string> = {
+  "measured-report": `template: measured-report
+documentclass: report
+top-level-division: chapter
+papersize: letter
+numbersections: true
+toc: true
+client: "Client name"
+subtitle: "Research and advisory"
+`,
   ludus: `template: ludus
 classoption:
   - red                               # theme: red, blue, green, orange
