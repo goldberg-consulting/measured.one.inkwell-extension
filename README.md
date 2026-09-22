@@ -1,236 +1,85 @@
 # Inkwell
 
-![Inkwell — Write. Run. Publish.](media/hero-banner.png)
+**Write Markdown. Run your analysis. Publish a polished PDF.**
 
-**Write Markdown in Cursor or VS Code. Turn it into a polished PDF.**
-
-Inkwell puts a live preview, runnable analysis, citations, and LaTeX templates
-beside your document. Write a simple report or a journal article; add Python, R,
-shell, or JavaScript when you need figures and results.
-
-[Install](#install) · [Your first PDF](#your-first-pdf) · [Controls](#everyday-controls) · [Examples](docs/examples.md) · [Syntax guide](guide.md)
-
-> **Version 0.5.1:** Download the VSIX from [GitHub Releases](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.5.1) and use **Extensions: Install from VSIX…** in Cursor or VS Code, then reload the window. The Homebrew cask still points to 0.4.0 until its checksum is updated.
+Inkwell brings a live split preview, Python and JavaScript figures, citations,
+and publication templates to Cursor and VS Code.
 
 ## Install
 
-### macOS: latest published release
+1. Download [Inkwell 0.5.2 for Cursor and VS Code](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.5.2).
+2. Open the Command Palette (**Cmd+Shift+P** on macOS) and choose
+   **Extensions: Install from VSIX…**. Select the downloaded file.
+3. Run **Developer: Reload Window**, then **Inkwell: Setup / Repair**.
+   Setup checks your PDF tools and offers a project Python environment.
 
-Install [Cursor](https://cursor.com) or [VS Code](https://code.visualstudio.com)
-and [Homebrew](https://brew.sh), then run:
+Already installed? Start with **Inkwell: New Project**, or open an existing
+Markdown document and choose **Inkwell: Open Preview**.
 
-```bash
-brew install --cask goldberg-consulting/inkwell/inkwell
+The Homebrew cask currently serves the older 0.4.0 release. Use the VSIX above
+for this update. See [installation and troubleshooting](docs/installation.md)
+for tool requirements and other platforms.
+
+## Try the measured.one report
+
+A complete Goldberg Consulting example with a US Letter layout, original
+vector cover, numbered chapters, and lettered appendices. Its synthetic data
+feeds two Python scripts and two Observable Plot scripts in one document.
+
+[View the 10-page PDF](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/download/v0.5.1/measured-one-report.pdf) ·
+[Download the starter project](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/download/v0.5.1/measured-one-starter.zip) ·
+[Read the Markdown source](examples/demo-measured-report.md)
+
+<a href="https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/download/v0.5.1/measured-one-report.pdf"><img src="media/examples/demo-measured-report.png" alt="Cover of Evidence into action, the measured.one consulting report" width="340"></a>
+
+Unzip the starter and open its folder in Cursor. Open `report.md`, then run
+**Inkwell: Setup Python Env** and choose **./.venv**. With Node.js installed,
+install the example's JavaScript dependencies once in the project terminal:
+
+```sh
+npm ci --prefix .inkwell/scripts/mixed-report
 ```
 
-The current cask installs **0.4.0** and its PDF tools, including MacTeX. This is a
-large first download. Reload your editor afterward: open the Command Palette
-with **Cmd+Shift+P**, then choose **Developer: Reload Window**.
+Press **Cmd+Shift+V** to open the split preview. Click **Run**, then **Compile**,
+and open the **PDF** tab. You can also choose **measured.one Report (US Letter)**
+when creating a new project.
 
-If Inkwell does not appear, use **Extensions: Install from VSIX...** in the
-Command Palette. The current cask keeps its file at
-`$(brew --prefix)/share/inkwell/inkwell-0.4.0.vsix` — usually
-`/opt/homebrew/share/inkwell/inkwell-0.4.0.vsix` on Apple Silicon or
-`/usr/local/share/inkwell/inkwell-0.4.0.vsix` on Intel. You can also download the
-extension directly from [Releases](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases).
+The “Signal field” cover is original vector artwork supplied under the
+[Inkwell Source License](LICENSE). See [design and artwork provenance](templates/measured-report/LICENSE.md)
+for terms and the design reference. No third-party cover photograph is included.
 
-<details>
-<summary><strong>Try 0.5 now: build and install from source</strong></summary>
+## Write, run, compile
 
-With Git, Node.js, and npm installed:
+- **Open split preview:** Cmd+Shift+V on macOS; Ctrl+Shift+V on Linux.
+- **Run document code:** click **Run**, or Cmd+Option+R on macOS.
+- **Compile the PDF:** click **Compile**, or Cmd+Shift+R on macOS.
+- **Inspect the result:** choose **PDF** for the compiled file or **Log** for errors.
 
-```bash
-git clone https://github.com/goldberg-consulting/measured.one.inkwell-extension.git
-cd measured.one.inkwell-extension
-npm ci
-npm run verify
-npm run package:vsix
-node scripts/verify-vsix.mjs inkwell-0.5.1.vsix --tag v0.5.1
-```
+Save edits to Python, JavaScript, and data files before running. **Run** executes
+again; **Run Changed Blocks** reuses verified results. **Compile** uses the
+completed results and saves a PDF beside your Markdown file.
 
-In your editor, choose **Extensions: Install from VSIX...**, select
-`inkwell-0.5.1.vsix`, and reload the window. Then run **Inkwell: Setup / Repair**.
-It checks your tools, offers any needed repairs, prepares the project, and
-verifies setup by building a real PDF. On macOS, it can reuse a working TeX
-installation or install missing tools after you approve the plan.
+![Inkwell split-preview controls and runnable document content](media/run-preview.jpg)
 
-</details>
+For Python, **Inkwell: Setup Python Env** creates the environment, installs your
+`requirements.txt`, and updates the current document's environment setting.
+New examples use `./.venv`; older documents may explicitly select `./venv`.
 
-**Linux:** install the VSIX and provide Pandoc 3+, a compatible pandoc-crossref,
-TeX Live, and Mermaid CLI using your platform's package managers. In 0.5,
-**Setup / Repair** checks these tools and prepares the project; automatic system
-installation is currently macOS-only.
+Notifications about proposed template or example updates are optional while
+writing. Closing or muting them does not block preview, Run, or Compile. Your
+edited files remain in place; **Inkwell: Setup Workspace** lets you review updates.
 
-For upgrades, existing TeX installations, editor selection, and troubleshooting,
-see the [installation guide](docs/installation.md).
-
-## Your first PDF
-
-These steps use **0.5**. Open the Command Palette with **Cmd+Shift+P** on macOS
-or **Ctrl+Shift+P** on Linux, then type **Inkwell** to find its commands.
-
-1. Choose **Inkwell: New Project**. Pick a folder, name your document, and select
-   **Inkwell Default** for a straightforward report.
-2. Follow the setup prompts. Choose the Python environment option to run the
-   starter's analysis examples; Python is optional for ordinary writing.
-3. Edit the `.md` file that opens. Choose **Inkwell: Open Preview** to see it
-   beside your source.
-4. If your document has runnable code, click **Run** and wait for it to finish.
-5. Click **Compile**, then open the **PDF** tab. Your PDF is saved beside the
-   source: `my-report.md` becomes `my-report.pdf`.
-
-**Already have a Markdown project?** Open its folder, run **Inkwell: Setup /
-Repair**, then open your document and its preview. Setup preserves your edited
-files and offers comparisons when bundled starter files have changed.
-
-![Inkwell Draft preview with live document content and Run controls](media/run-preview.jpg)
-
-*0.5 preview closeup. Write and inspect results in Draft; Compile updates the PDF.*
-
-## Everyday controls
-
-Keep your Markdown editor focused when using these shortcuts. On macOS,
-**Option** is the **Alt** key.
-
-| Do this | Toolbar or command | macOS | Linux |
-| --- | --- | --- | --- |
-| Open the preview | **Inkwell: Open Preview** | Cmd+Shift+V | Ctrl+Shift+V |
-| Execute document code | **Run** / **Inkwell: Run Code Blocks** | Cmd+Option+R | Ctrl+Alt+R |
-| Build or refresh the PDF | **Compile** / **Inkwell: Compile PDF** | Cmd+Shift+R | Ctrl+Shift+R |
-| Stop a running analysis | **Cancel** in the Run panel | — | — |
-| Save a PDF somewhere else | **Inkwell: Export PDF to File...** | — | — |
-
-**Run and Compile are separate steps.** After changing analysis code, run it
-again, then compile to put the new results in your PDF. Export also recompiles
-the document at the location you choose.
-
-The preview's **Print** button currently rebuilds the PDF. To print on paper,
-open the saved PDF in a PDF viewer and use its Print command.
-
-### Choose what you see
-
-- **Draft** updates as you type. Use it for writing, math, citations, and results.
-- **Print View** approximates the printed page layout while you work.
-- **PDF** shows the actual compiled file. Use this to check final page breaks,
-  fonts, figures, and references.
-- **Log** shows run and compilation messages when something needs attention.
-
-For a `.tex` document, the first tab is **Source** instead of Draft.
-
-![Inkwell PDF tab showing the compiled report and PDF viewing controls](media/compile-preview.jpg)
-
-*The PDF tab shows the actual compiled report. [Image sources](media/README.md).*
-
-### Change reading size or document style
-
-**Just make it easier to read:** use **A−**, **A+**, and **Reset** in Draft or
-Print View. In PDF, use **Fit width**, **Fit page**, or **Custom zoom**. These
-viewing controls are remembered and leave the exported document unchanged.
-
-**Change the exported document:** run **Inkwell: Configure Document Style**.
-Choose **This document** or **Project defaults**, then adjust a supported font,
-size, or spacing option. Save the document and compile again. A lock means the
-selected template controls that setting. [More about style](docs/style.md).
-
-**Change the layout:** run **Inkwell: Select LaTeX Template** to set the project
-template. A document's `template:` frontmatter takes precedence. Browse the
-[ten built-in templates and custom-template guide](docs/templates.md).
-
-**Compile automatically:** open editor Settings, search for
-`inkwell.autoCompile`, and choose `onSave` or `interval`. The default is `off`;
-the interval defaults to 60 seconds. Automatic compilation does not run your
-analysis code.
-
-## Start with a small document
-
-Save this as `my-report.md` in your prepared project, open Preview, and Compile:
-
-```markdown
----
-title: My first report
-author: Your name
-template: default
----
-
-# Findings
-
-Write in **Markdown**, including lists, links, and math: $E = mc^2$.
-
-## Next steps
-
-- Add a figure or table.
-- Compile and check the PDF.
-```
-
-### Add analysis when you need it
-
-For executable code, use braces around the language name. For example, after
-**Inkwell: Setup Python Environment (venv)**:
-
-````markdown
-```{python id="summary" display="both"}
-values = [12, 18, 24]
-print(f"Mean: {sum(values) / len(values):.1f}")
-```
-````
-
-Click **Run**, then **Compile**. `display="both"` includes the code and its
-output; use `output`, `code`, or `none` for other display choices.
-
-For longer analyses, use **Extract Code Block to Script** to move code into an
-editable file under `.inkwell/scripts/`. Generated results and run history live
-under `.inkwell/runs/`. Declare data files with `inputs=` so changes invalidate
-cached results. See [editable scripts and run controls](docs/run-files.md).
-
-### Add references
-
-Use **Inkwell: Configure Bibliography** to select your `.bib` files and citation
-style. Type `@` in the document for citation suggestions. Use **Inkwell:
-Bibliography Doctor** to diagnose missing files or duplicate keys.
-[Citations and cross-references](docs/references.md) explains the details.
-
-## When something needs attention
-
-- **A tool is missing or setup was interrupted:** run **Inkwell: Setup / Repair**.
-- **The PDF looks old:** wait for Run to finish, then Compile. Check the PDF tab.
-- **A run or compile failed:** open **Log**. For detailed compiler output, open
-  the editor's **Output** panel and select **Inkwell LaTeX**.
-- **Your font or layout change has no effect:** check for document frontmatter
-  overriding project defaults, or a template lock in **Configure Document Style**.
-
-## Go further
+## More examples and help
 
 - [Example gallery](docs/examples.md) — papers, reports, books, letters, and CVs.
-- [Syntax guide](guide.md) — frontmatter, code, figures, math, and diagrams.
-- [Configuration](docs/configuration.md) — document settings, project defaults, and upgrades.
-- [Tables](docs/tables.md) · [References](docs/references.md) · [Preview behavior](docs/preview-and-performance.md).
-- [Releases](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases) · [Report an issue](https://github.com/goldberg-consulting/measured.one.inkwell-extension/issues).
+- [Templates](docs/templates.md) — choose and customize your document layout.
+- [Syntax guide](guide.md) — code, figures, tables, math, and diagrams.
+- [Editable scripts and run controls](docs/run-files.md).
+- [Citations and references](docs/references.md).
+- [Configuration](docs/configuration.md) and [document style](docs/style.md).
+- [Report a problem](https://github.com/goldberg-consulting/measured.one.inkwell-extension/issues).
 
-Contributing? Run `npm run verify` before opening a PR. To build a distributable
-extension, use `npm run package:vsix`; see [release verification](docs/release.md).
+Contributing? Run `npm run verify`, then `npm run package:vsix` to build the
+extension. See [release verification](docs/release.md).
 
-[License](LICENSE)
-
-
-### measured.one consulting report
-
-Choose **measured.one Report (US Letter)** when creating a project, or open the
-bundled `demo-measured-report.md` example after Setup Workspace. It includes a
-Goldberg Consulting cover with original commercially usable vector artwork,
-numbered chapters, and lettered appendix chapters. The template is original;
-Daan Zwaneveld’s noncommercial TU Delft template and photograph are not included.
-
-The starter combines two Python files and two Observable Plot JavaScript files.
-Setup / Repair offers a project `.venv`; Python uses it automatically unless the
-document specifies another environment. Setup Python Env also updates the current
-document’s environment setting. Install the example’s pinned JavaScript packages
-once with `npm ci --prefix .inkwell/scripts/mixed-report`, then run its code blocks
-and compile the PDF. Node.js is required for Observable Plot. Setup installs no
-JavaScript packages automatically.
-
-**Run Code Blocks** and **Run This Block** explicitly execute again (including
-required upstream blocks). **Run Changed Blocks** reuses verified current results.
-Save script and data edits before running, and declare imported helpers/data with
-`inputs` so their content participates in cache checks. PDF compilation consumes
-verified results without executing code; when auto-compile is set to On Save,
-a completed run also requests an updated PDF.
+[License](LICENSE) · [Image sources](media/README.md)

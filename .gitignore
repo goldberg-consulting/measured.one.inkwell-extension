@@ -36,3 +36,14 @@ venv/
 # Rebuilt deterministically from pinned preview dependencies
 media/preview-client.js
 media/vendor/
+
+# Client deliverables stay in separate workspaces, never in commits or releases.
+**/*proposal*.md
+**/*proposal*.pdf
+**/*proposal*.docx
+**/*qualifications*.md
+**/*qualifications*.pdf
+**/*qualifications*.docx
+**/private/**
+**/confidential/**
+**/client-documents/**

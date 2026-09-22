@@ -49,7 +49,7 @@ inkwell:
   # code-font-size: small             # tiny, scriptsize, footnotesize, small, normalsize
   # tables: booktabs                  # booktabs, grid, plain
   # table-font-size: small
-  python-env: ./venv
+  python-env: ./.venv
 ---
 
 # Data-Ink and Visual Evidence {#sec:data-ink}

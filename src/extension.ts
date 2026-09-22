@@ -9,7 +9,7 @@ import { InkwellDiagnostics } from "./diagnostics";
 import { selectTemplateCommand } from "./templates";
 import { findInkwellRoot, getInkwellOutputsDir, getInkwellProjectRoot, saveManifestField } from "./config";
 import { checkToolchain, installLatexPackage, showToolchainStatus, setExtensionPath, setToolchainActions } from "./toolchain";
-import { runAllBlocks, parseCodeBlocks, RunCancellation } from "./runner";
+import { runAllBlocks, parseCodeBlocks, parseRunConfig, RunCancellation } from "./runner";
 import { clearCache } from "./cache";
 import { setupWorkspace, initProject } from "./scaffold";
 import * as path from "path";
@@ -402,6 +402,12 @@ async function setupPythonEnv(document: vscode.TextDocument): Promise<void> {
     { label: "./.inkwell/venv", detail: "Create venv under project .inkwell/ (workspace root)" },
     { label: "Custom path...", detail: "Specify a custom venv location" },
   ];
+  const configuredEnv = parseRunConfig(document.getText(), document.uri.fsPath).pythonEnv;
+  if (configuredEnv) {
+    const existing = envOptions.findIndex(option => option.label === configuredEnv);
+    if (existing >= 0) envOptions.splice(existing, 1);
+    envOptions.unshift({ label: configuredEnv, detail: "Currently selected by this document: create or repair this environment" });
+  }
 
   const pick = await vscode.window.showQuickPick(envOptions, {
     placeHolder: "Where should the Python virtual environment be created?",
@@ -411,7 +417,7 @@ async function setupPythonEnv(document: vscode.TextDocument): Promise<void> {
   let envPath: string;
   if (pick.label === "Custom path...") {
     const input = await vscode.window.showInputBox({
-      prompt: "Path for the virtual environment (relative to document or absolute)",
+      prompt: "Path for the virtual environment (relative to project root or absolute)",
       value: "./.venv",
     });
     if (!input) return;
@@ -424,12 +430,7 @@ async function setupPythonEnv(document: vscode.TextDocument): Promise<void> {
   if (path.isAbsolute(envPath)) {
     resolved = envPath;
   } else {
-    const rel = envPath.replace(/\\/g, "/").replace(/^\.\//, "");
-    if (rel === ".venv" || rel.startsWith(".inkwell/")) {
-      resolved = path.normalize(path.join(projectRoot, rel));
-    } else {
-      resolved = path.resolve(docDir, envPath);
-    }
+    resolved = path.resolve(projectRoot, envPath);
   }
 
   try { containedRunPath(projectRoot, resolved, true); }

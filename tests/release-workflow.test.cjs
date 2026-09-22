@@ -39,7 +39,7 @@ test('read-only release preflight works before build dependencies are installed'
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'inkwell-preflight-without-dependencies-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   fs.mkdirSync(path.join(root, 'scripts'));
-  for (const name of ['release-contract.mjs', 'verify-vsix.mjs', 'build-asset-manifest.mjs', 'build-preview-assets.mjs']) {
+  for (const name of ['release-contract.mjs', 'verify-vsix.mjs', 'build-asset-manifest.mjs', 'build-preview-assets.mjs', 'private-documents.mjs']) {
     fs.copyFileSync(path.join(repo, 'scripts', name), path.join(root, 'scripts', name));
   }
   fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'inkwell', publisher: 'measure-one', version: '0.5.0' }));

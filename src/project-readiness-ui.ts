@@ -20,9 +20,12 @@ export function readinessRoot(sourceFile: string, workspaceRoot?: string): strin
 
 export async function ensureProjectReadyWithUI(
   options: ProjectReadinessOptions,
-  ui: { allowPrompt?: boolean; onSuppressed?: () => PromiseLike<void> } = {},
+  ui: { allowPrompt?: boolean; onSuppressed?: () => PromiseLike<void>; useExistingFiles?: boolean } = {},
 ): Promise<ProjectReadiness> {
   let result = await ensureProjectReady(options);
+  // Reviewing bundled updates is separate from using the preserved project.
+  // Never await an optional notification on the preview/run/compile path.
+  if (result.status === "conflicts" && ui.useExistingFiles) return result;
   if (result.ready || result.status === "suppressed" || ui.allowPrompt === false) return result;
   if (result.status === "setup-required") {
     const choice = await vscode.window.showInformationMessage(
@@ -66,6 +69,7 @@ export async function ensureProjectReadyWithUI(
 /** Share a pending prompt/migration across commands in the same workspace. */
 export class ProjectReadinessGate {
   private readonly pending = new Map<string, Promise<boolean>>();
+  private readonly updatesNotified = new Set<string>();
   constructor(private readonly context: vscode.ExtensionContext) {}
 
   async ensure(document: vscode.TextDocument, allowPrompt = true): Promise<boolean> {
@@ -81,9 +85,20 @@ export class ProjectReadinessGate {
       const result = await ensureProjectReadyWithUI({
         root, trusted: vscode.workspace.isTrusted, assetRoot: this.context.extensionPath,
         dontAskHere: this.context.workspaceState.get<boolean>(key, false),
-      }, { allowPrompt, onSuppressed: () => this.context.workspaceState.update(key, true) });
-      if (result.ready) await vscode.commands.executeCommand("setContext", "inkwell.hasProject", true);
-      return result.ready;
+      }, { allowPrompt, useExistingFiles: true, onSuppressed: () => this.context.workspaceState.update(key, true) });
+      const canUseExistingFiles = result.status === "conflicts" && !result.diagnostics.some(d => d.severity === "error");
+      if (canUseExistingFiles && allowPrompt && !this.updatesNotified.has(root)) {
+        this.updatesNotified.add(root);
+        getInkwellOutputChannel().appendLine("Project updates are available. Preview, runs and compilation will use your preserved files. Run Inkwell: Setup Workspace to review updates.");
+        void Promise.resolve(vscode.window.showInformationMessage(
+          "Your edited project files are preserved and ready to use. Optional Inkwell updates are available.", "Review updates",
+        )).then(choice => {
+          if (choice === "Review updates") return vscode.commands.executeCommand("inkwell.setupWorkspace");
+        }).catch(error => getInkwellOutputChannel().appendLine(`Could not open project updates: ${String(error)}`));
+      }
+      const ready = result.ready || canUseExistingFiles;
+      if (ready) await vscode.commands.executeCommand("setContext", "inkwell.hasProject", true);
+      return ready;
     })();
     this.pending.set(root, work);
     try { return await work; } finally { if (this.pending.get(root) === work) this.pending.delete(root); }

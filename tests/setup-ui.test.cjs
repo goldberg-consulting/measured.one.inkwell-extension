@@ -187,3 +187,21 @@ for (const choice of ['Create .venv', 'Skip Python']) test(`verified setup offer
   await ui.run('/tmp/inkwell-python-prompt-fixture', undefined, { offerPython: false });
   assert.equal(prompts.filter(p => p.choices.includes('Create .venv')).length, 0);
 });
+
+test('preserved project files get short review actions instead of file paths in notification buttons', async () => {
+  const h = fixture();
+  const notices = [], errors = [];
+  h.vscode.window.showWarningMessage = async (...args) => { notices.push(args); };
+  h.vscode.window.showErrorMessage = async (...args) => { errors.push(args); };
+  const ui = h.api.createSetupUI({ extensionPath: '/tmp/isolated-extension', globalStorageUri: { fsPath: '/tmp/isolated-state' } }, {
+    store: { load: async () => undefined, save: async () => {} },
+    doctor: async () => ({ mode: 'full', ready: true, status: 'ok', fingerprint: 'fixture', checks: [] }),
+    plan: () => ({ id: 'none', title: 'Ready', steps: [] }),
+    readiness: async () => ({ ready: false, actions: [{ id: 'compare', label: 'Preserved .inkwell/examples/demo-python-report.md; compare the proposed replacement before continuing.', path: '/project/.inkwell/examples/demo-python-report.md', proposedPath: '/project/proposal.md' }] }),
+    smoke: async () => { throw new Error('unresolved setup must not claim smoke verification'); },
+  });
+  await ui.run('/project', undefined, { offerPython: false });
+  assert.equal(errors.length, 0);
+  assert.match(notices.at(-1)[0], /updates await review/);
+  assert.deepEqual(notices.at(-1).slice(1), ['Keep my files', 'Review files', 'Show diagnostics']);
+});

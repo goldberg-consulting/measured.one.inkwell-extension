@@ -128,9 +128,21 @@ test('project .venv is selected by default while explicit environments retain pr
   const auto = resolveInterpreter('python', undefined, {}, root, root);
   assert.equal(auto.cmd, path.join(bin, 'python3'));
   assert.equal(auto.envVars.VIRTUAL_ENV, path.join(root, '.venv'));
-  assert.equal(resolveInterpreter('python', undefined, { pythonEnv: 'custom' }, root, root).cmd, 'python3');
+  assert.throws(() => resolveInterpreter('python', undefined, { pythonEnv: 'custom' }, root, root), /Python environment "custom" was not found/);
   const windows = path.join(root, 'windows', 'Scripts');
   fs.mkdirSync(windows, { recursive: true });
   fs.writeFileSync(path.join(windows, 'python.exe'), 'fixture');
   assert.equal(venvPythonBin(path.dirname(windows)), path.join(windows, 'python.exe'));
+});
+
+test('missing or broken explicit Python environments never execute system Python', async t => {
+  const { root, source } = fixture(t);
+  fs.writeFileSync(path.join(root, 'requirements.txt'), 'numpy\n');
+  const [missing] = await runAllBlocks(fence('python', 'missing', 'print("should not run")', 'env="./venv"'), source);
+  assert.notEqual(missing.exitCode, 0);
+  assert.equal(missing.stdout, '');
+  assert.match(missing.stderr, /Setup Python Env.*requirements.txt/);
+  assert.doesNotMatch(missing.stderr, /Traceback|Using system/);
+  fs.mkdirSync(path.join(root, 'venv'));
+  assert.throws(() => resolveInterpreter('python', './venv', {}, root, root), /has no Python interpreter/);
 });

@@ -10,7 +10,7 @@ function fixture(t, probe, choices = []) {
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const calls = [], prompts = [], commands = [], state = new Map();
   const uri = file => ({ fsPath: file, scheme: 'file', toString: () => `file://${file}` });
-  const ask = async message => { prompts.push(message); return choices.shift(); };
+  const ask = async message => { prompts.push(message); const choice = choices.shift(); return typeof choice === 'function' ? choice() : choice; };
   const vscode = {
     Uri: { file: uri },
     workspace: { isTrusted: true, getWorkspaceFolder: () => ({ uri: uri(root) }) },
@@ -75,17 +75,39 @@ test('simultaneous preview and compile share a readiness prompt and migration', 
 
 test('Keep my files explicitly resolves managed conflicts and still verifies success', async t => {
   const h = fixture(t, options => result(options.resolveConflicts ? 'ready' : 'conflicts'), ['Keep my files']);
-  assert.equal(await h.gate.ensure(h.document), true);
+  const ready = await h.api.ensureProjectReadyWithUI({ root: h.root, trusted: true, explicitSetup: true });
+  assert.equal(ready.ready, true);
   assert.equal(h.calls[1].resolveConflicts, 'keep-user-files');
 });
 
 test('Compare opens the exact proposed file and leaves readiness unresolved', async t => {
   const h = fixture(t, () => ({ ...result('conflicts'), actions: [{ id: 'compare', path: '/tmp/user-guide.md', proposedPath: '/tmp/user-guide.md.new' }] }), ['Compare files']);
-  assert.equal(await h.gate.ensure(h.document), false);
+  const ready = await h.api.ensureProjectReadyWithUI({ root: h.root, trusted: true, explicitSetup: true });
+  assert.equal(ready.ready, false);
   assert.equal(h.commands[0][0], 'vscode.diff');
   assert.equal(h.commands[0][1].fsPath, '/tmp/user-guide.md');
   assert.equal(h.commands[0][2].fsPath, '/tmp/user-guide.md.new');
   assert.equal(h.calls.length, 1);
+});
+
+test('dismissed update notices do not block current or later authoring commands', async t => {
+  const h = fixture(t, () => result('conflicts'));
+  assert.equal(await h.gate.ensure(h.document), true);
+  assert.equal(await h.gate.ensure(h.document), true);
+  assert.equal(h.prompts.length, 1);
+  assert.equal(h.calls.some(call => call.resolveConflicts), false);
+});
+
+test('muted notifications that never resolve cannot hold compilation readiness open', async t => {
+  const h = fixture(t, () => result('conflicts'), [() => new Promise(() => {})]);
+  const ready = await Promise.race([h.gate.ensure(h.document), new Promise(resolve => setImmediate(() => resolve('blocked')))]);
+  assert.equal(ready, true);
+  assert.equal(await h.gate.ensure(h.document, false), true);
+});
+
+test('actual project errors still block authoring', async t => {
+  const h = fixture(t, () => ({ ...result('blocked'), diagnostics: [{ severity: 'error', message: 'Invalid manifest' }] }));
+  assert.equal(await h.gate.ensure(h.document, false), false);
 });
 
 test('unsaved documents never trigger a project probe or write', async t => {

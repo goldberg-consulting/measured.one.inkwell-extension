@@ -3,6 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { readPreviewAssetPaths } from './build-preview-assets.mjs';
+import { isPrivateDocumentPath } from './private-documents.mjs';
 
 export const ASSET_MANIFEST_PATH = 'out/assets-manifest.json';
 export const RUNTIME_TREES = ['templates', 'filters', 'csl', 'media', 'examples'];
@@ -27,7 +28,7 @@ export function isReleaseVersion(value) {
 export function isPrivatePath(value) {
   const normalized = value.toLowerCase();
   const parts = normalized.split('/');
-  return parts.some(part => privateParts.has(part) || /^\.env(?:\.|$)/.test(part))
+  return isPrivateDocumentPath(value) || parts.some(part => privateParts.has(part) || /^\.env(?:\.|$)/.test(part))
     || ['src', 'tests', 'benchmarks'].includes(parts[0])
     || (parts[0] === '.cursor' && normalized !== '.cursor/agents/inkwell-guide.md')
     || /\.(?:pem|key|p12|pfx|vsix)$/i.test(value);

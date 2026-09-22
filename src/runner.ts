@@ -216,8 +216,8 @@ export interface ResolvedInterpreter {
 }
 
 // Resolves the interpreter binary for a given language and optional
-// virtualenv. Falls back to the system interpreter if the env is missing
-// and reports a warning so the user knows what happened.
+// virtualenv. An explicit Python environment must exist: falling back to a
+// different interpreter can run analysis with missing or different packages.
 export function resolveInterpreter(
   langKey: string,
   envPath: string | undefined,
@@ -260,11 +260,7 @@ export function resolveInterpreter(
     if (isPython) {
       const interpreter = venvPythonBin(resolved);
       if (!interpreter) {
-        return {
-          cmd: defaultCmd, args: defaultArgs, envVars: {},
-          label: defaultCmd,
-          warning: `Venv "${envSpec}" exists but has no python3 binary. Using system Python.`,
-        };
+        throw new Error(`Python environment "${envSpec}" has no Python interpreter. Run "Inkwell: Setup Python Env" to repair it, then run the document again.`);
       }
       return {
         cmd: interpreter,
@@ -294,20 +290,17 @@ export function resolveInterpreter(
     return { cmd: resolved, args: defaultArgs, envVars: {}, label: resolved };
   }
 
-  let warning = `Environment "${envSpec}" not found at ${resolved}. Using system ${defaultCmd}. Run "Inkwell: Setup Python Env" to create it.`;
   if (langKey.startsWith("python")) {
     const reqFile = [path.join(docDir, "requirements.txt"), path.join(projectRoot, "requirements.txt")].find((p) =>
       fs.existsSync(p)
     );
-    if (reqFile) {
-      warning += ` Found requirements.txt at ${reqFile}; run setup from this document folder and choose "${envSpec}" to auto-install dependencies.`;
-    }
+    throw new Error(`Python environment "${envSpec}" was not found at ${resolved}. Run "Inkwell: Setup Python Env" and select "${envSpec}" to create it${reqFile ? " and install requirements.txt" : ""}, then run the document again.`);
   }
 
   return {
     cmd: defaultCmd, args: defaultArgs, envVars: {},
     label: defaultCmd,
-    warning,
+    warning: `Environment "${envSpec}" not found at ${resolved}. Using system ${defaultCmd}.`,
   };
 }
 

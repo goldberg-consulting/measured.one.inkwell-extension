@@ -13,7 +13,7 @@ inkwell:
   code-bg: "#f5f5f5"
   code-display: output
   tables: booktabs
-  python-env: ./venv
+  python-env: ./.venv
 ---
 
 # Introduction {#sec:intro}

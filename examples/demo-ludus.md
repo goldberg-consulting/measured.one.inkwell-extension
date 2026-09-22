@@ -72,7 +72,7 @@ inkwell:
   # code-font-size: small
   # tables: booktabs                  # booktabs, grid, plain
   # table-font-size: small
-  python-env: ./venv
+  python-env: ./.venv
 ---
 
 # Introduction {#sec:intro}

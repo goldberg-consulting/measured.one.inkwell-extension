@@ -86,6 +86,8 @@ function zip(entries, { deflated = false, mode = 0o100644 } = {}) {
 test('asset contract is deterministic and inventories recursive runtime assets without private files', t => {
   const f = fixture(t);
   f.write('examples/.inkwell/outputs/private.txt', 'private run data');
+  f.write('examples/client-proposal.md', 'private client deliverable');
+  f.write('examples/expert-qualifications.pdf', 'private qualifications');
   f.write('node_modules/private.js', 'private dependency');
   f.write('.cursor/skills/private/SKILL.md', 'private skill');
   f.write('out/accidental-tsc-output.js', 'not a bundle');

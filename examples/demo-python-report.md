@@ -23,7 +23,7 @@ inkwell:
   code-font-size: small
   code-border: true
   tables: booktabs
-  python-env: ./venv
+  python-env: ./.venv
 ---
 
 # The Run-and-Insert Loop {#sec:loop}

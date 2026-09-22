@@ -174,6 +174,23 @@ export function createSetupUI(context: vscode.ExtensionContext, overrides: Parti
         const choice = await vscode.window.showWarningMessage("Inkwell is ready. Some optional checks need attention; tools, project files and PDF compilation are verified.", "Show diagnostics");
         if (choice === "Show diagnostics") output.show(true);
       } else if (state.status === "complete") await vscode.window.showInformationMessage("Inkwell is ready: tools, project files and PDF compilation are verified.");
+      else if (state.status === "failed" && state.stage === "scaffold-migrate" && state.actions.some(action => action.id === "compare")) {
+        const choice = await vscode.window.showWarningMessage(
+          "Project updates await review. Your edited files are preserved. Review the updates to finish setup.",
+          "Keep my files", "Review files", "Show diagnostics",
+        );
+        if (choice === "Keep my files") {
+          const readiness = await ensureProjectReadyWithUI({ root, template, trusted: vscode.workspace.isTrusted,
+            explicitSetup: true, assetRoot: context.extensionPath, resolveConflicts: "keep-user-files" }, { allowPrompt: false });
+          if (readiness.ready) return await run(root, template, options, requestedPackage);
+          output.show(true);
+        } else if (choice === "Review files") {
+          const selected = await vscode.window.showQuickPick(state.actions.filter(action => action.id === "compare" && action.path && action.proposedPath)
+            .map(action => ({ label: path.basename(action.path!), description: path.relative(root, action.path!), action })),
+          { placeHolder: "Choose a preserved file to compare with its proposed update" });
+          if (selected) await vscode.commands.executeCommand("vscode.diff", vscode.Uri.file(selected.action.path!), vscode.Uri.file(selected.action.proposedPath!), "Your file ↔ proposed Inkwell update");
+        } else if (choice === "Show diagnostics") output.show(true);
+      }
       else {
         output.show(true);
         const labels = [...new Set(state.actions.map(action => action.label)), "Show diagnostics"];

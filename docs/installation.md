@@ -1,13 +1,13 @@
 # Installation and health checks
 
-## 0.5.1 release status
+## 0.5.2 release status
 
-The 0.5.1 VSIX is published on GitHub Releases and can be installed directly in
+The 0.5.2 VSIX is published on GitHub Releases and can be installed directly in
 Cursor or VS Code using **Extensions: Install from VSIX…**, followed by a window
 reload. This release was built and verified locally on macOS, not with GitHub
 Actions. The Homebrew tap has not been updated and may serve 0.4.0. The cask
 instructions below describe the 0.5 installer implementation; they are not a
-claim that a clean-machine Homebrew installation of 0.5.1 has been verified.
+claim that a clean-machine Homebrew installation of 0.5.2 has been verified.
 
 ## One-command macOS installation
 
@@ -34,7 +34,7 @@ Completion requires successful editor version verification, the full health
 report, and an actual Inkwell PDF build. Failed or interrupted work retains
 diagnostics and does not print a successful completion message. The installer
 retains its verification project, PDFs, state, and logs under
-`~/Library/Application Support/Inkwell/verification/0.5.1`.
+`~/Library/Application Support/Inkwell/verification/0.5.2`.
 
 Reload an already-running editor after installation or upgrade. Upgrades use
 `brew upgrade --cask goldberg-consulting/inkwell/inkwell`. If Homebrew asks you to
@@ -68,8 +68,8 @@ To use an existing artifact, supply its absolute path and expected version:
 
 ```bash
 ./scripts/install-inkwell-macos.sh \
-  --vsix=/absolute/path/inkwell-0.5.1.vsix \
-  --version=0.5.1 --editor=cursor
+  --vsix=/absolute/path/inkwell-0.5.2.vsix \
+  --version=0.5.2 --editor=cursor
 ```
 
 For a downloaded local file, add `--sha256=` with the checksum from the release

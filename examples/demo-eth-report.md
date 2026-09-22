@@ -54,7 +54,7 @@ inkwell:
   code-border: true
   code-font-size: small
   tables: booktabs
-  python-env: ./venv
+  python-env: ./.venv
 ---
 
 # Introduction {#sec:intro}

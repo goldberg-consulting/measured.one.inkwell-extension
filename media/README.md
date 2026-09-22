@@ -42,3 +42,19 @@ open Preview, run its code, and Compile. Capture Draft with the completed Run
 panel visible, then the PDF tab with the Run panel closed. The PDF capture
 shows its results page at 145% custom zoom. Keep the toolbar
 readable and avoid personal files, paths, or unrelated editor panels.
+
+## measured.one report cover
+
+- Asset: [`examples/demo-measured-report.png`](examples/demo-measured-report.png).
+- Rendered from page 1 of the published v0.5.1 `measured-one-report.pdf`.
+- The original “Signal field” vector artwork is defined in the measured-report
+  template. See its [provenance and license](../templates/measured-report/LICENSE.md).
+- The report uses synthetic demonstration data.
+
+## Extension icon
+
+- Source: [`icon.svg`](icon.svg); packaged image: [`icon.png`](icon.png).
+- Original vector fountain-pen mark in the measured.one teal and lime palette.
+- Square canvas with rounded corners and real transparency, replacing the old
+  stretched icon with a checkerboard baked into its background.
+- Supplied under the repository [license](../LICENSE).

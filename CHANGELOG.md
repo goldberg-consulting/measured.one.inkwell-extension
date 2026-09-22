@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.2 — September 22, 2026
+
+- Keep preview, runs, and compilation available when optional project-update notifications are dismissed or muted. Preserve edited files until updates are reviewed.
+- Replace long file-warning notification buttons with short review actions.
+- Stop Python runs with an actionable setup error when an explicitly selected environment is missing, instead of falling back to system Python. Update the bundled Python report to use `.venv`.
+- Simplify the extension README and feature the measured.one report with a cover preview, PDF, source, and starter download.
+
 ## 0.5.1 — September 22, 2026
 
 - Fixed an installed-extension integrity check that incorrectly rejected Cursor/VS Code installation metadata and blocked preview/setup; actual manifest changes are still rejected.

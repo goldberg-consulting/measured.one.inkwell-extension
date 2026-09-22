@@ -44,3 +44,14 @@ demo.pdf
 # outputs directory) are never part of a clean extension bundle.
 .inkwell/**
 examples/.inkwell/**
+
+# Client deliverables stay in separate workspaces, never in commits or releases.
+**/*proposal*.md
+**/*proposal*.pdf
+**/*proposal*.docx
+**/*qualifications*.md
+**/*qualifications*.pdf
+**/*qualifications*.docx
+**/private/**
+**/confidential/**
+**/client-documents/**
