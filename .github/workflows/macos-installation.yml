@@ -1,6 +1,6 @@
 name: macOS installation journey
 
-# Scheduled runs use the explicitly pinned repository variables below. Missing
+# Scheduled runs are idle until a candidate is configured. Partial or invalid
 # inputs fail closed; this job never selects a moving latest release candidate.
 on:
   workflow_dispatch:
@@ -28,7 +28,42 @@ permissions:
   contents: read
 
 jobs:
+  configuration:
+    runs-on: ubuntu-22.04
+    outputs:
+      enabled: ${{ steps.inputs.outputs.enabled }}
+    steps:
+      - name: Validate candidate configuration
+        id: inputs
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_COMMIT: ${{ inputs.release_commit || vars.INKWELL_RC_COMMIT }}
+          CANDIDATE_URL: ${{ inputs.candidate_url || vars.INKWELL_RC_URL }}
+          CANDIDATE_SHA256: ${{ inputs.candidate_sha256 || vars.INKWELL_RC_SHA256 }}
+          TAP_REF: ${{ inputs.tap_ref || vars.INKWELL_RC_TAP_COMMIT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = schedule ] && [ -z "$RELEASE_COMMIT$CANDIDATE_URL$CANDIDATE_SHA256$TAP_REF" ]; then
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            echo 'Installation checks skipped: no release candidate is configured. Set all four INKWELL_RC_* repository variables to enable scheduled checks. No installation evidence was produced.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          for name in RELEASE_COMMIT CANDIDATE_URL CANDIDATE_SHA256 TAP_REF; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing candidate input: $name. Configure all four INKWELL_RC_* variables or supply all dispatch inputs."
+              exit 1
+            fi
+          done
+          if ! [[ "$RELEASE_COMMIT" =~ ^[a-f0-9]{40}$ && "$TAP_REF" =~ ^[a-f0-9]{40}$ && "$CANDIDATE_SHA256" =~ ^[a-f0-9]{64}$ && "$CANDIDATE_URL" == "https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/download/inkwell-rc-$RELEASE_COMMIT/inkwell-"*".vsix" ]]; then
+            echo '::error::Invalid immutable candidate configuration: require full commit hashes, a SHA-256 checksum, and the matching RC asset URL.'
+            exit 1
+          fi
+          echo 'enabled=true' >> "$GITHUB_OUTPUT"
+
   install:
+    needs: configuration
+    if: needs.configuration.outputs.enabled == 'true'
     strategy:
       fail-fast: false
       matrix:

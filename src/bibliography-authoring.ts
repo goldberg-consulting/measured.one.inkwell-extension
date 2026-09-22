@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import MarkdownIt from "markdown-it";
+import { createMarkdownParser } from "./markdown-parser";
 import { getDocumentConfig, getInkwellProjectRoot, getResolvedReferences } from "./config";
 import { BibliographyDiagnostic, BibliographyEntry, BibliographySnapshot, bibliographyService, preferredBibliographyEntry } from "./bibliography-service";
 import { citationPandocEngine } from "./citation-pandoc";
@@ -11,7 +11,7 @@ export interface CitationLocation { key: string; start: number; end: number; lin
 export function citationLocations(text: string): CitationLocation[] {
   const starts = [0];
   for (const match of text.matchAll(/\r?\n/g)) starts.push(match.index! + match[0].length);
-  const tokens = new MarkdownIt().parse(text, {}), masked = text.split("");
+  const tokens = createMarkdownParser().parse(text, {}), masked = text.split("");
   const excluded = new Set<number>();
   for (const token of tokens) if (["fence", "code_block"].includes(token.type) && token.map) for (let line = token.map[0]; line < token.map[1]; line++) excluded.add(line);
   const escaped = (offset: number) => { let slashes = 0; while (offset > 0 && text[--offset] === "\\") slashes++; return slashes % 2 === 1; };

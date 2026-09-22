@@ -14,7 +14,7 @@ import { promisify } from "util";
 import { performance } from "perf_hooks";
 import { findDefaultsYaml, getDocumentConfig, getResolvedReferences, getInkwellProjectRoot } from "./config";
 import { DocumentConfig, Metadata, parseDocumentFrontmatter, stripResolvedConfigFields } from "./document-config";
-import { stringify as stringifyYaml } from "yaml";
+import { yamlParser } from "./yaml-parser";
 import { InkwellDiagnostics, CompileError } from "./diagnostics";
 import { getTemplateForDocument, copySupportingFiles, PdfEngine, ResolvedTemplate, collectAllFeatures } from "./templates";
 import { prepareForCompilation } from "./inject";
@@ -605,7 +605,7 @@ function canonicalMetadata(value: unknown): string {
 /** Only the staged source changes; unknown metadata and header-includes stay intact. */
 export function serializeDocumentForPandoc(markdown: string, config: DocumentConfig): string {
   if (canonicalMetadata(config.compatibility) === canonicalMetadata(config.documentMetadata)) return markdown;
-  return `---\n${stringifyYaml(config.compatibility, { lineWidth: 0 })}---\n${config.body}`;
+  return `---\n${yamlParser().stringify(config.compatibility, { lineWidth: 0 })}---\n${config.body}`;
 }
 
 /** Raw Pandoc variables must not override values already resolved by Inkwell. */
@@ -873,7 +873,7 @@ async function compilePandoc(
     const effectiveDefaults = sanitizePandocDefaults(fs.readFileSync(defaults, "utf8"), defaults);
     if (Object.keys(effectiveDefaults).length) {
       const defaultsFile = path.join(cacheDir, "pandoc-defaults.yaml");
-      fs.writeFileSync(defaultsFile, stringifyYaml(effectiveDefaults, { lineWidth: 0 }), "utf8");
+      fs.writeFileSync(defaultsFile, yamlParser().stringify(effectiveDefaults, { lineWidth: 0 }), "utf8");
       pandocArgs.push("--defaults", defaultsFile);
     }
   }

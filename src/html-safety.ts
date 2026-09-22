@@ -1,6 +1,10 @@
-import { Parser } from "htmlparser2";
 import type MarkdownIt from "markdown-it";
 import type Token from "markdown-it/lib/token.mjs";
+
+function htmlParser(): typeof import("htmlparser2").Parser {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return (require("htmlparser2") as typeof import("htmlparser2")).Parser;
+}
 
 export interface HtmlSafetyLimits {
   maxInputBytes: number;
@@ -155,7 +159,7 @@ function sanitize(input: string, budget: Budget, inline: boolean): string {
     return parts.join("");
   }
   const stack: Array<{ name: string; suppressed: boolean }> = [];
-  const parser = new Parser({
+  const parser = new (htmlParser())({
     onopentag(name, attributes) {
       budget.consume("nodes", 1);
       if (stack.length >= budget.limits.maxDepth) throw new HtmlSafetyLimitError("maxDepth");

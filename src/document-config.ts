@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { isMap, isScalar, isSeq, LineCounter, parseDocument } from "yaml";
+import { yamlParser } from "./yaml-parser";
 import { constrainTypographyCapabilities, getTemplateCapabilities, TemplateCapabilities } from "./template-capabilities";
 import { normalizeFontFamily, normalizeHeadingWeight, normalizeTypographyColor, sizeInPoints } from "./style-model";
 
@@ -112,8 +112,8 @@ function copy(value: unknown, ancestors = new Set<unknown>()): unknown {
 }
 
 function readYaml(rawYaml: string, sourcePath: string, lineOffset: number): Pick<ParsedFrontmatter, "metadata" | "locations" | "diagnostics"> {
-  const lineCounter = new LineCounter();
-  const yaml = parseDocument(rawYaml, { lineCounter, uniqueKeys: true, version: "1.2", prettyErrors: false });
+  const lineCounter = new (yamlParser().LineCounter)();
+  const yaml = yamlParser().parseDocument(rawYaml, { lineCounter, uniqueKeys: true, version: "1.2", prettyErrors: false });
   const locations: Record<string, SourceLocation> = {};
   const at = (offset: number): SourceLocation => {
     const position = lineCounter.linePos(offset);
@@ -124,16 +124,16 @@ function readYaml(rawYaml: string, sourcePath: string, lineOffset: number): Pick
     severity: yaml.errors.includes(error as (typeof yaml.errors)[number]) ? "error" : "warning",
   }));
   const walk = (node: unknown, prefix: string): void => {
-    if (isMap(node)) {
+    if (yamlParser().isMap(node)) {
       for (const pair of node.items) {
-        if (!isScalar(pair.key)) continue;
+        if (!yamlParser().isScalar(pair.key)) continue;
         const key = String(pair.key.value);
         const full = prefix ? `${prefix}.${key}` : key;
         locations[full] = at(pair.key.range?.[0] || 0);
         if (forbidden.has(key)) diagnostics.push({ ...locations[full], code: "unsafe-key", severity: "error", key: full, message: `Configuration key ${key} is reserved.` });
         walk(pair.value, full);
       }
-    } else if (isSeq(node)) {
+    } else if (yamlParser().isSeq(node)) {
       node.items.forEach((item, index) => walk(item, `${prefix}.${index}`));
     }
   };

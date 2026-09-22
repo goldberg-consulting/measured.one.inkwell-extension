@@ -150,7 +150,16 @@ test('headless smoke cannot masquerade as a clean no-code installation and a sin
 
 test('release identity refuses dirty tracked files and untracked runtime inputs', t => {
   const f = fixture(t);
-  const git = args => { const result = spawnSync('git', args, { cwd: f.root, encoding: 'utf8' }); assert.equal(result.status, 0, result.stderr); };
+  const git = args => {
+    const env = { ...process.env };
+    for (const key of Object.keys(env)) {
+      if (key === 'GIT_DIR' || key === 'GIT_WORK_TREE' || key === 'GIT_INDEX_FILE'
+        || key === 'GIT_OBJECT_DIRECTORY' || key === 'GIT_ALTERNATE_OBJECT_DIRECTORIES'
+        || key === 'GIT_COMMON_DIR' || key === 'GIT_QUARANTINE_PATH') delete env[key];
+    }
+    const result = spawnSync('git', args, { cwd: f.root, encoding: 'utf8', env });
+    assert.equal(result.status, 0, result.stderr);
+  };
   git(['init', '--quiet']); git(['config', 'user.name', 'Fixture']); git(['config', 'user.email', 'fixture@example.invalid']);
   fs.mkdirSync(path.join(f.root, 'src')); fs.writeFileSync(path.join(f.root, 'src/index.ts'), 'original');
   git(['add', 'src/index.ts']); git(['commit', '--quiet', '-m', 'fixture']);
