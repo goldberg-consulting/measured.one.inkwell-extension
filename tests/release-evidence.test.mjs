@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { PUBLICATION_GATES, COMPLETION_GATES, recordEvidence, validateEvidenceBundle, validateGateReport, assertCleanReleaseCheckout, verifyRunProvenance, selectEvidence } from '../scripts/release-evidence.mjs';
 import { compareBenchmarks } from '../scripts/check-benchmark-regression.mjs';
 
+const demoNames = Object.keys(JSON.parse(fs.readFileSync(new URL('fixtures/demo-text.json', import.meta.url), 'utf8')));
 const candidate = { schemaVersion: 1, releaseCommit: 'a'.repeat(40), version: '0.5.0', filename: 'inkwell-0.5.0.vsix',
   vsixSha256: 'b'.repeat(64), assetsManifestSha256: 'c'.repeat(64) };
 const previewSample = (warmup, callbackMs, timerLagMs) => ({ warmup, maximumCallbackMs: callbackMs, maximumTimerLagMs: timerLagMs,
@@ -19,7 +20,7 @@ const host = { ok: true, machine: { platform: 'linux' }, artifact: { archiveSha2
     timerLagMaximaMedianMs: 42, maximumCallbackMs: 34, maximumTimerLagMs: 44, unchangedCompletionChildProcesses: 0 },
   iterations: [{ warmup: false, host: { workflow: { ok: true, pdf: { verified: true } } } }] };
 function timing(ms) {
-  const corpus = Array.from({ length: 10 }, (_, i) => ({ name: `demo-${i}.md`, sha256: 'a'.repeat(64) }));
+  const corpus = demoNames.map(name => ({ name, sha256: 'a'.repeat(64) }));
   const process = binary => ({ binary, milliseconds: 1, exitCode: 0, signal: null });
   return { schemaVersion: 1, success: true, runId: randomUUID(), repetitions: 5, warmups: 1,
     machine: { platform: 'darwin', arch: 'arm64', cpu: 'fixture', node: 'v25.2.1', osRelease: '25.5.0', memoryBytes: 1024 },
@@ -39,8 +40,8 @@ function report(gate, timings) {
     cspViolations: [], browserErrors: [], printEnhancementsVerified: true, documentScrollIsolationVerified: true };
   if (gate === 'package') return { ok: true, archiveSha256: candidate.vsixSha256 };
   if (gate === 'performance') return compareBenchmarks(...(timings || [timing(100), timing(65), timing(65)]));
-  if (gate === 'demos') return { success: true, artifact: { archiveSha256: candidate.vsixSha256 }, demos: Array.from({ length: 10 }, (_, index) =>
-    ({ name: `demo-${index}`, success: true, expectedText: true, unresolved: [], runFailures: [] })) };
+  if (gate === 'demos') return { success: true, artifact: { archiveSha256: candidate.vsixSha256 }, demos: demoNames.map(name =>
+    ({ name, success: true, expectedText: true, unresolved: [], runFailures: [] })) };
   return { ok: true, vsixSha256: candidate.vsixSha256, releaseCommit: candidate.releaseCommit, doctorReady: true, pdfVerified: true,
     cleanProfile: true, noCodeJourneyVerified: true, texRootBefore: '/fixture/TinyTeX', texRootAfter: '/fixture/TinyTeX',
     canonicalCommand: 'brew install --cask goldberg-consulting/inkwell/inkwell', previousVersion: '0.4.0',
@@ -113,7 +114,23 @@ test('activation budgets, subprocesses, missing PDF and partial demo corpus cann
   const missingPdf = structuredClone(host); delete missingPdf.iterations[0].host.workflow.pdf;
   assert.throws(() => validateGateReport('run-to-pdf', bytes(missingPdf), candidate), /PDF/);
   const demos = report('demos'); demos.demos.pop();
-  assert.throws(() => validateGateReport('demos', bytes(demos), candidate), /ten demos/);
+  assert.throws(() => validateGateReport('demos', bytes(demos), candidate), /complete expected demo corpus/);
+});
+
+test('demo evidence requires measured-report and rejects unknown replacements despite a matching count', () => {
+  assert.ok(demoNames.includes('demo-measured-report.md'));
+  const complete = report('demos');
+  assert.doesNotThrow(() => validateGateReport('demos', bytes(complete), candidate));
+  const repeated = timing(65);
+  assert.doesNotThrow(() => validateGateReport('demos', bytes(repeated), candidate), 'retain all warmup and measured iteration evidence');
+  for (const value of [complete, repeated]) {
+    const missing = structuredClone(value);
+    missing.demos = missing.demos.filter(item => item.name !== 'demo-measured-report.md');
+    assert.throws(() => validateGateReport('demos', bytes(missing), candidate), /complete expected demo corpus/);
+    const replaced = structuredClone(value);
+    replaced.demos.filter(item => item.name === 'demo-measured-report.md').forEach(item => { item.name = 'demo-unknown.md'; });
+    assert.throws(() => validateGateReport('demos', bytes(replaced), candidate), /complete expected demo corpus/);
+  }
 });
 
 test('warm preview evidence retains coherent finite observations without inventing a shared-host timing threshold', () => {

@@ -332,6 +332,37 @@ test('Linux and macOS verify consume one immutable candidate and enforce actual 
   assert.match(demoCommands, /check-benchmark-regression\.mjs/);
 });
 
+test('the required verify check succeeds only after every candidate, platform and demo dependency passes', () => {
+  const workflow = YAML.parse(fs.readFileSync(path.join(repo, '.github/workflows/verify.yml'), 'utf8'));
+  const job = workflow.jobs['final-check'];
+  assert.equal(job.name, 'verify', 'match the required branch-protection status context');
+  assert.deepEqual(job.needs, ['candidate', 'verify', 'demos']);
+  assert.equal(job.if, 'always()', 'failed or skipped dependencies must still produce a final result');
+  assert.equal(job['runs-on'], 'ubuntu-22.04');
+  assert.equal(job['continue-on-error'], undefined);
+  assert.equal(job.steps.length, 1);
+  const step = job.steps[0];
+  assert.equal(step.if, undefined);
+  assert.equal(step['continue-on-error'], undefined);
+  assert.deepEqual(step.env, {
+    CANDIDATE_RESULT: '${{ needs.candidate.result }}',
+    PLATFORMS_RESULT: '${{ needs.verify.result }}',
+    DEMOS_RESULT: '${{ needs.demos.result }}',
+  });
+  const success = Object.fromEntries(Object.keys(step.env).map(key => [key, 'success']));
+  const run = overrides => spawnSync('bash', ['--noprofile', '--norc', '-euo', 'pipefail', '-c', step.run], {
+    encoding: 'utf8', env: { PATH: process.env.PATH, ...success, ...overrides },
+  });
+  const passed = run({});
+  assert.equal(passed.status, 0, passed.stderr);
+  assert.equal(passed.stderr, '');
+  for (const key of Object.keys(success)) for (const result of ['failure', 'cancelled', 'skipped', '', undefined]) {
+    const failed = run({ [key]: result });
+    assert.equal(failed.status, 1, `${key}=${result}: ${failed.stderr}`);
+    assert.match(failed.stderr, /Required verification did not pass/);
+  }
+});
+
 test('RC and final evidence stages never fabricate absent installation or performance results', () => {
   const rc = fs.readFileSync(path.join(repo, '.github/workflows/release-candidate.yml'), 'utf8');
   assert.ok(rc.indexOf('--stage rc') < rc.indexOf('gh release create'));
@@ -347,7 +378,7 @@ test('RC and final evidence stages never fabricate absent installation or perfor
   assert.equal(supplemental.with.pattern, undefined, 'source workflow artifacts use different names and must be selected by validated gate records');
   assert.match(assembly.find(step => step.run?.includes('release-evidence.mjs select')).run, /--gates performance,pdf-parity,upgrade-from-0.4/);
   const installer = YAML.parse(fs.readFileSync(path.join(repo, '.github/workflows/macos-installation.yml'), 'utf8'));
-  assert.ok(installer.on.schedule.length);
+  assert.deepEqual(Object.keys(installer.on), ['workflow_dispatch']);
   assert.deepEqual(installer.jobs.install.strategy.matrix.profile, ['full-cask', 'existing-tex']);
   const commands = installer.jobs.install.steps.map(step => step.run || '').join('\n');
   assert.match(commands, /CANDIDATE_SHA256/);
@@ -355,4 +386,70 @@ test('RC and final evidence stages never fabricate absent installation or perfor
   assert.match(commands, /out\/doctor-cli\.js.*--full.*--editor code/);
   assert.match(commands, /out\/smoke-cli\.js/);
   assert.doesNotMatch(commands, /--gate (?:clean-macos-cask|standalone-existing-tex)/, 'headless install is insufficient proof of the still-required no-code UI gate');
+});
+
+test('macOS installation requires explicit pinned inputs and retains failures without empty-upload errors', () => {
+  const installer = YAML.parse(fs.readFileSync(path.join(repo, '.github/workflows/macos-installation.yml'), 'utf8'));
+  const job = installer.jobs.install, steps = job.steps;
+  for (const [variable, input] of Object.entries({ RELEASE_COMMIT: 'release_commit', CANDIDATE_URL: 'candidate_url', CANDIDATE_SHA256: 'candidate_sha256', TAP_REF: 'tap_ref' })) {
+    assert.equal(installer.on.workflow_dispatch.inputs[input].required, true);
+    assert.equal(job.env[variable], '${{ inputs.' + input + ' }}');
+  }
+  assert.equal(steps[0].name, 'Require immutable inputs', 'reject missing or invalid inputs before checkout and installation');
+  const checkouts = steps.filter(step => step.uses === 'actions/checkout@v4');
+  assert.deepEqual(checkouts.map(step => step.with.ref), ['${{ inputs.release_commit }}', '${{ inputs.tap_ref }}']);
+  const upload = steps.find(step => step.uses === 'actions/upload-artifact@v4');
+  assert.equal(upload.if, 'always()', 'retain any evidence after installation failures');
+  assert.equal(upload.with['if-no-files-found'], 'warn', 'preflight failures have no evidence to upload');
+  assert.equal(job['continue-on-error'], undefined);
+  for (const step of steps) assert.equal(step['continue-on-error'], undefined, `${step.name || step.uses} must preserve failures`);
+});
+
+test('macOS installation preflight diagnoses missing and invalid inputs and accepts immutable candidates', () => {
+  const installer = YAML.parse(fs.readFileSync(path.join(repo, '.github/workflows/macos-installation.yml'), 'utf8'));
+  const preflight = installer.jobs.install.steps.find(step => step.name === 'Require immutable inputs').run;
+  const releaseCommit = 'a'.repeat(40);
+  const valid = {
+    RELEASE_COMMIT: releaseCommit,
+    TAP_REF: 'b'.repeat(40),
+    CANDIDATE_SHA256: 'c'.repeat(64),
+    CANDIDATE_URL: `https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/download/inkwell-rc-${releaseCommit}/inkwell-0.5.2.vsix`,
+  };
+  const run = overrides => spawnSync('bash', ['--noprofile', '--norc', '-euo', 'pipefail', '-c', preflight], {
+    // Runner startup hooks are unrelated to the workflow script under test.
+    encoding: 'utf8', env: { ...process.env, ...valid, ...overrides, BASH_ENV: undefined, ENV: undefined },
+  });
+  for (const empty of ['', undefined]) {
+    const missing = run(Object.fromEntries(Object.keys(valid).map(key => [key, empty])));
+    assert.equal(missing.status, 1, missing.stderr);
+    for (const input of ['release_commit', 'tap_ref', 'candidate_sha256', 'candidate_url']) {
+      assert.match(missing.stderr, new RegExp(`::error title=Invalid ${input}::`));
+    }
+  }
+  for (const [variable, input, values] of [
+    ['RELEASE_COMMIT', 'release_commit', ['main', 'a'.repeat(39), 'A'.repeat(40), `${releaseCommit}\n`]],
+    ['TAP_REF', 'tap_ref', ['main', 'b'.repeat(39), 'B'.repeat(40)]],
+    ['CANDIDATE_SHA256', 'candidate_sha256', ['c'.repeat(63), 'C'.repeat(64), 'g'.repeat(64)]],
+    ['CANDIDATE_URL', 'candidate_url', [
+      valid.CANDIDATE_URL.replace('https:', 'http:'),
+      valid.CANDIDATE_URL.replace('github.com/', 'github.com.example/'),
+      valid.CANDIDATE_URL.replace(`inkwell-rc-${releaseCommit}`, 'latest'),
+      valid.CANDIDATE_URL.replace(releaseCommit, 'd'.repeat(40)),
+      valid.CANDIDATE_URL.replace('/inkwell-0.5.2.vsix', '/nested/inkwell-0.5.2.vsix'),
+      valid.CANDIDATE_URL.replace('/inkwell-0.5.2.vsix', '/inkwell-latest.vsix'),
+      `${valid.CANDIDATE_URL}?download=other.vsix`,
+      `${valid.CANDIDATE_URL}#other.vsix`,
+    ]],
+  ]) {
+    for (const value of values) {
+      const result = run({ [variable]: value });
+      assert.equal(result.status, 1, `${variable}=${value}: ${result.stderr}`);
+      assert.match(result.stderr, new RegExp(`::error title=Invalid ${input}::`));
+    }
+  }
+  for (const filename of ['inkwell-0.5.2.vsix', 'inkwell-0.5.2-rc.1.vsix']) {
+    const result = run({ CANDIDATE_URL: valid.CANDIDATE_URL.replace('inkwell-0.5.2.vsix', filename) });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, '');
+  }
 });

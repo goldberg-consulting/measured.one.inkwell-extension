@@ -190,3 +190,22 @@ jobs:
     with:
       candidate-artifact: inkwell-candidate
       release-commit: ${{ needs.candidate.outputs.commit }}
+
+  final-check:
+    name: verify
+    needs: [candidate, verify, demos]
+    if: always()
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Require every verification job to pass
+        env:
+          CANDIDATE_RESULT: ${{ needs.candidate.result }}
+          PLATFORMS_RESULT: ${{ needs.verify.result }}
+          DEMOS_RESULT: ${{ needs.demos.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${CANDIDATE_RESULT:-}" != success || "${PLATFORMS_RESULT:-}" != success || "${DEMOS_RESULT:-}" != success ]]; then
+            printf 'Required verification did not pass: candidate=%s, platforms=%s, demos=%s\n' "${CANDIDATE_RESULT:-missing}" "${PLATFORMS_RESULT:-missing}" "${DEMOS_RESULT:-missing}" >&2
+            exit 1
+          fi

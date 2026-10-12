@@ -1,5 +1,6 @@
 import * as crypto from "crypto";
-import MarkdownIt from "markdown-it";
+import type MarkdownIt from "markdown-it";
+import { createMarkdownParser } from "./markdown-parser";
 import type Token from "markdown-it/lib/token.mjs";
 import { decodeTableData, TABLE_DATA_FENCE, TableData } from "./table-data";
 import { isNumericTableValue, TableAlignment } from "./table-values";
@@ -26,7 +27,10 @@ interface Attributes { id?: string; classes: string[]; values: Record<string, st
 interface Caption { text: string; attributes: Attributes; start: number; end: number; prefix: string; level: number }
 interface TableRecord { marker: string; captionStart: string; captionEnd: string; attributes: Attributes; caption: string; data?: TableData; number?: number; inlineMarker?: boolean }
 interface Edit { start: number; end: number; replacement: string }
-const parser = new MarkdownIt({ html: true });
+let parser: MarkdownIt | undefined;
+function tableParser(): MarkdownIt {
+  return parser ??= createMarkdownParser({ html: true });
+}
 const presets = new Set(["booktabs", "grid", "plain", "zebra", "compact"]);
 const safeId = (value: string): boolean => /^[A-Za-z0-9_][A-Za-z0-9_.:-]*$/.test(value);
 const escapeHtml = (value: string): string => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -156,7 +160,7 @@ function rawEnvironmentEnd(source: string, start: number): number | undefined {
 }
 
 function maskRawTables(source: string, marker: (kind: string) => string, diagnostics: TablePreviewDiagnostic[]): { markdown: string; replacements: Map<string, string> } {
-  const tokens = parser.parse(source, {}), offsets = lineOffsets(source);
+  const tokens = tableParser().parse(source, {}), offsets = lineOffsets(source);
   const protectedRanges = protectedCodeRanges(source, tokens, offsets);
   const replacements = new Map<string, string>(), edits: Edit[] = [];
   const expression = /^ {0,3}\\begin\{(?:table\*?|tabular\*?|tabularx|longtable|longtblr|tblr)\}/gm;
@@ -230,7 +234,7 @@ export function extractTablePresentation(markdown: string, options: { tablePrefi
   const marker = (kind: string): string => `<!--${nonce}${kind}${sequence++}-->`;
   const diagnostics: TablePreviewDiagnostic[] = [], labels = new Map<string, string>();
   const masked = maskRawTables(markdown, marker, diagnostics);
-  const source = masked.markdown, offsets = lineOffsets(source), tokens = parser.parse(source, {});
+  const source = masked.markdown, offsets = lineOffsets(source), tokens = tableParser().parse(source, {});
   const records = new Map<string, TableRecord>(), edits: Edit[] = [];
   const claimedCaptions = new Set<number>(), usedIds = new Set<string>();
   const prefix = options.tablePrefix || "Table";

@@ -1,5 +1,5 @@
-import { isAlias, isMap, isNode, isScalar, isSeq, parseDocument, Scalar, stringify, YAMLMap } from "yaml";
-import type { Node, Pair } from "yaml";
+import { yamlParser } from "./yaml-parser";
+import type { Node, Pair, YAMLMap } from "yaml";
 import { DocumentConfig, parseDocumentFrontmatter, resolveDocumentConfig, SizeValue, sizeToString, TypographyConfig } from "./document-config";
 
 export type DocumentStyleKey = `typography.${keyof TypographyConfig}`;
@@ -53,7 +53,7 @@ export function validateDocumentStyleValue(config: DocumentConfig, key: Document
   if (control.locked) throw new Error(`${control.label} is locked by ${config.capabilities.name} at ${control.value}. ${control.reason}`);
   if (typeof raw !== "string" && typeof raw !== "number") throw new Error("Choose a text or numeric style value.");
   const checked = resolveDocumentConfig({
-    text: `---\n${stringify({ typography: { [fieldName(key)]: raw } })}---\n`,
+    text: `---\n${yamlParser().stringify({ typography: { [fieldName(key)]: raw } })}---\n`,
     manifest: { template: config.template }, templateCapabilities: config.capabilities,
   });
   const issue = checked.diagnostics.find(item => item.key === key && (item.severity === "error" || item.code === "template-capability"));
@@ -94,17 +94,17 @@ function spliceSource(raw: string, edit: SourceEdit): string {
   return raw.slice(0, edit.start) + edit.replacement + raw.slice(edit.end);
 }
 function sourceMap(raw: string) {
-  const yaml = parseDocument(raw, { keepSourceTokens: true, uniqueKeys: true });
-  if (yaml.errors.length || (yaml.contents !== null && !isMap(yaml.contents))) throw new Error("Document frontmatter must be a valid YAML mapping.");
+  const yaml = yamlParser().parseDocument(raw, { keepSourceTokens: true, uniqueKeys: true });
+  if (yaml.errors.length || (yaml.contents !== null && !yamlParser().isMap(yaml.contents))) throw new Error("Document frontmatter must be a valid YAML mapping.");
   return yaml;
 }
 function pairFor(map: YAMLMap, key: string): Pair | undefined {
-  return map.items.find(pair => isScalar(pair.key) && pair.key.value === key);
+  return map.items.find(pair => yamlParser().isScalar(pair.key) && pair.key.value === key);
 }
 function inlineValue(value: unknown, previous?: unknown): string {
-  const node = new Scalar(value);
-  if (typeof value === "string" && isScalar(previous) && (previous.type === "QUOTE_SINGLE" || previous.type === "QUOTE_DOUBLE")) node.type = previous.type;
-  return stringify(Array.isArray(value) || mapping(value) ? value : node, {
+  const node = new (yamlParser().Scalar)(value);
+  if (typeof value === "string" && yamlParser().isScalar(previous) && (previous.type === "QUOTE_SINGLE" || previous.type === "QUOTE_DOUBLE")) node.type = previous.type;
+  return yamlParser().stringify(Array.isArray(value) || mapping(value) ? value : node, {
     collectionStyle: "flow", lineWidth: 0, blockQuote: false, singleQuote: true,
   }).replace(/\n$/, "");
 }
@@ -123,20 +123,20 @@ function commentsIn(token: unknown, start: number, end: number): { offset: numbe
 /** Replace only a selected value token, retaining its quoting and surrounding CST trivia. */
 function valueEdits(raw: string, previous: Node, value: unknown, eol: string): SourceEdit[] {
   if (!previous.range) throw new Error("This YAML setting has no editable source range.");
-  if (isScalar(previous) && Object.is(previous.value, value)) return [];
-  if (!isAlias(previous) && "anchor" in previous && previous.anchor) throw new Error("This setting defines a YAML anchor. Edit the anchor directly before configuring this setting.");
-  if (isSeq(previous) && Array.isArray(value) && value.length > previous.items.length && previous.items.every((item, index) => isScalar(item) && Object.is(item.value, value[index]))) {
+  if (yamlParser().isScalar(previous) && Object.is(previous.value, value)) return [];
+  if (!yamlParser().isAlias(previous) && "anchor" in previous && previous.anchor) throw new Error("This setting defines a YAML anchor. Edit the anchor directly before configuring this setting.");
+  if (yamlParser().isSeq(previous) && Array.isArray(value) && value.length > previous.items.length && previous.items.every((item, index) => yamlParser().isScalar(item) && Object.is(item.value, value[index]))) {
     const added = value.slice(previous.items.length).map(item => inlineValue(item));
     if (previous.flow) {
       const last = previous.items.at(-1);
-      const start = isNode(last) ? last.range![1] : previous.range[0] + 1;
+      const start = yamlParser().isNode(last) ? last.range![1] : previous.range[0] + 1;
       return [{ start, end: start, replacement: `${last ? ", " : ""}${added.join(", ")}` }];
     }
     const indent = indentationAt(raw, previous.range[0]);
     const start = previous.range[1];
     return [{ start, end: start, replacement: `${raw[start - 1] === "\n" ? "" : eol}${added.map(item => `${indent}- ${item}`).join(eol)}${eol}` }];
   }
-  if (isSeq(previous) && Array.isArray(value) && previous.items.length === value.length && previous.items.every(isNode)) {
+  if (yamlParser().isSeq(previous) && Array.isArray(value) && previous.items.length === value.length && previous.items.every(yamlParser().isNode)) {
     return previous.items.flatMap((item, index) => valueEdits(raw, item as Node, value[index], eol));
   }
   const [start, end] = previous.range;
@@ -149,7 +149,7 @@ function valueEdits(raw: string, previous: Node, value: unknown, eol: string): S
   } else if (start === end) {
     if (raw[start - 1] === ":") replacement = ` ${replacement}`;
     if (raw[start] === "#") replacement += " ";
-  } else if (isMap(previous) || isSeq(previous)) {
+  } else if (yamlParser().isMap(previous) || yamlParser().isSeq(previous)) {
     // A changed collection may remove entries; retain every comment even when
     // its former entry is no longer selected. Unchanged-length scalar lists
     // take the token-by-token path above and preserve their exact formatting.
@@ -164,7 +164,7 @@ function valueEdits(raw: string, previous: Node, value: unknown, eol: string): S
 function insertPair(raw: string, map: YAMLMap | null, path: readonly string[], value: unknown, eol: string): SourceEdit {
   if (!map) {
     const branch = path.reduceRight<unknown>((child, key) => ({ [key]: child }), value);
-    const replacement = stringify(branch, { lineWidth: 0, blockQuote: false, singleQuote: true }).replace(/\n/g, eol);
+    const replacement = yamlParser().stringify(branch, { lineWidth: 0, blockQuote: false, singleQuote: true }).replace(/\n/g, eol);
     return { start: raw.length, end: raw.length, replacement: `${raw && !raw.endsWith("\n") ? eol : ""}${replacement}` };
   }
   if (map.flow) {
@@ -173,14 +173,14 @@ function insertPair(raw: string, map: YAMLMap | null, path: readonly string[], v
     const last = map.items.at(-1);
     // Inserting immediately after the final value also retains any existing
     // trailing comma, spaces, comments, and closing brace byte for byte.
-    const at = last && isNode(last.value) ? last.value.range?.[1] : last && isNode(last.key) ? last.key.range?.[1] : undefined;
+    const at = last && yamlParser().isNode(last.value) ? last.value.range?.[1] : last && yamlParser().isNode(last.key) ? last.key.range?.[1] : undefined;
     const start = at ?? map.range![0] + 1;
     return { start, end: start, replacement: `${last ? ", " : ""}${entry}` };
   }
-  const firstKey = map.items.find(pair => isNode(pair.key))?.key as Node | undefined;
+  const firstKey = map.items.find(pair => yamlParser().isNode(pair.key))?.key as Node | undefined;
   const indent = firstKey?.range ? indentationAt(raw, firstKey.range[0]) : "";
   const branch = path.reduceRight<unknown>((child, key) => ({ [key]: child }), value);
-  const rendered = stringify(branch, { lineWidth: 0, blockQuote: false, singleQuote: true });
+  const rendered = yamlParser().stringify(branch, { lineWidth: 0, blockQuote: false, singleQuote: true });
   const addition = rendered.split("\n").slice(0, -1).map(line => indent + line).join(eol) + eol;
   const start = map.range![1];
   return { start, end: start, replacement: `${start && raw[start - 1] !== "\n" ? eol : ""}${addition}` };
@@ -201,13 +201,13 @@ function writeSetting(raw: string, path: readonly string[], value: unknown, eol:
     if (!pair) return spliceSource(raw, insertPair(raw, current, effectivePath.slice(index), value, eol));
     const previous = pair.value;
     if (index === effectivePath.length - 1) {
-      if (!isNode(previous)) throw new Error("This YAML setting has no editable source value.");
-      if (!isAlias(previous) && "anchor" in previous && previous.anchor && effectivePath.length > 1) {
+      if (!yamlParser().isNode(previous)) throw new Error("This YAML setting has no editable source value.");
+      if (!yamlParser().isAlias(previous) && "anchor" in previous && previous.anchor && effectivePath.length > 1) {
         return spliceSource(raw, insertPair(raw, root, [dotted], value, eol));
       }
       return valueEdits(raw, previous, value, eol).sort((a, b) => b.start - a.start).reduce(spliceSource, raw);
     }
-    if (!isMap(previous) || previous.anchor) {
+    if (!yamlParser().isMap(previous) || previous.anchor) {
       // Do not mutate an alias target, shared map, legacy scalar table preset,
       // or native CSL references sequence merely to add one Inkwell option.
       return spliceSource(raw, insertPair(raw, root, [dotted], value, eol));

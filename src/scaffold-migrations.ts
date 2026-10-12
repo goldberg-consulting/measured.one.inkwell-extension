@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
-import { parseDocument } from "yaml";
+import { yamlParser } from "./yaml-parser";
 import { BUNDLED_ASSET_PATHS, resolveContainedPath, validateBundledAssets, AssetDiagnostic } from "./bundled-assets";
 import { DEFAULT_REQUIREMENTS, GITIGNORE, STARTER_BIB, SINE_PLOT_PY, SCATTER_PY, CONVERGENCE_TABLE_PY } from "./scaffold-assets";
 import { normalizeManifestDefaults, resolveDocumentConfig, stripResolvedConfigFields } from "./document-config";
@@ -110,7 +110,7 @@ function readLegacyDefaults(root: string, plan: MigrationPlan): { defaults: Reco
   if (fs.statSync(file).size > 16 * 1024 * 1024) throw new Error("defaults.yaml exceeds the 16 MiB configuration limit.");
   const bytes = fs.readFileSync(file);
   const sourceHash = hash(bytes);
-  const yaml = parseDocument(bytes.toString("utf8"), { uniqueKeys: true, version: "1.2", prettyErrors: false });
+  const yaml = yamlParser().parseDocument(bytes.toString("utf8"), { uniqueKeys: true, version: "1.2", prettyErrors: false });
   if (yaml.errors.length) throw new Error(`Cannot migrate defaults.yaml: ${yaml.errors.map(error => error.message).join("; ")}. Correct the original YAML before setup.`);
   const values: unknown = yaml.toJS({ maxAliasCount: 100 });
   if (!isObject(values)) throw new Error("defaults.yaml must contain a YAML mapping before its supported settings can be migrated.");
