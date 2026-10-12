@@ -1,7 +1,7 @@
 name: macOS installation journey
 
-# Scheduled runs use the explicitly pinned repository variables below. Missing
-# inputs fail closed; this job never selects a moving latest release candidate.
+# Run explicitly for one pinned release candidate. Missing inputs fail closed;
+# this job never selects a moving latest release candidate.
 on:
   workflow_dispatch:
     inputs:
@@ -21,8 +21,6 @@ on:
         description: Exact tap candidate commit containing the RC URL and checksum
         required: true
         type: string
-  schedule:
-    - cron: '19 7 * * 1'
 
 permissions:
   contents: read
@@ -36,10 +34,10 @@ jobs:
     runs-on: macos-14
     timeout-minutes: 120
     env:
-      RELEASE_COMMIT: ${{ inputs.release_commit || vars.INKWELL_RC_COMMIT }}
-      CANDIDATE_URL: ${{ inputs.candidate_url || vars.INKWELL_RC_URL }}
-      CANDIDATE_SHA256: ${{ inputs.candidate_sha256 || vars.INKWELL_RC_SHA256 }}
-      TAP_REF: ${{ inputs.tap_ref || vars.INKWELL_RC_TAP_COMMIT }}
+      RELEASE_COMMIT: ${{ inputs.release_commit }}
+      CANDIDATE_URL: ${{ inputs.candidate_url }}
+      CANDIDATE_SHA256: ${{ inputs.candidate_sha256 }}
+      TAP_REF: ${{ inputs.tap_ref }}
       PROFILE: ${{ matrix.profile }}
       HOMEBREW_NO_ANALYTICS: 1
       HOMEBREW_NO_AUTO_UPDATE: 1
@@ -50,18 +48,35 @@ jobs:
       - name: Require immutable inputs
         run: |
           set -euo pipefail
-          [[ "$RELEASE_COMMIT" =~ ^[a-f0-9]{40}$ ]]
-          [[ "$TAP_REF" =~ ^[a-f0-9]{40}$ ]]
-          [[ "$CANDIDATE_SHA256" =~ ^[a-f0-9]{64}$ ]]
-          [[ "$CANDIDATE_URL" == "https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/download/inkwell-rc-$RELEASE_COMMIT/inkwell-"*".vsix" ]]
+          invalid=0
+          if [[ ! "${RELEASE_COMMIT:-}" =~ ^[a-f0-9]{40}$ ]]; then
+            echo '::error title=Invalid release_commit::Provide the exact release commit: 40 lowercase hexadecimal characters.' >&2
+            invalid=1
+          fi
+          if [[ ! "${TAP_REF:-}" =~ ^[a-f0-9]{40}$ ]]; then
+            echo '::error title=Invalid tap_ref::Provide the exact tap candidate commit: 40 lowercase hexadecimal characters.' >&2
+            invalid=1
+          fi
+          if [[ ! "${CANDIDATE_SHA256:-}" =~ ^[a-f0-9]{64}$ ]]; then
+            echo '::error title=Invalid candidate_sha256::Provide the SHA-256 of the candidate VSIX: 64 lowercase hexadecimal characters.' >&2
+            invalid=1
+          fi
+          candidate_prefix="https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/download/inkwell-rc-${RELEASE_COMMIT:-}/"
+          candidate_url="${CANDIDATE_URL:-}"
+          candidate_asset="${candidate_url#"$candidate_prefix"}"
+          if [[ "$candidate_url" != "$candidate_prefix"* || ! "$candidate_asset" =~ ^inkwell-[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?\.vsix$ ]]; then
+            echo '::error title=Invalid candidate_url::Provide the immutable inkwell-VERSION.vsix asset URL under this repository release tag inkwell-rc-RELEASE_COMMIT, matching release_commit and without query parameters or fragments.' >&2
+            invalid=1
+          fi
+          exit "$invalid"
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.release_commit || vars.INKWELL_RC_COMMIT }}
+          ref: ${{ inputs.release_commit }}
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
           repository: goldberg-consulting/homebrew-inkwell
-          ref: ${{ inputs.tap_ref || vars.INKWELL_RC_TAP_COMMIT }}
+          ref: ${{ inputs.tap_ref }}
           path: tap
           persist-credentials: false
       - uses: actions/setup-node@v4
@@ -153,5 +168,5 @@ jobs:
             candidate/candidate.json
             reports/
             evidence/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 90
