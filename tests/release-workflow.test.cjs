@@ -332,6 +332,37 @@ test('Linux and macOS verify consume one immutable candidate and enforce actual 
   assert.match(demoCommands, /check-benchmark-regression\.mjs/);
 });
 
+test('the required verify check succeeds only after every candidate, platform and demo dependency passes', () => {
+  const workflow = YAML.parse(fs.readFileSync(path.join(repo, '.github/workflows/verify.yml'), 'utf8'));
+  const job = workflow.jobs['final-check'];
+  assert.equal(job.name, 'verify', 'match the required branch-protection status context');
+  assert.deepEqual(job.needs, ['candidate', 'verify', 'demos']);
+  assert.equal(job.if, 'always()', 'failed or skipped dependencies must still produce a final result');
+  assert.equal(job['runs-on'], 'ubuntu-22.04');
+  assert.equal(job['continue-on-error'], undefined);
+  assert.equal(job.steps.length, 1);
+  const step = job.steps[0];
+  assert.equal(step.if, undefined);
+  assert.equal(step['continue-on-error'], undefined);
+  assert.deepEqual(step.env, {
+    CANDIDATE_RESULT: '${{ needs.candidate.result }}',
+    PLATFORMS_RESULT: '${{ needs.verify.result }}',
+    DEMOS_RESULT: '${{ needs.demos.result }}',
+  });
+  const success = Object.fromEntries(Object.keys(step.env).map(key => [key, 'success']));
+  const run = overrides => spawnSync('bash', ['--noprofile', '--norc', '-euo', 'pipefail', '-c', step.run], {
+    encoding: 'utf8', env: { PATH: process.env.PATH, ...success, ...overrides },
+  });
+  const passed = run({});
+  assert.equal(passed.status, 0, passed.stderr);
+  assert.equal(passed.stderr, '');
+  for (const key of Object.keys(success)) for (const result of ['failure', 'cancelled', 'skipped', '', undefined]) {
+    const failed = run({ [key]: result });
+    assert.equal(failed.status, 1, `${key}=${result}: ${failed.stderr}`);
+    assert.match(failed.stderr, /Required verification did not pass/);
+  }
+});
+
 test('RC and final evidence stages never fabricate absent installation or performance results', () => {
   const rc = fs.readFileSync(path.join(repo, '.github/workflows/release-candidate.yml'), 'utf8');
   assert.ok(rc.indexOf('--stage rc') < rc.indexOf('gh release create'));
