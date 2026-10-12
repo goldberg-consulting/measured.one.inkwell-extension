@@ -1,8 +1,8 @@
 import * as fs from "fs";
 import * as path from "path";
 import { createHash, randomUUID } from "crypto";
-import { stringify } from "yaml";
-import MarkdownIt from "markdown-it";
+import { yamlParser } from "./yaml-parser";
+import { createMarkdownParser } from "./markdown-parser";
 import { resolveContainedPath } from "./bundled-assets";
 import { buildTexInvocationPath } from "./shell-env";
 import { executeRunProcess, ProcessOutcome } from "./run-process";
@@ -20,7 +20,7 @@ interface CitationPandocDependencies {
   now?: () => number;
 }
 const digest = (value: string) => createHash("sha256").update(value).digest("hex");
-const decodeHtml = new MarkdownIt().utils.unescapeAll;
+let decodeHtml: ((value: string) => string) | undefined;
 const successful = (result: ProcessOutcome) => result.exitCode === 0 && !result.signal && !result.error && !result.cancelled && !result.timedOut && !result.maxBufferExceeded;
 function findPandoc(environment: NodeJS.ProcessEnv): string | undefined {
   for (const directory of (environment.PATH || "").split(path.delimiter).filter(Boolean)) {
@@ -151,7 +151,7 @@ export class CitationPandocEngine {
       }
       const csl = references.csl ? await copyInput(references.csl, `${staging}/style.csl`, snapshot.cslHash, references.cslSource?.source === "builtin") : undefined;
       if (epoch !== this.epoch) return undefined;
-      await fs.promises.writeFile(contained(input), `---\n${stringify({ ...bibliographyMetadata({ ...references, bibliography, csl }), "inkwell-preview-citations": true })}---\n\n${markdown}`, { flag: "wx" });
+      await fs.promises.writeFile(contained(input), `---\n${yamlParser().stringify({ ...bibliographyMetadata({ ...references, bibliography, csl }), "inkwell-preview-citations": true })}---\n\n${markdown}`, { flag: "wx" });
       const args = ["--from=markdown", "--to=commonmark_x-raw_attribute", "--wrap=none"];
       if (references.scope === "section") args.push("--lua-filter", path.join(filters, "section-bibliographies.lua"));
       else args.push("--lua-filter", path.join(filters, "reference-prepare.lua"), "--citeproc");
@@ -166,7 +166,7 @@ export class CitationPandocEngine {
       const latest = await bibliographyService.snapshot(references, identity.version);
       if (latest.fingerprint !== snapshot.fingerprint || signature(identity.binary) !== identity.signature) return fail("Bibliography, CSL, or Pandoc changed during citation rendering. Retry the preview.");
       const missing = [...new Set([...outcome.stderr.matchAll(/Citeproc: citation ([^\r\n]+?) not found/g)].map(match => match[1]))];
-      const keys = new Set([...outcome.stdout.matchAll(/data-cites="([^"]*)"/g)].flatMap(match => decodeHtml(match[1]).split(/\s+/)).filter(Boolean));
+      const keys = new Set([...outcome.stdout.matchAll(/data-cites="([^"]*)"/g)].flatMap(match => (decodeHtml ??= createMarkdownParser().utils.unescapeAll)(match[1]).split(/\s+/)).filter(Boolean));
       const result: CitationCache = { schemaVersion: 2, engine: "pandoc", fingerprint, body: outcome.stdout,
         resolved: [...keys].filter(key => !missing.includes(key)), missing };
       await fs.promises.writeFile(contained(temporary), JSON.stringify(result), { flag: "wx" });

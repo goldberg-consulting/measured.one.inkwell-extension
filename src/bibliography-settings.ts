@@ -1,4 +1,4 @@
-import { stringify } from "yaml";
+import { yamlParser } from "./yaml-parser";
 import { DocumentConfig, resolveDocumentConfig, sizeToString, SizeValue } from "./document-config";
 import { planFrontmatterSettingsEdit } from "./document-style";
 
@@ -24,7 +24,7 @@ export function validateBibliographySetting(config: DocumentConfig, key: string,
   const capability = config.capabilities.options[key];
   if (capability && capability.support !== "supported") throw new Error(capability.reason || "This setting is controlled by the selected template.");
   const [section, field] = key.split(".");
-  const checked = resolveDocumentConfig({ text: `---\n${stringify({ [section]: { [field]: value } })}---\n`,
+  const checked = resolveDocumentConfig({ text: `---\n${yamlParser().stringify({ [section]: { [field]: value } })}---\n`,
     manifest: { template: config.template }, templateCapabilities: config.capabilities });
   const diagnostic = checked.diagnostics.find(item => item.key === key && (item.severity === "error" || item.code === "template-capability"));
   if (diagnostic) throw new Error(diagnostic.message);

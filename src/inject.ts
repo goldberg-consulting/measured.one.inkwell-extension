@@ -12,7 +12,7 @@
 import * as path from "path";
 import * as fs from "fs";
 import * as crypto from "crypto";
-import MarkdownIt from "markdown-it";
+import { createMarkdownParser } from "./markdown-parser";
 import { execFileSync } from "child_process";
 import { BlockResult, CodeBlock, DisplayMode, readCurrentRunResults, parseCodeBlocks, parseQuotedAttrs, parseRunConfig, resolveVenvPython, RunConfig } from "./runner";
 import { buildCodeBlockPath, findBinaryViaShell } from "./shell-env";
@@ -180,7 +180,7 @@ function shieldBindingLiterals(markdown: string, inspectMetadata?: (values: stri
   const body = tables.text.slice(frontmatter), starts = [0];
   for (const match of body.matchAll(/\r\n|\r|\n/g)) starts.push(match.index! + match[0].length);
   const ranges: Array<[number, number]> = [];
-  const tokens = new MarkdownIt().parse(body, {});
+  const tokens = createMarkdownParser().parse(body, {});
   for (const token of tokens) {
     if (!token.map) continue;
     const start = starts[token.map[0]], end = starts[token.map[1]] ?? body.length;
