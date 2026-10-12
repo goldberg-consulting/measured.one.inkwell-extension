@@ -9,8 +9,9 @@ import { spawnSync } from 'node:child_process';
 import { compareBenchmarks } from '../scripts/check-benchmark-regression.mjs';
 
 const hash = 'a'.repeat(64);
+const demoNames = Object.keys(JSON.parse(fs.readFileSync(new URL('fixtures/demo-text.json', import.meta.url), 'utf8')));
 function report(ms, { repetitions = 5, warmups = 1 } = {}) {
-  const corpus = Array.from({ length: 10 }, (_, index) => ({ name: `demo-${index}.md`, sha256: hash }));
+  const corpus = demoNames.map(name => ({ name, sha256: hash }));
   const process = binary => ({ binary, milliseconds: 1, exitCode: 0, signal: null });
   return { schemaVersion: 1, success: true, runId: randomUUID(), repetitions, warmups,
     machine: { platform: 'darwin', arch: 'arm64', cpu: 'fixture', node: 'v25.2.1', osRelease: '25.5.0', memoryBytes: 1024 },
@@ -38,7 +39,9 @@ function rejected(reports, reason) {
 test('two complete comparable warm runs pass and retain evidence identities', () => {
   const reports = inputs(), result = compareBenchmarks(...reports);
   assert.equal(result.ok, true); assert.equal(result.status, 'passed');
-  assert.equal(result.baselineMedianMs, 1000); assert.equal(result.candidateMedianMs, 650); assert.equal(result.confirmationMedianMs, 680);
+  assert.equal(result.baselineMedianMs, 100 * demoNames.length);
+  assert.equal(result.candidateMedianMs, 65 * demoNames.length);
+  assert.equal(result.confirmationMedianMs, 68 * demoNames.length);
   assert.deepEqual(result.runIds, reports.map(item => item.runId));
   assert.deepEqual(result.benchmarkIdentity, reports[0].benchmarkIdentity);
 });
@@ -46,19 +49,19 @@ test('two complete comparable warm runs pass and retain evidence identities', ()
 test('warmups are excluded and the median uses whole-corpus sums', () => {
   const reports = inputs(), baseline = reports[0];
   baseline.demos.filter(demo => demo.measured).forEach(demo => { demo.totalMs = 1; });
-  for (let repetition = 0; repetition < 5; repetition++) baseline.demos.find(demo => demo.repetition === repetition && demo.name === `demo-${repetition}.md`).totalMs = 991;
+  for (let repetition = 0; repetition < 5; repetition++) baseline.demos.find(demo => demo.repetition === repetition && demo.name === demoNames[repetition]).totalMs = 100 * demoNames.length - (demoNames.length - 1);
   baseline.demos.filter(demo => !demo.measured).forEach(demo => { demo.totalMs = 1e9; });
   const result = compareBenchmarks(...reports);
-  assert.equal(result.baselineMedianMs, 1000, 'sum of individual medians would incorrectly be 10');
+  assert.equal(result.baselineMedianMs, 100 * demoNames.length, 'sum of individual medians would incorrectly equal the corpus size');
   assert.equal(result.demos[0].baselineMedianMs, 1);
 });
 
 test('one noisy demo needs independent confirmation and exact ten percent is allowed', () => {
   const baseline = report(100), candidate = report(50), confirmation = report(50);
-  const setDemo = (report, ms) => report.demos.filter(demo => demo.name === 'demo-0.md').forEach(demo => { demo.totalMs = ms; });
+  const setDemo = (report, ms) => report.demos.filter(demo => demo.name === demoNames[0]).forEach(demo => { demo.totalMs = ms; });
   setDemo(candidate, 120); assert.equal(compareBenchmarks(baseline, candidate, confirmation).ok, true);
   setDemo(confirmation, 120);
-  assert.match(compareBenchmarks(baseline, candidate, confirmation).failures.join(' '), /demo-0.md regresses/);
+  assert.ok(compareBenchmarks(baseline, candidate, confirmation).failures.includes(`${demoNames[0]} regresses by over 10% on both confirmation runs.`));
   setDemo(candidate, 110); setDemo(confirmation, 110);
   assert.equal(compareBenchmarks(baseline, candidate, confirmation).ok, true);
 });
@@ -132,16 +135,16 @@ for (const [key, values] of [['repetitions', [undefined, null, '5', 4, 5.5, 21, 
 for (const [label, mutate] of [
   ['missing warmups', report => { report.demos = report.demos.filter(demo => demo.measured); }],
   ['missing measurement', report => { report.demos.pop(); }],
-  ['unknown demo', report => { report.demos.push({ ...report.demos[10], name: 'outside-corpus.md', totalMs: 1e6 }); }],
+  ['unknown demo', report => { report.demos.push({ ...report.demos[demoNames.length], name: 'outside-corpus.md', totalMs: 1e6 }); }],
   ['duplicate warmup', report => { report.demos[1] = { ...report.demos[0] }; }],
-  ['duplicate measurement', report => { report.demos[11] = { ...report.demos[10] }; }],
-  ['out-of-range measurement', report => { report.demos[10].repetition = 5; }],
+  ['duplicate measurement', report => { report.demos[demoNames.length + 1] = { ...report.demos[demoNames.length] }; }],
+  ['out-of-range measurement', report => { report.demos[demoNames.length].repetition = 5; }],
   ['out-of-range warmup', report => { report.demos[0].repetition = -2; }],
   ['fractional repetition', report => { report.demos[0].repetition = 0.5; }],
   ['measured warmup', report => { report.demos[0].measured = true; }],
-  ['unmeasured measurement', report => { report.demos[10].measured = false; }],
-  ['truthy nonboolean', report => { report.demos[10].measured = 'true'; }],
-  ['cold measurement', report => { report.demos[10].cacheState = 'cold'; }],
+  ['unmeasured measurement', report => { report.demos[demoNames.length].measured = false; }],
+  ['truthy nonboolean', report => { report.demos[demoNames.length].measured = 'true'; }],
+  ['cold measurement', report => { report.demos[demoNames.length].cacheState = 'cold'; }],
   ['missing cache state', report => { delete report.demos[0].cacheState; }],
 ]) test(`${label} cannot alter the full-corpus comparison`, () => {
   const reports = inputs(); mutate(reports[0]); rejected(reports, /matrix|iteration|measured or cacheState/);
@@ -149,8 +152,20 @@ for (const [label, mutate] of [
 
 test('extra baseline time cannot fabricate improvement from identical legitimate timings', () => {
   const baseline = report(100);
-  for (let repetition = 0; repetition < 5; repetition++) baseline.demos.push({ ...baseline.demos[10], name: 'outside-corpus.md', repetition, totalMs: 1000 });
+  for (let repetition = 0; repetition < 5; repetition++) baseline.demos.push({ ...baseline.demos[demoNames.length], name: 'outside-corpus.md', repetition, totalMs: 1000 });
   rejected([baseline, report(100), report(100)], /unknown demo/);
+});
+
+test('all comparable reports must retain measured-report and cannot replace it with an unknown demo', () => {
+  assert.ok(demoNames.includes('demo-measured-report.md'));
+  for (const replace of [false, true]) {
+    const reports = inputs();
+    for (const report of reports) for (const key of ['corpus', 'preparedCorpus', 'demos']) {
+      if (replace) report[key].filter(item => item.name === 'demo-measured-report.md').forEach(item => { item.name = 'demo-unknown.md'; });
+      else report[key] = report[key].filter(item => item.name !== 'demo-measured-report.md');
+    }
+    rejected(reports, /complete expected demo corpus/);
+  }
 });
 
 for (const [label, mutate] of [

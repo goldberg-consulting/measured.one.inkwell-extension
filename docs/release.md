@@ -7,7 +7,7 @@ Run workflows from the release commit itself, using its branch or tag in the Act
 ## Candidate checks
 
 1. Run **Verify** on the intended commit. It builds one `inkwell-candidate` artifact. Linux and macOS consume those bytes for package identity, behavior, migrations, mocked installers, required offline preview, and real extension-host activation.
-2. Its reusable demo job runs all ten documents through the packaged runtime, with one warmup and five measured repetitions on two independent runs. It also runs the real editor run/extract/edit/insert/PDF fixture and the warm-preview responsiveness measurement.
+2. Its reusable demo job runs the complete demo corpus through the packaged runtime, with one warmup and five measured repetitions on two independent runs. Every demo must have PDF text expectations in `tests/fixtures/demo-text.json`, including the measured report. It also runs the real editor run/extract/edit/insert/PDF fixture and the warm-preview responsiveness measurement.
 3. Supply a valid comparable baseline to the benchmark job before claiming its gate. A baseline containing an incomplete PDF is invalid. Missing baselines leave performance evidence absent; they never imply a waiver. The three retained measurement reports are recomputed during evidence aggregation.
 4. Retain PDF parity, 0.4 upgrade and any remaining required evidence. Each record includes its actual report files and their hashes. The PDF parity gate requires all ten templates, normalized-style parity, a pinned toolchain fingerprint and raster results within 0.5% differing pixels at a 10/255 channel threshold.
 

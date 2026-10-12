@@ -12,9 +12,14 @@ const runId = value => typeof value === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-4[
 const positive = value => Number.isFinite(value) && value > 0;
 const positiveInteger = value => Number.isSafeInteger(value) && value > 0;
 const text = value => typeof value === 'string' && value.trim().length > 0 && value !== 'unavailable';
-const validManifest = value => Array.isArray(value) && value.length === 10
+export function hasCompleteDemoCorpus(names) {
+  const expected = Object.keys(JSON.parse(fs.readFileSync(new URL('../tests/fixtures/demo-text.json', import.meta.url), 'utf8')));
+  return Array.isArray(names) && expected.length > 0 && names.length === expected.length
+    && new Set(names).size === expected.length && names.every(name => expected.includes(name));
+}
+const validManifest = value => Array.isArray(value)
   && value.every(entry => object(entry) && text(entry.name) && sha256(entry.sha256))
-  && new Set(value.map(entry => entry.name)).size === 10;
+  && hasCompleteDemoCorpus(value.map(entry => entry.name));
 const manifestIdentity = manifest => JSON.stringify(manifest.map(({ name, sha256 }) => [name, sha256]).sort());
 const sameFields = (left, right) => JSON.stringify(Object.entries(left).sort()) === JSON.stringify(Object.entries(right).sort());
 const flatIdentity = value => object(value) && Object.keys(value).length > 0 && Object.values(value).every(item =>
@@ -44,7 +49,7 @@ function validateReport(report, label, failures) {
     && Number.isInteger(report.warmups) && report.warmups >= 1 && report.warmups <= 5;
   if (!validCounts) fail('requires 5 to 20 measured iterations and 1 to 5 unmeasured warmups.');
   const validCorpus = validManifest(report.corpus);
-  if (!validCorpus) fail('requires the complete ten-demo corpus with unique names and source SHA256 values.');
+  if (!validCorpus) fail('requires the complete expected demo corpus with unique names and source SHA256 values.');
   if (!validManifest(report.preparedCorpus) || (validCorpus
       && JSON.stringify(report.preparedCorpus.map(entry => entry.name).sort()) !== JSON.stringify(report.corpus.map(entry => entry.name).sort()))) {
     fail('requires a complete preparedCorpus manifest with matching demo names and effective source SHA256 values.');

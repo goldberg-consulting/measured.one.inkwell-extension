@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readZipEntries, verifyVsix } from './verify-vsix.mjs';
 import { ASSET_MANIFEST_PATH, isSafeRelativePath } from './build-asset-manifest.mjs';
-import { compareBenchmarks } from './check-benchmark-regression.mjs';
+import { compareBenchmarks, hasCompleteDemoCorpus } from './check-benchmark-regression.mjs';
 
 export const PUBLICATION_GATES = Object.freeze(['behavior-linux', 'behavior-macos', 'package', 'activation-linux', 'activation-macos',
   'offline-linux', 'offline-macos', 'run-to-pdf', 'warm-preview', 'pdf-parity', 'demos', 'performance', 'upgrade-from-0.4', 'clean-macos-cask', 'standalone-existing-tex', 'tap-audit']);
@@ -99,8 +99,9 @@ export function validateGateReport(gate, bytes, candidate) {
     'PDF parity requires all templates, normalized styles and pinned-toolchain raster goldens within the declared tolerance.');
   } else if (gate === 'demos') {
     ensure(report.success === true && report.artifact?.archiveSha256 === candidate.vsixSha256
-      && new Set(report.demos?.map(item => item.name)).size === 10 && report.demos.every(item => item.success && item.expectedText
-        && !item.unresolved?.length && !item.runFailures?.length), 'All ten demos must pass through the exact packaged compiler.');
+      && Array.isArray(report.demos) && hasCompleteDemoCorpus([...new Set(report.demos.map(item => item?.name))])
+      && report.demos.every(item => item.success && item.expectedText
+        && !item.unresolved?.length && !item.runFailures?.length), 'The complete expected demo corpus must pass through the exact packaged compiler.');
   } else if (gate === 'package') {
     ensure(report.ok === true && report.archiveSha256 === candidate.vsixSha256, 'Package evidence must validate the same VSIX bytes.');
   } else if (gate === 'performance') {

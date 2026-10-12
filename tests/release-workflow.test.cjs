@@ -384,8 +384,9 @@ test('macOS installation preflight diagnoses missing and invalid inputs and acce
     CANDIDATE_SHA256: 'c'.repeat(64),
     CANDIDATE_URL: `https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/download/inkwell-rc-${releaseCommit}/inkwell-0.5.2.vsix`,
   };
-  const run = overrides => spawnSync('bash', ['-euo', 'pipefail', '-c', preflight], {
-    encoding: 'utf8', env: { ...process.env, ...valid, ...overrides },
+  const run = overrides => spawnSync('bash', ['--noprofile', '--norc', '-euo', 'pipefail', '-c', preflight], {
+    // Runner startup hooks are unrelated to the workflow script under test.
+    encoding: 'utf8', env: { ...process.env, ...valid, ...overrides, BASH_ENV: undefined, ENV: undefined },
   });
   for (const empty of ['', undefined]) {
     const missing = run(Object.fromEntries(Object.keys(valid).map(key => [key, empty])));

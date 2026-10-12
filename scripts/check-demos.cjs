@@ -16,6 +16,14 @@ const warmups = Number(options.warmups || 0);
 const baseline = Object.hasOwn(options, 'baseline');
 if (!Number.isInteger(repetitions) || repetitions < 1 || repetitions > 20) throw new Error('Invalid repetitions');
 if (!Number.isInteger(warmups) || warmups < 0 || warmups > 5) throw new Error('Invalid warmup count');
+const examples = fs.readdirSync(path.join(repo, 'examples')).filter(f => /^demo-.*\.md$/.test(f)).sort();
+const expectedDemoText = JSON.parse(fs.readFileSync(path.join(repo, 'tests/fixtures/demo-text.json'), 'utf8'));
+for (const name of examples) {
+  const fragments = expectedDemoText[name];
+  if (!Array.isArray(fragments) || !fragments.length || fragments.some(fragment => typeof fragment !== 'string' || !fragment.trim())) {
+    throw new Error(`Missing or invalid PDF text expectations for ${name}: add a nonempty string array to tests/fixtures/demo-text.json.`);
+  }
+}
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'inkwell-demos-'));
 const project = path.join(work, 'project');
 const disposable = () => ({ dispose() {} });
@@ -123,13 +131,17 @@ async function main() {
   const bib = seed;
   fs.writeFileSync(path.join(project, '.inkwell/references/refs.bib'), bib);
   fs.writeFileSync(path.join(project, '.inkwell/manifest.json'), '{"template":"default"}\n');
-  for (const [relative, content] of Object.entries(seeds.SCAFFOLD_SEED_FILES)) {
-    if (!relative.startsWith('.inkwell/scripts/')) continue;
+  const scripts = Object.fromEntries(Object.entries(seeds.SCAFFOLD_SEED_FILES).filter(([name]) => name.startsWith('.inkwell/scripts/')));
+  const { BUNDLED_ASSET_PATHS } = require(path.join(repo, 'out/bundled-assets.js'));
+  for (const relative of BUNDLED_ASSET_PATHS.filter(name => name.startsWith('examples/mixed-report/')).sort()) {
+    scripts[relative.replace('examples/', '.inkwell/scripts/')] = fs.readFileSync(path.join(packagedRoot || repo, relative), 'utf8');
+  }
+  for (const [relative, content] of Object.entries(scripts)) {
     const destination = path.join(project, relative);
     fs.mkdirSync(path.dirname(destination), { recursive: true });
     fs.writeFileSync(destination, content);
   }
-  const examples = fs.readdirSync(path.join(repo, 'examples')).filter(f => /^demo-.*\.md$/.test(f)).sort();
+  cp.execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['ci', '--prefix', path.join(project, '.inkwell/scripts/mixed-report'), '--no-audit', '--no-fund'], { stdio: 'pipe' });
   for (const name of examples) {
     const text = Object.hasOwn(options, 'committed-examples')
       ? cp.execFileSync('git', ['show', `HEAD:examples/${name}`], { cwd: repo })
@@ -143,13 +155,13 @@ async function main() {
     try { result.runtime[name] = cp.execFileSync(binary, args, { encoding: 'utf8' }).split(/\r?\n/)[0]; }
     catch { result.runtime[name] = 'unavailable'; }
   }
-  result.corpusHash = hash(JSON.stringify({ sources: result.corpus, bibliography: hash(bib), scripts: Object.fromEntries(Object.entries(seeds.SCAFFOLD_SEED_FILES).filter(([name]) => name.startsWith('.inkwell/scripts/')).map(([name, text]) => [name, hash(text)])) }));
+  result.corpusHash = hash(JSON.stringify({ sources: result.corpus, bibliography: hash(bib), scripts: Object.fromEntries(Object.entries(scripts).map(([name, text]) => [name, hash(text)])) }));
   process.env.MPLCONFIGDIR = path.join(work, 'matplotlib');
   if (path.isAbsolute(python) && path.basename(path.dirname(python)) === 'bin') {
     // The release rejects project environments that escape through a symlink.
     // Copy the fixture environment into this disposable project; preserve only
     // its normal interpreter links and use copy-on-write where supported.
-    fs.cpSync(path.dirname(path.dirname(python)), path.join(project, 'venv'), {
+    fs.cpSync(path.dirname(path.dirname(python)), path.join(project, '.venv'), {
       recursive: true, verbatimSymlinks: true, mode: fs.constants.COPYFILE_FICLONE,
     });
   }
@@ -239,7 +251,7 @@ async function main() {
         const text = cp.execFileSync(process.env.INKWELL_PDF_PYTHON || python, ['-c', 'import sys,json; from pypdf import PdfReader; r=PdfReader(sys.argv[1]); print(json.dumps({"pages":len(r.pages),"text":" ".join(p.extract_text() or "" for p in r.pages)}))', compiled.pdfPath], { encoding: 'utf8' });
         const extracted = JSON.parse(text);
         record.pages = extracted.pages;
-        const expected = JSON.parse(fs.readFileSync(path.join(repo, 'tests/fixtures/demo-text.json'), 'utf8'))[name];
+        const expected = expectedDemoText[name];
         record.expectedText = expected.every(fragment => extracted.text.replace(/\s+/g, ' ').toLowerCase().includes(fragment.toLowerCase()));
       }
       result.demos.push(record);
