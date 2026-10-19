@@ -24,9 +24,10 @@ or `~/Applications`. It verifies the exact `measure-one.inkwell` release in ever
 detected editor. The cask has no editor-selection option. No editor shell-command
 setup is needed.
 
-Homebrew manages Pandoc, pandoc-crossref, Mermaid CLI, Node, and full MacTeX as
-direct cask dependencies. MacTeX is an unconditional part of this cask's full
-profile. The installer uses the requirements file inside the VSIX payload and
+The prepared 0.5.3 cask manages Pandoc, pandoc-crossref, and Node as direct
+dependencies. The shared installer preserves a working TeX installation and
+installs MacTeX only when no TeX distribution exists. It installs Mermaid support
+and other missing tools as needed. The installer uses the requirements file inside the VSIX payload and
 installs only missing packages. It does not use a same-named file in the caller's
 working directory.
 

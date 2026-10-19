@@ -131,7 +131,7 @@ test('real bundled preview renders math, Mermaid, code and bounded PDF pages wit
         browserSignal: browser.signalCode, state, requests: requests.slice(-100), denied, browserStderr: stderr.slice(-4000) };
       const file = path.join(os.tmpdir(), `inkwell-offline-failure-${Date.now()}-${process.pid}.json`);
       fs.writeFileSync(file, JSON.stringify(failure, null, 2) + '\n');
-      t.diagnostic(`Offline browser failure evidence: ${file}`);
+      t.diagnostic(`Offline browser failure evidence: ${file}\n${JSON.stringify(failure)}`);
       throw new Error(`Offline preview wait failed: ${predicate.toString()}\n${JSON.stringify(state)}\nEvidence: ${file}`, { cause: error });
     }
   };
