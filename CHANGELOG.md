@@ -2,6 +2,9 @@
 
 ## 0.5.3 — October 19, 2026
 
+- Restore current Homebrew installation using the same release VSIX, the shared installer, and version-aware removal. Preserve an existing working TeX installation.
+- Fix CI browser selection, platform scrollbar assumptions, and authenticated dependency lookup.
+
 - Load document parsers on first use to keep extension activation responsive.
 - Verify all current demo documents, including the measured.one report and Python report.
 - Run macOS release installation checks on demand and report one aggregate verification result.

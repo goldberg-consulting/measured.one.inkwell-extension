@@ -7,7 +7,7 @@ and publication templates to Cursor and VS Code.
 
 ## Install
 
-1. Download [Inkwell 0.5.2 for Cursor and VS Code](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.5.2).
+1. Download [Inkwell 0.5.3 for Cursor and VS Code](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.5.3).
 2. Open the Command Palette (**Cmd+Shift+P** on macOS) and choose
    **Extensions: Install from VSIX…**. Select the downloaded file.
 3. Run **Developer: Reload Window**, then **Inkwell: Setup / Repair**.
@@ -16,9 +16,16 @@ and publication templates to Cursor and VS Code.
 Already installed? Start with **Inkwell: New Project**, or open an existing
 Markdown document and choose **Inkwell: Open Preview**.
 
-The Homebrew cask currently serves the older 0.4.0 release. Use the VSIX above
-for this update. See [installation and troubleshooting](docs/installation.md)
-for tool requirements and other platforms.
+On macOS, you can also install with Homebrew:
+
+```sh
+brew install --cask goldberg-consulting/inkwell/inkwell
+```
+
+For an existing Homebrew installation, run `brew update` followed by
+`brew upgrade --cask goldberg-consulting/inkwell/inkwell`. See
+[installation and troubleshooting](docs/installation.md) for tool requirements
+and other platforms.
 
 ## Try the measured.one report
 
