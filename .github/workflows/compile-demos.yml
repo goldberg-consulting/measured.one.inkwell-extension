@@ -243,4 +243,7 @@ jobs:
             /tmp/inkwell-demos-*/**/*.log
             /tmp/inkwell-vscode/**/compile.log
             /tmp/inkwell-vscode/**/*.tex
+            /tmp/inkwell-host-*/**/editor.log
+            /tmp/inkwell-host-*/**/result.json
+            /tmp/inkwell-host-*/**/logs/**
           if-no-files-found: warn
