@@ -1,0 +1,95 @@
+name: Validate patch Homebrew installation
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: read
+  actions: read
+jobs:
+  install:
+    runs-on: macos-14
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HOMEBREW_NO_AUTO_UPDATE: 1
+      HOMEBREW_NO_ANALYTICS: 1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 61daf71136c7f6c102947433cfd1ac76cec8349c
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/checkout@v4
+        with:
+          repository: goldberg-consulting/homebrew-inkwell
+          ref: b2d0ccada57846ac3734393d28ef4a3521ede176
+          path: tap
+      - name: Retrieve exact passing candidate
+        run: |
+          set -euo pipefail
+          gh run download 39262670748 -R goldberg-consulting/measured.one.inkwell-extension -n inkwell-candidate -D candidate
+          npm ci
+          node scripts/verify-vsix.mjs candidate/inkwell-0.5.3.vsix --tag v0.5.3
+          test "$(shasum -a 256 candidate/inkwell-0.5.3.vsix | cut -d ' ' -f1)" = e9121d2d3a4797b283442efbdc82ef19dc992c5ee4c2d92fa412d64b4c3e7baa
+          unzip -q candidate/inkwell-0.5.3.vsix -d candidate/unpacked
+          mkdir reports
+      - name: Prepare editor and existing TeX
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 https://update.code.visualstudio.com/latest/darwin-arm64/stable -o "$RUNNER_TEMP/editor.zip"
+          sudo ditto -x -k "$RUNNER_TEMP/editor.zip" /Applications
+          brew install pandoc pandoc-crossref mermaid-cli ghostscript poppler
+          curl --fail --location --retry 3 https://yihui.org/tinytex/install-bin-unix.sh -o "$RUNNER_TEMP/tinytex.sh"
+          sh "$RUNNER_TEMP/tinytex.sh"
+          export PATH="$HOME/Library/TinyTeX/bin/universal-darwin:$PATH"
+          echo "$HOME/Library/TinyTeX/bin/universal-darwin" >> "$GITHUB_PATH"
+          tlmgr update --self
+          node -e 'const fs=require("fs");for(const line of fs.readFileSync("candidate/unpacked/extension/requirements-latex.txt","utf8").split(/\r?\n/)){const n=line.replace(/#.*/,"").trim();if(n){if(!/^[a-z0-9+.-]+$/.test(n))throw Error("Invalid package");console.log(n)}}' > "$RUNNER_TEMP/tex-packages.txt"
+          packages=()
+          while IFS= read -r package; do packages+=("$package"); done < "$RUNNER_TEMP/tex-packages.txt"
+          tlmgr install "${packages[@]}"
+          kpsewhich -var-value TEXMFROOT > reports/tex-before.txt
+          code_path="/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
+          "$code_path" --list-extensions --show-versions > reports/editor-before.txt
+          if grep -qi '^measure-one.inkwell@' reports/editor-before.txt; then exit 1; fi
+      - name: Install the actual cask from the identical local candidate bytes
+        run: |
+          set -euo pipefail
+          node scripts/release-contract.mjs verify-tap tap > reports/lifecycle.log
+          node - <<'NODE'
+          const fs=require('fs'),{pathToFileURL}=require('url'),path=require('path');
+          const p='tap/Casks/inkwell.rb',s=fs.readFileSync(p,'utf8');
+          const url=pathToFileURL(path.resolve('candidate/inkwell-0.5.3.vsix')).href;
+          fs.writeFileSync(p,s.replace(/^  url .+$/m,`  url "${url}"`));
+          NODE
+          git -C tap config user.name 'Patch validation'
+          git -C tap config user.email 'actions@users.noreply.github.com'
+          git -C tap add Casks/inkwell.rb
+          git -C tap commit -m 'Use identical local candidate for prepublication installation test'
+          brew tap goldberg-consulting/inkwell "$GITHUB_WORKSPACE/tap"
+          if brew help trust >/dev/null 2>&1; then brew trust --cask goldberg-consulting/inkwell/inkwell; fi
+          brew install --cask goldberg-consulting/inkwell/inkwell 2>&1 | tee reports/install.log
+          kpsewhich -var-value TEXMFROOT > reports/tex-after.txt
+          cmp reports/tex-before.txt reports/tex-after.txt
+      - name: Verify PDF and reinstall then uninstall preservation
+        run: |
+          set -euo pipefail
+          root="$GITHUB_WORKSPACE/candidate/unpacked/extension"
+          node "$root/out/doctor-cli.js" --extension-root "$root" --full --editor code --json > reports/doctor.json
+          node "$root/out/smoke-cli.js" "$GITHUB_WORKSPACE/reports/smoke" > reports/smoke.json
+          node -e 'const fs=require("fs"),r=JSON.parse(fs.readFileSync("reports/smoke.json"));if(!r.success||!r.verified)throw Error("PDF failed");fs.copyFileSync(r.pdfPath,"reports/verified.pdf")'
+          mkdir -p "$HOME/Documents/inkwell-preservation-fixture"
+          printf 'authored document\n' > "$HOME/Documents/inkwell-preservation-fixture/report.md"
+          shasum -a 256 "$HOME/Documents/inkwell-preservation-fixture/report.md" > reports/preservation-before.txt
+          brew reinstall --cask goldberg-consulting/inkwell/inkwell 2>&1 | tee reports/reinstall.log
+          brew uninstall --cask goldberg-consulting/inkwell/inkwell 2>&1 | tee reports/uninstall.log
+          shasum -a 256 "$HOME/Documents/inkwell-preservation-fixture/report.md" > reports/preservation-after.txt
+          cmp reports/preservation-before.txt reports/preservation-after.txt
+          "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" --list-extensions --show-versions > reports/editor-after.txt
+          if grep -qi '^measure-one.inkwell@' reports/editor-after.txt; then exit 1; fi
+          test ! -d /opt/homebrew/Caskroom/inkwell/0.5.3
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: patch-installation-evidence
+          path: reports/
