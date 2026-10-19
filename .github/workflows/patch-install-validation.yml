@@ -1,5 +1,7 @@
 name: Validate patch Homebrew installation
 on:
+  push:
+    branches: [validation/inkwell-0.5.3]
   workflow_dispatch: {}
 permissions:
   contents: read
