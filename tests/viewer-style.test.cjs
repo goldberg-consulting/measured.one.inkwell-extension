@@ -294,6 +294,7 @@ test('browser PDF fit follows pane resizing and custom zoom keeps both page edge
         container.appendChild(canvas); document.body.appendChild(container);
         viewerMeasurements.left = canvas.getBoundingClientRect().left;
         viewerMeasurements.scrollWidth = container.scrollWidth;
+        viewerMeasurements.clientWidth = container.clientWidth;
         container.scrollLeft = 1000;
         viewerMeasurements.maxScroll = container.scrollLeft;
         viewerMeasurements.right = canvas.getBoundingClientRect().right;
@@ -315,6 +316,7 @@ test('browser PDF fit follows pane resizing and custom zoom keeps both page edge
   assert.equal(measured.before, 976); assert.equal(measured.after, 576);
   assert.ok(measured.renders.length >= 2, 'fit width must rerender after the pane changes size');
   assert.equal(measured.left, 0); assert.equal(measured.scrollWidth, 1000);
-  assert.equal(measured.maxScroll, 500); assert.equal(measured.right, 500);
-  assert.equal(measured.smallLeft, 150, 'a page narrower than its pane stays centered');
+  assert.equal(measured.maxScroll, measured.scrollWidth - measured.clientWidth);
+  assert.equal(measured.right, measured.clientWidth);
+  assert.equal(measured.smallLeft, (measured.clientWidth - 200) / 2, 'a page narrower than its pane stays centered');
 });
