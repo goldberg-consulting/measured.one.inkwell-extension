@@ -2,7 +2,7 @@
   "name": "inkwell",
   "displayName": "Inkwell",
   "description": "Write Markdown, run Python and JavaScript, and publish polished PDFs in a live split preview.",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "publisher": "measure-one",
   "icon": "media/icon.png",
   "license": "SEE LICENSE IN LICENSE",

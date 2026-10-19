@@ -1,13 +1,13 @@
 # Installation and health checks
 
-## 0.5.2 release status
+## 0.5.3 release status
 
-The 0.5.2 VSIX is published on GitHub Releases and can be installed directly in
-Cursor or VS Code using **Extensions: Install from VSIX…**, followed by a window
-reload. This release was built and verified locally on macOS, not with GitHub
-Actions. The Homebrew tap has not been updated and may serve 0.4.0. The cask
-instructions below describe the 0.5 installer implementation; they are not a
-claim that a clean-machine Homebrew installation of 0.5.2 has been verified.
+The 0.5.3 VSIX is available from [GitHub Releases](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.5.3)
+and the Homebrew tap. The exact package passed functional verification on Linux
+and macOS, the full demo corpus, offline preview, and the real editor-to-PDF
+workflow. Patch installation qualification includes a fresh macOS runner,
+Homebrew installation and reinstallation, a verified PDF, and uninstall checks
+that preserve existing TeX and an authored document.
 
 ## One-command macOS installation
 
@@ -24,9 +24,10 @@ or `~/Applications`. It verifies the exact `measure-one.inkwell` release in ever
 detected editor. The cask has no editor-selection option. No editor shell-command
 setup is needed.
 
-Homebrew manages Pandoc, pandoc-crossref, Mermaid CLI, Node, and full MacTeX as
-direct cask dependencies. MacTeX is an unconditional part of this cask's full
-profile. The installer uses the requirements file inside the VSIX payload and
+The 0.5.3 cask manages Pandoc, pandoc-crossref, and Node as direct
+dependencies. The shared installer preserves a working TeX installation and
+installs MacTeX only when no TeX distribution exists. It installs Mermaid support
+and other missing tools as needed. The installer uses the requirements file inside the VSIX payload and
 installs only missing packages. It does not use a same-named file in the caller's
 working directory.
 
@@ -34,7 +35,7 @@ Completion requires successful editor version verification, the full health
 report, and an actual Inkwell PDF build. Failed or interrupted work retains
 diagnostics and does not print a successful completion message. The installer
 retains its verification project, PDFs, state, and logs under
-`~/Library/Application Support/Inkwell/verification/0.5.2`.
+`~/Library/Application Support/Inkwell/verification/0.5.3`.
 
 Reload an already-running editor after installation or upgrade. Upgrades use
 `brew upgrade --cask goldberg-consulting/inkwell/inkwell`. If Homebrew asks you to

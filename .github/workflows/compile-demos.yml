@@ -116,13 +116,15 @@ jobs:
           echo "VSIX=$vsix" >> "$GITHUB_ENV"
 
       - name: Install pandoc 3.x and pandoc-crossref
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           PANDOC_VERSION="3.9"
           curl --fail --location --retry 3 "https://github.com/jgm/pandoc/releases/download/${PANDOC_VERSION}/pandoc-${PANDOC_VERSION}-1-amd64.deb" --output "$RUNNER_TEMP/pandoc.deb"
           sudo dpkg -i "$RUNNER_TEMP/pandoc.deb"
           pandoc --version
-          curl --fail --location --retry 3 https://api.github.com/repos/lierdakil/pandoc-crossref/releases/latest --output "$RUNNER_TEMP/crossref-release.json"
+          gh api repos/lierdakil/pandoc-crossref/releases/latest > "$RUNNER_TEMP/crossref-release.json"
           crossref_url="$(node -e 'const release=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const asset=release.assets.find(item=>item.name.endsWith("Linux-X64.tar.xz"));if(!asset)throw new Error("Required crossref release asset is missing");process.stdout.write(asset.browser_download_url)' "$RUNNER_TEMP/crossref-release.json")"
           curl --fail --location --proto '=https' --retry 3 "$crossref_url" --output "$RUNNER_TEMP/pandoc-crossref.tar.xz"
           mkdir -p "$RUNNER_TEMP/pandoc-crossref"
@@ -243,4 +245,7 @@ jobs:
             /tmp/inkwell-demos-*/**/*.log
             /tmp/inkwell-vscode/**/compile.log
             /tmp/inkwell-vscode/**/*.tex
+            /tmp/inkwell-host-*/**/editor.log
+            /tmp/inkwell-host-*/**/result.json
+            /tmp/inkwell-host-*/**/logs/**
           if-no-files-found: warn

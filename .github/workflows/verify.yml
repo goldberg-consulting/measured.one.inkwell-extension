@@ -62,14 +62,17 @@ jobs:
             platform: linux
             editor_download: linux-x64
             editor_binary: VSCode-linux-x64/code
+            browser_binary: /usr/bin/google-chrome
           - os: macos-14
             platform: macos
             editor_download: darwin-arm64
             editor_binary: ""
+            browser_binary: /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     env:
       INKWELL_REQUIRE_BROWSER: 1
+      INKWELL_CHROME_BIN: ${{ matrix.browser_binary }}
       FORCE_COLOR: 0
     steps:
       - uses: actions/checkout@v4
@@ -182,6 +185,7 @@ jobs:
             behavior.log
             offline.json
             host.json
+            /tmp/inkwell-offline-failure-*.json
           if-no-files-found: error
 
   demos:
