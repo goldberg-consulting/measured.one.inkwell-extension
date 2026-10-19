@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: goldberg-consulting/homebrew-inkwell
-          ref: b2d0ccada57846ac3734393d28ef4a3521ede176
+          ref: 7a8f910fc2365d2a46ea79163545bfad8b73cc7c
           path: tap
       - name: Retrieve exact passing candidate
         run: |
@@ -54,21 +54,12 @@ jobs:
           code_path="/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
           "$code_path" --list-extensions --show-versions > reports/editor-before.txt
           if grep -qi '^measure-one.inkwell@' reports/editor-before.txt; then exit 1; fi
-      - name: Install the actual cask from the identical local candidate bytes
+      - name: Install from the public canonical Homebrew tap
         run: |
           set -euo pipefail
           node scripts/release-contract.mjs verify-tap tap > reports/lifecycle.log
-          node - <<'NODE'
-          const fs=require('fs'),{pathToFileURL}=require('url'),path=require('path');
-          const p='tap/Casks/inkwell.rb',s=fs.readFileSync(p,'utf8');
-          const url=pathToFileURL(path.resolve('candidate/inkwell-0.5.3.vsix')).href;
-          fs.writeFileSync(p,s.replace(/^  url .+$/m,`  url "${url}"`));
-          NODE
-          git -C tap config user.name 'Patch validation'
-          git -C tap config user.email 'actions@users.noreply.github.com'
-          git -C tap add Casks/inkwell.rb
-          git -C tap commit -m 'Use identical local candidate for prepublication installation test'
-          brew tap goldberg-consulting/inkwell "$GITHUB_WORKSPACE/tap"
+          brew tap goldberg-consulting/inkwell
+          test "$(git -C "$(brew --repository goldberg-consulting/inkwell)" rev-parse HEAD)" = 7a8f910fc2365d2a46ea79163545bfad8b73cc7c
           if brew help trust >/dev/null 2>&1; then brew trust --cask goldberg-consulting/inkwell/inkwell; fi
           brew install --cask goldberg-consulting/inkwell/inkwell 2>&1 | tee reports/install.log
           kpsewhich -var-value TEXMFROOT > reports/tex-after.txt
