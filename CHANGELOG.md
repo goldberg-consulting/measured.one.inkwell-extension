@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.4 — November 12, 2026
 
 - Add `row-rules` and `row-rule-color` table settings: light rules between body rows in the PDF and preview, without grid's vertical borders or extra rules beside the header and bottom rules.
 - Give measured.one Report body tables the configurable table adapter, so `inkwell: tables:` presets, font size, padding, colors, and row rules apply.
@@ -32,7 +32,7 @@
 - Includes the reliability and preview fixes already on main, including currency dollar-sign rendering.
 - Built and verified locally; GitHub Actions were not used for this release.
 
-## Unreleased — 0.5 reliability work
+## 0.5.4 — November 12, 2026 — 0.5 reliability work
 
 ### Output safety
 

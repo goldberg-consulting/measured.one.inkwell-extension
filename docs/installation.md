@@ -1,8 +1,8 @@
 # Installation and health checks
 
-## 0.5.3 release status
+## 0.5.4 release status
 
-The 0.5.3 VSIX is available from [GitHub Releases](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.5.3)
+The 0.5.4 VSIX is available from [GitHub Releases](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.5.4)
 and the Homebrew tap. The exact package passed functional verification on Linux
 and macOS, the full demo corpus, offline preview, and the real editor-to-PDF
 workflow. Patch installation qualification includes a fresh macOS runner,
@@ -24,7 +24,7 @@ or `~/Applications`. It verifies the exact `measure-one.inkwell` release in ever
 detected editor. The cask has no editor-selection option. No editor shell-command
 setup is needed.
 
-The 0.5.3 cask manages Pandoc, pandoc-crossref, and Node as direct
+The 0.5.4 cask manages Pandoc, pandoc-crossref, and Node as direct
 dependencies. The shared installer preserves a working TeX installation and
 installs MacTeX only when no TeX distribution exists. It installs Mermaid support
 and other missing tools as needed. The installer uses the requirements file inside the VSIX payload and
@@ -35,7 +35,7 @@ Completion requires successful editor version verification, the full health
 report, and an actual Inkwell PDF build. Failed or interrupted work retains
 diagnostics and does not print a successful completion message. The installer
 retains its verification project, PDFs, state, and logs under
-`~/Library/Application Support/Inkwell/verification/0.5.3`.
+`~/Library/Application Support/Inkwell/verification/0.5.4`.
 
 Reload an already-running editor after installation or upgrade. Upgrades use
 `brew upgrade --cask goldberg-consulting/inkwell/inkwell`. If Homebrew asks you to

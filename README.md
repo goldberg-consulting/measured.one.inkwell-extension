@@ -7,7 +7,7 @@ and publication templates to Cursor and VS Code.
 
 ## Install
 
-1. Download [Inkwell 0.5.3 for Cursor and VS Code](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.5.3).
+1. Download [Inkwell 0.5.4 for Cursor and VS Code](https://github.com/goldberg-consulting/measured.one.inkwell-extension/releases/tag/v0.5.4).
 2. Open the Command Palette (**Cmd+Shift+P** on macOS) and choose
    **Extensions: Install from VSIX…**. Select the downloaded file.
 3. Run **Developer: Reload Window**, then **Inkwell: Setup / Repair**.
