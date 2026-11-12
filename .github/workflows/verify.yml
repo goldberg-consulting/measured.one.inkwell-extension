@@ -63,7 +63,7 @@ jobs:
             editor_download: linux-x64
             editor_binary: VSCode-linux-x64/code
             browser_binary: /usr/bin/google-chrome
-          - os: macos-14
+          - os: macos-15
             platform: macos
             editor_download: darwin-arm64
             editor_binary: ""
