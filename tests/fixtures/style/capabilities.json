@@ -106,6 +106,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -207,6 +213,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.8,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -217,7 +225,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:10.909091pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:10.909091pt;--inkwell-caption-size:10.909091pt;--inkwell-reference-size:10.909091pt;--inkwell-heading-1-size:14.346202pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:10.909091pt;--inkwell-heading-4-size:10.909091pt;--inkwell-heading-5-size:10.909091pt;--inkwell-heading-6-size:10.909091pt;--inkwell-body-font:\"Latin Modern Roman\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Latin Modern Roman\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.738813;",
-    "tableCss": "--inkwell-table-font-size:10.909091pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:10.909091pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "",
     "tablePdfOptions": {
       "defaults": {
@@ -230,6 +238,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.8,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -250,6 +260,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -370,6 +382,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -471,6 +489,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.8,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -481,7 +501,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:11.955168pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:11.955168pt;--inkwell-caption-size:11.955168pt;--inkwell-reference-size:11.955168pt;--inkwell-heading-1-size:11.955168pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:11.955168pt;--inkwell-heading-4-size:11.955168pt;--inkwell-heading-5-size:11.955168pt;--inkwell-heading-6-size:11.955168pt;--inkwell-body-font:\"Inter\",sans-serif;--inkwell-sans-font:\"Inter\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Inter\",sans-serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.499542;",
-    "tableCss": "--inkwell-table-font-size:11.955168pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:11.955168pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "",
     "tablePdfOptions": {
       "defaults": {
@@ -494,6 +514,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.8,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -514,6 +536,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -603,56 +627,64 @@
       "tables.preset": {
         "support": "locked",
         "value": "booktabs",
-        "reason": "Hipster CV preserves its native body-table rules. Choose Default or ETH Report for other presets."
+        "reason": "Hipster CV preserves its native body-table rules. Choose Default, ETH Report, or measured.one Report for other presets."
       },
       "tables.stripe": {
         "support": "locked",
-        "reason": "Hipster CV owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Hipster CV owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.density": {
         "support": "locked",
-        "reason": "Hipster CV owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Hipster CV owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.captionPosition": {
         "support": "locked",
         "value": "above",
-        "reason": "Hipster CV owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Hipster CV owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.headerWeight": {
         "support": "locked",
-        "reason": "Hipster CV owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Hipster CV owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.headerBackground": {
         "support": "locked",
-        "reason": "Hipster CV owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Hipster CV owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.stripeColor": {
         "support": "locked",
-        "reason": "Hipster CV owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Hipster CV owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.ruleColor": {
         "support": "locked",
-        "reason": "Hipster CV owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Hipster CV owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.ruleThickness": {
         "support": "locked",
-        "reason": "Hipster CV owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Hipster CV owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
+      },
+      "tables.rowRules": {
+        "support": "locked",
+        "reason": "Hipster CV owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
+      },
+      "tables.rowRuleColor": {
+        "support": "locked",
+        "reason": "Hipster CV owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.paddingHorizontal": {
         "support": "locked",
-        "reason": "Hipster CV owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Hipster CV owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.paddingVertical": {
         "support": "locked",
-        "reason": "Hipster CV owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Hipster CV owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.alignment": {
         "support": "locked",
-        "reason": "Hipster CV owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Hipster CV owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.numericAlignment": {
         "support": "locked",
-        "reason": "Hipster CV owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Hipster CV owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.width": {
         "support": "supported"
@@ -665,7 +697,7 @@
       },
       "tables.captionStyle": {
         "support": "locked",
-        "reason": "Hipster CV owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Hipster CV owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "typography.bodyFont": {
         "support": "locked",
@@ -739,6 +771,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.8,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -749,7 +783,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:9.96264pt;--inkwell-code-size:7.970112pt;--inkwell-table-size:9.96264pt;--inkwell-caption-size:9.96264pt;--inkwell-reference-size:9.96264pt;--inkwell-heading-1-size:14.346202pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:9.96264pt;--inkwell-heading-4-size:9.96264pt;--inkwell-heading-5-size:9.96264pt;--inkwell-heading-6-size:9.96264pt;--inkwell-body-font:\"Latin Modern Roman\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Latin Modern Roman\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.2;",
-    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "",
     "tablePdfOptions": {
       "defaults": {
@@ -762,6 +796,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.8,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -782,6 +818,8 @@
         "stripeColor": false,
         "ruleColor": false,
         "ruleThicknessPt": false,
+        "rowRules": false,
+        "rowRuleColor": false,
         "paddingHorizontalPt": false,
         "paddingVerticalPt": false,
         "alignment": false,
@@ -871,68 +909,76 @@
       "tables.preset": {
         "support": "locked",
         "value": "booktabs",
-        "reason": "KTH Letter preserves its native body-table rules. Choose Default or ETH Report for other presets."
+        "reason": "KTH Letter preserves its native body-table rules. Choose Default, ETH Report, or measured.one Report for other presets."
       },
       "tables.stripe": {
         "support": "locked",
-        "reason": "KTH Letter owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "KTH Letter owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.density": {
         "support": "locked",
-        "reason": "KTH Letter owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "KTH Letter owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.captionPosition": {
         "support": "locked",
         "value": "above",
-        "reason": "KTH Letter owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "KTH Letter owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.headerWeight": {
         "support": "locked",
-        "reason": "KTH Letter owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "KTH Letter owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.headerBackground": {
         "support": "locked",
-        "reason": "KTH Letter owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "KTH Letter owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.stripeColor": {
         "support": "locked",
-        "reason": "KTH Letter owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "KTH Letter owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.ruleColor": {
         "support": "locked",
-        "reason": "KTH Letter owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "KTH Letter owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.ruleThickness": {
         "support": "locked",
-        "reason": "KTH Letter owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "KTH Letter owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
+      },
+      "tables.rowRules": {
+        "support": "locked",
+        "reason": "KTH Letter owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
+      },
+      "tables.rowRuleColor": {
+        "support": "locked",
+        "reason": "KTH Letter owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.paddingHorizontal": {
         "support": "locked",
-        "reason": "KTH Letter owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "KTH Letter owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.paddingVertical": {
         "support": "locked",
-        "reason": "KTH Letter owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "KTH Letter owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.alignment": {
         "support": "locked",
-        "reason": "KTH Letter owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "KTH Letter owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.numericAlignment": {
         "support": "locked",
-        "reason": "KTH Letter owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "KTH Letter owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.width": {
         "support": "locked",
-        "reason": "KTH Letter owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "KTH Letter owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.overflow": {
         "support": "locked",
-        "reason": "KTH Letter owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "KTH Letter owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.captionStyle": {
         "support": "locked",
-        "reason": "KTH Letter owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "KTH Letter owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "typography.bodyFont": {
         "support": "locked",
@@ -1006,6 +1052,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.8,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -1016,7 +1064,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:10.909091pt;--inkwell-code-size:9.96264pt;--inkwell-table-size:10.909091pt;--inkwell-caption-size:10.909091pt;--inkwell-reference-size:10.909091pt;--inkwell-heading-1-size:14.346202pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:10.909091pt;--inkwell-heading-4-size:10.909091pt;--inkwell-heading-5-size:10.909091pt;--inkwell-heading-6-size:10.909091pt;--inkwell-body-font:\"Times\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Times\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.242009;",
-    "tableCss": "--inkwell-table-font-size:10.909091pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:10.909091pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "",
     "tablePdfOptions": {
       "defaults": {
@@ -1029,6 +1077,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.8,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -1049,6 +1099,8 @@
         "stripeColor": false,
         "ruleColor": false,
         "ruleThicknessPt": false,
+        "rowRules": false,
+        "rowRuleColor": false,
         "paddingHorizontalPt": false,
         "paddingVerticalPt": false,
         "alignment": false,
@@ -1138,56 +1190,64 @@
       "tables.preset": {
         "support": "locked",
         "value": "booktabs",
-        "reason": "Ludus Academik preserves its native body-table rules. Choose Default or ETH Report for other presets."
+        "reason": "Ludus Academik preserves its native body-table rules. Choose Default, ETH Report, or measured.one Report for other presets."
       },
       "tables.stripe": {
         "support": "locked",
-        "reason": "Ludus Academik owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Ludus Academik owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.density": {
         "support": "locked",
-        "reason": "Ludus Academik owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Ludus Academik owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.captionPosition": {
         "support": "locked",
         "value": "above",
-        "reason": "Ludus Academik owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Ludus Academik owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.headerWeight": {
         "support": "locked",
-        "reason": "Ludus Academik owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Ludus Academik owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.headerBackground": {
         "support": "locked",
-        "reason": "Ludus Academik owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Ludus Academik owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.stripeColor": {
         "support": "locked",
-        "reason": "Ludus Academik owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Ludus Academik owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.ruleColor": {
         "support": "locked",
-        "reason": "Ludus Academik owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Ludus Academik owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.ruleThickness": {
         "support": "locked",
-        "reason": "Ludus Academik owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Ludus Academik owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
+      },
+      "tables.rowRules": {
+        "support": "locked",
+        "reason": "Ludus Academik owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
+      },
+      "tables.rowRuleColor": {
+        "support": "locked",
+        "reason": "Ludus Academik owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.paddingHorizontal": {
         "support": "locked",
-        "reason": "Ludus Academik owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Ludus Academik owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.paddingVertical": {
         "support": "locked",
-        "reason": "Ludus Academik owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Ludus Academik owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.alignment": {
         "support": "locked",
-        "reason": "Ludus Academik owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Ludus Academik owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.numericAlignment": {
         "support": "locked",
-        "reason": "Ludus Academik owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Ludus Academik owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.width": {
         "support": "supported"
@@ -1200,7 +1260,7 @@
       },
       "tables.captionStyle": {
         "support": "locked",
-        "reason": "Ludus Academik owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Ludus Academik owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "typography.bodyFont": {
         "support": "locked",
@@ -1274,6 +1334,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.8,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -1284,7 +1346,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:9.96264pt;--inkwell-code-size:8.966376pt;--inkwell-table-size:9.96264pt;--inkwell-caption-size:9.96264pt;--inkwell-reference-size:9.96264pt;--inkwell-heading-1-size:14.346202pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:9.96264pt;--inkwell-heading-4-size:9.96264pt;--inkwell-heading-5-size:9.96264pt;--inkwell-heading-6-size:9.96264pt;--inkwell-body-font:\"Source Sans 3\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Source Sans 3\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.2;",
-    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "",
     "tablePdfOptions": {
       "defaults": {
@@ -1297,6 +1359,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.8,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -1317,6 +1381,8 @@
         "stripeColor": false,
         "ruleColor": false,
         "ruleThicknessPt": false,
+        "rowRules": false,
+        "rowRuleColor": false,
         "paddingHorizontalPt": false,
         "paddingVerticalPt": false,
         "alignment": false,
@@ -1406,56 +1472,64 @@
       "tables.preset": {
         "support": "locked",
         "value": "booktabs",
-        "reason": "Rho Academic Article preserves its native body-table rules. Choose Default or ETH Report for other presets."
+        "reason": "Rho Academic Article preserves its native body-table rules. Choose Default, ETH Report, or measured.one Report for other presets."
       },
       "tables.stripe": {
         "support": "locked",
-        "reason": "Rho Academic Article owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Rho Academic Article owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.density": {
         "support": "locked",
-        "reason": "Rho Academic Article owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Rho Academic Article owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.captionPosition": {
         "support": "locked",
         "value": "above",
-        "reason": "Rho Academic Article owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Rho Academic Article owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.headerWeight": {
         "support": "locked",
-        "reason": "Rho Academic Article owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Rho Academic Article owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.headerBackground": {
         "support": "locked",
-        "reason": "Rho Academic Article owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Rho Academic Article owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.stripeColor": {
         "support": "locked",
-        "reason": "Rho Academic Article owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Rho Academic Article owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.ruleColor": {
         "support": "locked",
-        "reason": "Rho Academic Article owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Rho Academic Article owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.ruleThickness": {
         "support": "locked",
-        "reason": "Rho Academic Article owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Rho Academic Article owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
+      },
+      "tables.rowRules": {
+        "support": "locked",
+        "reason": "Rho Academic Article owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
+      },
+      "tables.rowRuleColor": {
+        "support": "locked",
+        "reason": "Rho Academic Article owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.paddingHorizontal": {
         "support": "locked",
-        "reason": "Rho Academic Article owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Rho Academic Article owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.paddingVertical": {
         "support": "locked",
-        "reason": "Rho Academic Article owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Rho Academic Article owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.alignment": {
         "support": "locked",
-        "reason": "Rho Academic Article owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Rho Academic Article owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.numericAlignment": {
         "support": "locked",
-        "reason": "Rho Academic Article owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Rho Academic Article owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.width": {
         "support": "supported"
@@ -1468,7 +1542,7 @@
       },
       "tables.captionStyle": {
         "support": "locked",
-        "reason": "Rho Academic Article owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Rho Academic Article owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "typography.bodyFont": {
         "support": "locked",
@@ -1542,6 +1616,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.8,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -1552,7 +1628,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:8.966376pt;--inkwell-code-size:7.970112pt;--inkwell-table-size:8.966376pt;--inkwell-caption-size:8.966376pt;--inkwell-reference-size:8.966376pt;--inkwell-heading-1-size:10.909091pt;--inkwell-heading-2-size:9.96264pt;--inkwell-heading-3-size:8.966376pt;--inkwell-heading-4-size:8.966376pt;--inkwell-heading-5-size:8.966376pt;--inkwell-heading-6-size:8.966376pt;--inkwell-body-font:\"STIX Two Text\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"STIX Two Text\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.216667;",
-    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "",
     "tablePdfOptions": {
       "defaults": {
@@ -1565,6 +1641,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.8,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -1585,6 +1663,8 @@
         "stripeColor": false,
         "ruleColor": false,
         "ruleThicknessPt": false,
+        "rowRules": false,
+        "rowRuleColor": false,
         "paddingHorizontalPt": false,
         "paddingVerticalPt": false,
         "alignment": false,
@@ -1674,56 +1754,64 @@
       "tables.preset": {
         "support": "locked",
         "value": "booktabs",
-        "reason": "RMxAA preserves its native body-table rules. Choose Default or ETH Report for other presets."
+        "reason": "RMxAA preserves its native body-table rules. Choose Default, ETH Report, or measured.one Report for other presets."
       },
       "tables.stripe": {
         "support": "locked",
-        "reason": "RMxAA owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "RMxAA owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.density": {
         "support": "locked",
-        "reason": "RMxAA owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "RMxAA owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.captionPosition": {
         "support": "locked",
         "value": "above",
-        "reason": "RMxAA owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "RMxAA owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.headerWeight": {
         "support": "locked",
-        "reason": "RMxAA owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "RMxAA owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.headerBackground": {
         "support": "locked",
-        "reason": "RMxAA owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "RMxAA owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.stripeColor": {
         "support": "locked",
-        "reason": "RMxAA owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "RMxAA owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.ruleColor": {
         "support": "locked",
-        "reason": "RMxAA owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "RMxAA owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.ruleThickness": {
         "support": "locked",
-        "reason": "RMxAA owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "RMxAA owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
+      },
+      "tables.rowRules": {
+        "support": "locked",
+        "reason": "RMxAA owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
+      },
+      "tables.rowRuleColor": {
+        "support": "locked",
+        "reason": "RMxAA owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.paddingHorizontal": {
         "support": "locked",
-        "reason": "RMxAA owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "RMxAA owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.paddingVertical": {
         "support": "locked",
-        "reason": "RMxAA owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "RMxAA owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.alignment": {
         "support": "locked",
-        "reason": "RMxAA owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "RMxAA owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.numericAlignment": {
         "support": "locked",
-        "reason": "RMxAA owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "RMxAA owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.width": {
         "support": "supported"
@@ -1736,7 +1824,7 @@
       },
       "tables.captionStyle": {
         "support": "locked",
-        "reason": "RMxAA owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "RMxAA owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "typography.bodyFont": {
         "support": "locked",
@@ -1810,6 +1898,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.8,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -1820,7 +1910,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:8.966376pt;--inkwell-code-size:7.970112pt;--inkwell-table-size:8.966376pt;--inkwell-caption-size:8.966376pt;--inkwell-reference-size:8.966376pt;--inkwell-heading-1-size:10.909091pt;--inkwell-heading-2-size:9.96264pt;--inkwell-heading-3-size:8.966376pt;--inkwell-heading-4-size:8.966376pt;--inkwell-heading-5-size:8.966376pt;--inkwell-heading-6-size:8.966376pt;--inkwell-body-font:\"STIX Two Text\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"STIX Two Text\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.216667;",
-    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "",
     "tablePdfOptions": {
       "defaults": {
@@ -1833,6 +1923,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.8,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -1853,6 +1945,8 @@
         "stripeColor": false,
         "ruleColor": false,
         "ruleThicknessPt": false,
+        "rowRules": false,
+        "rowRuleColor": false,
         "paddingHorizontalPt": false,
         "paddingVerticalPt": false,
         "alignment": false,
@@ -1942,68 +2036,76 @@
       "tables.preset": {
         "support": "locked",
         "value": "booktabs",
-        "reason": "TMSCE preserves its native body-table rules. Choose Default or ETH Report for other presets."
+        "reason": "TMSCE preserves its native body-table rules. Choose Default, ETH Report, or measured.one Report for other presets."
       },
       "tables.stripe": {
         "support": "locked",
-        "reason": "TMSCE owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "TMSCE owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.density": {
         "support": "locked",
-        "reason": "TMSCE owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "TMSCE owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.captionPosition": {
         "support": "locked",
         "value": "above",
-        "reason": "TMSCE owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "TMSCE owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.headerWeight": {
         "support": "locked",
-        "reason": "TMSCE owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "TMSCE owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.headerBackground": {
         "support": "locked",
-        "reason": "TMSCE owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "TMSCE owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.stripeColor": {
         "support": "locked",
-        "reason": "TMSCE owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "TMSCE owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.ruleColor": {
         "support": "locked",
-        "reason": "TMSCE owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "TMSCE owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.ruleThickness": {
         "support": "locked",
-        "reason": "TMSCE owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "TMSCE owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
+      },
+      "tables.rowRules": {
+        "support": "locked",
+        "reason": "TMSCE owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
+      },
+      "tables.rowRuleColor": {
+        "support": "locked",
+        "reason": "TMSCE owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.paddingHorizontal": {
         "support": "locked",
-        "reason": "TMSCE owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "TMSCE owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.paddingVertical": {
         "support": "locked",
-        "reason": "TMSCE owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "TMSCE owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.alignment": {
         "support": "locked",
-        "reason": "TMSCE owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "TMSCE owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.numericAlignment": {
         "support": "locked",
-        "reason": "TMSCE owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "TMSCE owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.width": {
         "support": "locked",
-        "reason": "TMSCE owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "TMSCE owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.overflow": {
         "support": "locked",
-        "reason": "TMSCE owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "TMSCE owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.captionStyle": {
         "support": "locked",
-        "reason": "TMSCE owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "TMSCE owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "typography.bodyFont": {
         "support": "locked",
@@ -2077,6 +2179,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.8,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -2087,7 +2191,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:10.909091pt;--inkwell-code-size:9.96264pt;--inkwell-table-size:10.909091pt;--inkwell-caption-size:10.909091pt;--inkwell-reference-size:10.909091pt;--inkwell-heading-1-size:14.346202pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:10.909091pt;--inkwell-heading-4-size:10.909091pt;--inkwell-heading-5-size:10.909091pt;--inkwell-heading-6-size:10.909091pt;--inkwell-body-font:\"Latin Modern Roman\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Latin Modern Roman\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.242009;",
-    "tableCss": "--inkwell-table-font-size:10.909091pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:10.909091pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "",
     "tablePdfOptions": {
       "defaults": {
@@ -2100,6 +2204,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.8,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -2120,6 +2226,8 @@
         "stripeColor": false,
         "ruleColor": false,
         "ruleThicknessPt": false,
+        "rowRules": false,
+        "rowRuleColor": false,
         "paddingHorizontalPt": false,
         "paddingVerticalPt": false,
         "alignment": false,
@@ -2209,68 +2317,76 @@
       "tables.preset": {
         "support": "locked",
         "value": "booktabs",
-        "reason": "Tufte Handout preserves its native body-table rules. Choose Default or ETH Report for other presets."
+        "reason": "Tufte Handout preserves its native body-table rules. Choose Default, ETH Report, or measured.one Report for other presets."
       },
       "tables.stripe": {
         "support": "locked",
-        "reason": "Tufte Handout owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Handout owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.density": {
         "support": "locked",
-        "reason": "Tufte Handout owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Handout owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.captionPosition": {
         "support": "locked",
         "value": "above",
-        "reason": "Tufte Handout owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Handout owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.headerWeight": {
         "support": "locked",
-        "reason": "Tufte Handout owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Handout owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.headerBackground": {
         "support": "locked",
-        "reason": "Tufte Handout owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Handout owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.stripeColor": {
         "support": "locked",
-        "reason": "Tufte Handout owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Handout owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.ruleColor": {
         "support": "locked",
-        "reason": "Tufte Handout owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Handout owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.ruleThickness": {
         "support": "locked",
-        "reason": "Tufte Handout owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Handout owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
+      },
+      "tables.rowRules": {
+        "support": "locked",
+        "reason": "Tufte Handout owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
+      },
+      "tables.rowRuleColor": {
+        "support": "locked",
+        "reason": "Tufte Handout owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.paddingHorizontal": {
         "support": "locked",
-        "reason": "Tufte Handout owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Handout owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.paddingVertical": {
         "support": "locked",
-        "reason": "Tufte Handout owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Handout owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.alignment": {
         "support": "locked",
-        "reason": "Tufte Handout owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Handout owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.numericAlignment": {
         "support": "locked",
-        "reason": "Tufte Handout owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Handout owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.width": {
         "support": "locked",
-        "reason": "Tufte Handout owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Handout owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.overflow": {
         "support": "locked",
-        "reason": "Tufte Handout owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Handout owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.captionStyle": {
         "support": "locked",
-        "reason": "Tufte Handout owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Handout owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "typography.bodyFont": {
         "support": "locked",
@@ -2344,6 +2460,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.8,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -2354,7 +2472,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:9.96264pt;--inkwell-code-size:8.966376pt;--inkwell-table-size:9.96264pt;--inkwell-caption-size:9.96264pt;--inkwell-reference-size:9.96264pt;--inkwell-heading-1-size:14.346202pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:9.96264pt;--inkwell-heading-4-size:9.96264pt;--inkwell-heading-5-size:9.96264pt;--inkwell-heading-6-size:9.96264pt;--inkwell-body-font:\"Palatino\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Palatino\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.2;",
-    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "",
     "tablePdfOptions": {
       "defaults": {
@@ -2367,6 +2485,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.8,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -2387,6 +2507,8 @@
         "stripeColor": false,
         "ruleColor": false,
         "ruleThicknessPt": false,
+        "rowRules": false,
+        "rowRuleColor": false,
         "paddingHorizontalPt": false,
         "paddingVerticalPt": false,
         "alignment": false,
@@ -2476,68 +2598,76 @@
       "tables.preset": {
         "support": "locked",
         "value": "booktabs",
-        "reason": "Tufte Book VDQI preserves its native body-table rules. Choose Default or ETH Report for other presets."
+        "reason": "Tufte Book VDQI preserves its native body-table rules. Choose Default, ETH Report, or measured.one Report for other presets."
       },
       "tables.stripe": {
         "support": "locked",
-        "reason": "Tufte Book VDQI owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Book VDQI owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.density": {
         "support": "locked",
-        "reason": "Tufte Book VDQI owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Book VDQI owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.captionPosition": {
         "support": "locked",
         "value": "above",
-        "reason": "Tufte Book VDQI owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Book VDQI owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.headerWeight": {
         "support": "locked",
-        "reason": "Tufte Book VDQI owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Book VDQI owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.headerBackground": {
         "support": "locked",
-        "reason": "Tufte Book VDQI owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Book VDQI owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.stripeColor": {
         "support": "locked",
-        "reason": "Tufte Book VDQI owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Book VDQI owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.ruleColor": {
         "support": "locked",
-        "reason": "Tufte Book VDQI owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Book VDQI owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.ruleThickness": {
         "support": "locked",
-        "reason": "Tufte Book VDQI owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Book VDQI owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
+      },
+      "tables.rowRules": {
+        "support": "locked",
+        "reason": "Tufte Book VDQI owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
+      },
+      "tables.rowRuleColor": {
+        "support": "locked",
+        "reason": "Tufte Book VDQI owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.paddingHorizontal": {
         "support": "locked",
-        "reason": "Tufte Book VDQI owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Book VDQI owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.paddingVertical": {
         "support": "locked",
-        "reason": "Tufte Book VDQI owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Book VDQI owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.alignment": {
         "support": "locked",
-        "reason": "Tufte Book VDQI owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Book VDQI owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.numericAlignment": {
         "support": "locked",
-        "reason": "Tufte Book VDQI owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Book VDQI owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.width": {
         "support": "locked",
-        "reason": "Tufte Book VDQI owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Book VDQI owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.overflow": {
         "support": "locked",
-        "reason": "Tufte Book VDQI owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Book VDQI owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "tables.captionStyle": {
         "support": "locked",
-        "reason": "Tufte Book VDQI owns this table option. Choose Default or ETH Report for configurable body-table styles."
+        "reason": "Tufte Book VDQI owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles."
       },
       "typography.bodyFont": {
         "support": "locked",
@@ -2611,6 +2741,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.8,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -2621,7 +2753,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:9.96264pt;--inkwell-code-size:8.966376pt;--inkwell-table-size:9.96264pt;--inkwell-caption-size:9.96264pt;--inkwell-reference-size:9.96264pt;--inkwell-heading-1-size:14.346202pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:9.96264pt;--inkwell-heading-4-size:9.96264pt;--inkwell-heading-5-size:9.96264pt;--inkwell-heading-6-size:9.96264pt;--inkwell-body-font:\"Palatino\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Palatino\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.2;",
-    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "",
     "tablePdfOptions": {
       "defaults": {
@@ -2634,6 +2766,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.8,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -2654,6 +2788,8 @@
         "stripeColor": false,
         "ruleColor": false,
         "ruleThicknessPt": false,
+        "rowRules": false,
+        "rowRuleColor": false,
         "paddingHorizontalPt": false,
         "paddingVerticalPt": false,
         "alignment": false,
@@ -2801,6 +2937,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -2902,6 +3044,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.8,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -2912,7 +3056,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:9.96264pt;--inkwell-code-size:7.970112pt;--inkwell-table-size:9.96264pt;--inkwell-caption-size:8.966376pt;--inkwell-reference-size:6.973848pt;--inkwell-heading-1-size:17.215442pt;--inkwell-heading-2-size:14.346202pt;--inkwell-heading-3-size:11.955168pt;--inkwell-heading-4-size:11.955168pt;--inkwell-heading-5-size:11.955168pt;--inkwell-heading-6-size:11.955168pt;--inkwell-body-font:\"Times New Roman\",serif;--inkwell-sans-font:\"Arial\",sans-serif;--inkwell-mono-font:\"Courier New\",monospace;--inkwell-heading-font:\"Arial\",serif;--inkwell-heading-weight:400;--inkwell-heading-color:#336699;--inkwell-line-spacing:1.68;",
-    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "\\setmainfont[Scale=1]{Times New Roman}\n\\setsansfont[Scale=1]{Arial}\n\\setmonofont[Scale=1]{Courier New}\n% Inkwell heading typography\n\\newfontfamily\\inkwellheadingfont{Arial}[Scale=1]\n\\definecolor{inkwellheadingcolor}{HTML}{336699}\n\\titleformat{\\section}{\\normalfont\\inkwellheadingfont\\fontsize{17.28pt}{20.736pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}{\\thesection}{1em}{}\n\\titleformat{\\subsection}{\\normalfont\\inkwellheadingfont\\fontsize{14.4pt}{17.28pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}{\\thesubsection}{1em}{}\n\\titleformat{\\subsubsection}{\\normalfont\\inkwellheadingfont\\fontsize{12pt}{14.4pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}{\\thesubsubsection}{1em}{}\n\\titleformat{\\paragraph}[runin]{\\normalfont\\inkwellheadingfont\\fontsize{12pt}{14.4pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}{\\theparagraph}{1em}{}\n\\titleformat{\\subparagraph}[runin]{\\normalfont\\inkwellheadingfont\\fontsize{12pt}{14.4pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}{\\thesubparagraph}{1em}{}\n% Inkwell highlighted and plain code sizing\n\\usepackage{fvextra}\n\\newcommand{\\inkwellcodesize}{\\fontsize{8pt}{9.6pt}\\selectfont}\n\\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\\\\{\\},breaklines,breakanywhere,fontsize=\\inkwellcodesize}\n\\DefineVerbatimEnvironment{verbatim}{Verbatim}{breaklines,breakanywhere,fontsize=\\inkwellcodesize}\n% Inkwell figure and body-table caption sizing\n\\DeclareCaptionFont{inkwellcaption}{\\fontsize{9pt}{10.8pt}\\selectfont}\n\\captionsetup[figure]{font=inkwellcaption}\n\\captionsetup[table]{font=inkwellcaption}\n% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{10pt}{12pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -2925,6 +3069,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.8,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -2947,6 +3093,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -3094,6 +3242,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -3195,6 +3349,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.8,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -3205,7 +3361,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:10.909091pt;--inkwell-code-size:7.970112pt;--inkwell-table-size:9.96264pt;--inkwell-caption-size:8.966376pt;--inkwell-reference-size:6.973848pt;--inkwell-heading-1-size:17.215442pt;--inkwell-heading-2-size:14.346202pt;--inkwell-heading-3-size:13.090909pt;--inkwell-heading-4-size:13.090909pt;--inkwell-heading-5-size:13.090909pt;--inkwell-heading-6-size:13.090909pt;--inkwell-body-font:\"Times New Roman\",serif;--inkwell-sans-font:\"Arial\",sans-serif;--inkwell-mono-font:\"Courier New\",monospace;--inkwell-heading-font:\"Arial\",serif;--inkwell-heading-weight:400;--inkwell-heading-color:#336699;--inkwell-line-spacing:1.738813;",
-    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "\\setmainfont[Scale=1]{Times New Roman}\n\\setsansfont[Scale=1]{Arial}\n\\setmonofont[Scale=1]{Courier New}\n% Inkwell heading typography\n\\newfontfamily\\inkwellheadingfont{Arial}[Scale=1]\n\\definecolor{inkwellheadingcolor}{HTML}{336699}\n\\titleformat{\\section}{\\normalfont\\inkwellheadingfont\\fontsize{17.28pt}{20.736pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}{\\thesection}{1em}{}\n\\titleformat{\\subsection}{\\normalfont\\inkwellheadingfont\\fontsize{14.4pt}{17.28pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}{\\thesubsection}{1em}{}\n\\titleformat{\\subsubsection}{\\normalfont\\inkwellheadingfont\\fontsize{13.14pt}{15.768pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}{\\thesubsubsection}{1em}{}\n\\titleformat{\\paragraph}[runin]{\\normalfont\\inkwellheadingfont\\fontsize{13.14pt}{15.768pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}{\\theparagraph}{1em}{}\n\\titleformat{\\subparagraph}[runin]{\\normalfont\\inkwellheadingfont\\fontsize{13.14pt}{15.768pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}{\\thesubparagraph}{1em}{}\n% Inkwell highlighted and plain code sizing\n\\usepackage{fvextra}\n\\newcommand{\\inkwellcodesize}{\\fontsize{8pt}{9.6pt}\\selectfont}\n\\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\\\\{\\},breaklines,breakanywhere,fontsize=\\inkwellcodesize}\n\\DefineVerbatimEnvironment{verbatim}{Verbatim}{breaklines,breakanywhere,fontsize=\\inkwellcodesize}\n% Inkwell figure and body-table caption sizing\n\\DeclareCaptionFont{inkwellcaption}{\\fontsize{9pt}{10.8pt}\\selectfont}\n\\captionsetup[figure]{font=inkwellcaption}\n\\captionsetup[table]{font=inkwellcaption}\n% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{10pt}{12pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -3218,6 +3374,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.8,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -3240,6 +3398,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -3387,6 +3547,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -3488,6 +3654,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.8,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -3498,7 +3666,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:11.955168pt;--inkwell-code-size:7.970112pt;--inkwell-table-size:9.96264pt;--inkwell-caption-size:8.966376pt;--inkwell-reference-size:6.973848pt;--inkwell-heading-1-size:20.658531pt;--inkwell-heading-2-size:17.215442pt;--inkwell-heading-3-size:14.346202pt;--inkwell-heading-4-size:14.346202pt;--inkwell-heading-5-size:14.346202pt;--inkwell-heading-6-size:14.346202pt;--inkwell-body-font:\"Times New Roman\",serif;--inkwell-sans-font:\"Arial\",sans-serif;--inkwell-mono-font:\"Courier New\",monospace;--inkwell-heading-font:\"Arial\",serif;--inkwell-heading-weight:400;--inkwell-heading-color:#336699;--inkwell-line-spacing:1.691667;",
-    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "\\setmainfont[Scale=1]{Times New Roman}\n\\setsansfont[Scale=1]{Arial}\n\\setmonofont[Scale=1]{Courier New}\n% Inkwell heading typography\n\\newfontfamily\\inkwellheadingfont{Arial}[Scale=1]\n\\definecolor{inkwellheadingcolor}{HTML}{336699}\n\\titleformat{\\section}{\\normalfont\\inkwellheadingfont\\fontsize{20.736pt}{24.8832pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}{\\thesection}{1em}{}\n\\titleformat{\\subsection}{\\normalfont\\inkwellheadingfont\\fontsize{17.28pt}{20.736pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}{\\thesubsection}{1em}{}\n\\titleformat{\\subsubsection}{\\normalfont\\inkwellheadingfont\\fontsize{14.4pt}{17.28pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}{\\thesubsubsection}{1em}{}\n\\titleformat{\\paragraph}[runin]{\\normalfont\\inkwellheadingfont\\fontsize{14.4pt}{17.28pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}{\\theparagraph}{1em}{}\n\\titleformat{\\subparagraph}[runin]{\\normalfont\\inkwellheadingfont\\fontsize{14.4pt}{17.28pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}{\\thesubparagraph}{1em}{}\n% Inkwell highlighted and plain code sizing\n\\usepackage{fvextra}\n\\newcommand{\\inkwellcodesize}{\\fontsize{8pt}{9.6pt}\\selectfont}\n\\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\\\\{\\},breaklines,breakanywhere,fontsize=\\inkwellcodesize}\n\\DefineVerbatimEnvironment{verbatim}{Verbatim}{breaklines,breakanywhere,fontsize=\\inkwellcodesize}\n% Inkwell figure and body-table caption sizing\n\\DeclareCaptionFont{inkwellcaption}{\\fontsize{9pt}{10.8pt}\\selectfont}\n\\captionsetup[figure]{font=inkwellcaption}\n\\captionsetup[table]{font=inkwellcaption}\n% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{10pt}{12pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -3511,6 +3679,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.8,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -3533,6 +3703,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -3664,6 +3836,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -3765,6 +3943,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#336699",
       "ruleThicknessPt": 0.8,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -3775,7 +3955,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:10.909091pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:8.966376pt;--inkwell-caption-size:10.909091pt;--inkwell-reference-size:10.909091pt;--inkwell-heading-1-size:14.346202pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:10.909091pt;--inkwell-heading-4-size:10.909091pt;--inkwell-heading-5-size:10.909091pt;--inkwell-heading-6-size:10.909091pt;--inkwell-body-font:\"Latin Modern Roman\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Latin Modern Roman\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.738813;",
-    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{9pt}{10.8pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -3788,6 +3968,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#336699",
         "ruleThicknessPt": 0.8,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -3815,6 +3997,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -3946,6 +4130,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -4047,6 +4237,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#336699",
       "ruleThicknessPt": 0.8,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -4057,7 +4249,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:10.909091pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:8.966376pt;--inkwell-caption-size:10.909091pt;--inkwell-reference-size:10.909091pt;--inkwell-heading-1-size:14.346202pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:10.909091pt;--inkwell-heading-4-size:10.909091pt;--inkwell-heading-5-size:10.909091pt;--inkwell-heading-6-size:10.909091pt;--inkwell-body-font:\"Latin Modern Roman\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Latin Modern Roman\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.738813;",
-    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{9pt}{10.8pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -4070,6 +4262,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#336699",
         "ruleThicknessPt": 0.8,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -4097,6 +4291,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -4228,6 +4424,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -4329,6 +4531,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#336699",
       "ruleThicknessPt": 0.5,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -4339,7 +4543,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:10.909091pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:8.966376pt;--inkwell-caption-size:10.909091pt;--inkwell-reference-size:10.909091pt;--inkwell-heading-1-size:14.346202pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:10.909091pt;--inkwell-heading-4-size:10.909091pt;--inkwell-heading-5-size:10.909091pt;--inkwell-heading-6-size:10.909091pt;--inkwell-body-font:\"Latin Modern Roman\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Latin Modern Roman\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.738813;",
-    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{9pt}{10.8pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -4352,6 +4556,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#336699",
         "ruleThicknessPt": 0.5,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -4379,6 +4585,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -4510,6 +4718,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -4611,6 +4825,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#336699",
       "ruleThicknessPt": 0.5,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -4621,7 +4837,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:10.909091pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:8.966376pt;--inkwell-caption-size:10.909091pt;--inkwell-reference-size:10.909091pt;--inkwell-heading-1-size:14.346202pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:10.909091pt;--inkwell-heading-4-size:10.909091pt;--inkwell-heading-5-size:10.909091pt;--inkwell-heading-6-size:10.909091pt;--inkwell-body-font:\"Latin Modern Roman\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Latin Modern Roman\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.738813;",
-    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{9pt}{10.8pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -4634,6 +4850,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#336699",
         "ruleThicknessPt": 0.5,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -4661,6 +4879,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -4792,6 +5012,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -4893,6 +5119,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#336699",
       "ruleThicknessPt": 0,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -4903,7 +5131,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:10.909091pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:8.966376pt;--inkwell-caption-size:10.909091pt;--inkwell-reference-size:10.909091pt;--inkwell-heading-1-size:14.346202pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:10.909091pt;--inkwell-heading-4-size:10.909091pt;--inkwell-heading-5-size:10.909091pt;--inkwell-heading-6-size:10.909091pt;--inkwell-body-font:\"Latin Modern Roman\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Latin Modern Roman\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.738813;",
-    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{9pt}{10.8pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -4916,6 +5144,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#336699",
         "ruleThicknessPt": 0,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -4943,6 +5173,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -5074,6 +5306,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -5175,6 +5413,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#336699",
       "ruleThicknessPt": 0,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -5185,7 +5425,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:10.909091pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:8.966376pt;--inkwell-caption-size:10.909091pt;--inkwell-reference-size:10.909091pt;--inkwell-heading-1-size:14.346202pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:10.909091pt;--inkwell-heading-4-size:10.909091pt;--inkwell-heading-5-size:10.909091pt;--inkwell-heading-6-size:10.909091pt;--inkwell-body-font:\"Latin Modern Roman\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Latin Modern Roman\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.738813;",
-    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{9pt}{10.8pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -5198,6 +5438,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#336699",
         "ruleThicknessPt": 0,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -5225,6 +5467,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -5356,6 +5600,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -5457,6 +5707,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#336699",
       "ruleThicknessPt": 0.8,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -5467,7 +5719,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:10.909091pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:8.966376pt;--inkwell-caption-size:10.909091pt;--inkwell-reference-size:10.909091pt;--inkwell-heading-1-size:14.346202pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:10.909091pt;--inkwell-heading-4-size:10.909091pt;--inkwell-heading-5-size:10.909091pt;--inkwell-heading-6-size:10.909091pt;--inkwell-body-font:\"Latin Modern Roman\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Latin Modern Roman\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.738813;",
-    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:#f5f5fa;--inkwell-table-rule-color:#336699;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:#f5f5fa;--inkwell-table-rule-color:#336699;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{9pt}{10.8pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -5480,6 +5732,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#336699",
         "ruleThicknessPt": 0.8,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -5507,6 +5761,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -5638,6 +5894,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -5739,6 +6001,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#336699",
       "ruleThicknessPt": 0.8,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -5749,7 +6013,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:10.909091pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:8.966376pt;--inkwell-caption-size:10.909091pt;--inkwell-reference-size:10.909091pt;--inkwell-heading-1-size:14.346202pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:10.909091pt;--inkwell-heading-4-size:10.909091pt;--inkwell-heading-5-size:10.909091pt;--inkwell-heading-6-size:10.909091pt;--inkwell-body-font:\"Latin Modern Roman\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Latin Modern Roman\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.738813;",
-    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:#f5f5fa;--inkwell-table-rule-color:#336699;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:#f5f5fa;--inkwell-table-rule-color:#336699;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{9pt}{10.8pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -5762,6 +6026,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#336699",
         "ruleThicknessPt": 0.8,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -5789,6 +6055,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -5920,6 +6188,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -6021,6 +6295,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#336699",
       "ruleThicknessPt": 0.5,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 3,
       "paddingVerticalPt": 1.5,
       "alignment": [],
@@ -6031,7 +6307,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:10.909091pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:8.966376pt;--inkwell-caption-size:10.909091pt;--inkwell-reference-size:10.909091pt;--inkwell-heading-1-size:14.346202pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:10.909091pt;--inkwell-heading-4-size:10.909091pt;--inkwell-heading-5-size:10.909091pt;--inkwell-heading-6-size:10.909091pt;--inkwell-body-font:\"Latin Modern Roman\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Latin Modern Roman\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.738813;",
-    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-padding-horizontal:2.988792pt;--inkwell-table-padding-vertical:1.494396pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:2.988792pt;--inkwell-table-padding-vertical:1.494396pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{9pt}{10.8pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -6044,6 +6320,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#336699",
         "ruleThicknessPt": 0.5,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 3,
         "paddingVerticalPt": 1.5,
         "alignment": [],
@@ -6071,6 +6349,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -6202,6 +6482,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -6303,6 +6589,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#336699",
       "ruleThicknessPt": 0.5,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 3,
       "paddingVerticalPt": 1.5,
       "alignment": [],
@@ -6313,7 +6601,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:10.909091pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:8.966376pt;--inkwell-caption-size:10.909091pt;--inkwell-reference-size:10.909091pt;--inkwell-heading-1-size:14.346202pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:10.909091pt;--inkwell-heading-4-size:10.909091pt;--inkwell-heading-5-size:10.909091pt;--inkwell-heading-6-size:10.909091pt;--inkwell-body-font:\"Latin Modern Roman\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Latin Modern Roman\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.738813;",
-    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-padding-horizontal:2.988792pt;--inkwell-table-padding-vertical:1.494396pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:2.988792pt;--inkwell-table-padding-vertical:1.494396pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{9pt}{10.8pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -6326,6 +6614,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#336699",
         "ruleThicknessPt": 0.5,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 3,
         "paddingVerticalPt": 1.5,
         "alignment": [],
@@ -6353,6 +6643,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -6482,6 +6774,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -6583,6 +6881,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.5,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 3,
       "paddingVerticalPt": 1.5,
       "alignment": [],
@@ -6593,7 +6893,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:10.909091pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:9.96264pt;--inkwell-caption-size:10.909091pt;--inkwell-reference-size:10.909091pt;--inkwell-heading-1-size:14.346202pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:10.909091pt;--inkwell-heading-4-size:10.909091pt;--inkwell-heading-5-size:10.909091pt;--inkwell-heading-6-size:10.909091pt;--inkwell-body-font:\"Latin Modern Roman\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Latin Modern Roman\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.738813;",
-    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-padding-horizontal:2.988792pt;--inkwell-table-padding-vertical:1.494396pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:2.988792pt;--inkwell-table-padding-vertical:1.494396pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{10pt}{12pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -6606,6 +6906,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.5,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 3,
         "paddingVerticalPt": 1.5,
         "alignment": [],
@@ -6632,6 +6934,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -6761,6 +7065,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -6862,6 +7172,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.5,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 3,
       "paddingVerticalPt": 1.5,
       "alignment": [],
@@ -6872,7 +7184,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:10.909091pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:9.96264pt;--inkwell-caption-size:10.909091pt;--inkwell-reference-size:10.909091pt;--inkwell-heading-1-size:14.346202pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:10.909091pt;--inkwell-heading-4-size:10.909091pt;--inkwell-heading-5-size:10.909091pt;--inkwell-heading-6-size:10.909091pt;--inkwell-body-font:\"Latin Modern Roman\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Latin Modern Roman\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.738813;",
-    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-padding-horizontal:2.988792pt;--inkwell-table-padding-vertical:1.494396pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:#f5f5fa;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:2.988792pt;--inkwell-table-padding-vertical:1.494396pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:#f5f5fa;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{10pt}{12pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -6885,6 +7197,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.5,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 3,
         "paddingVerticalPt": 1.5,
         "alignment": [],
@@ -6911,6 +7225,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -7040,6 +7356,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -7141,6 +7463,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.5,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -7151,7 +7475,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:10.909091pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:9.96264pt;--inkwell-caption-size:10.909091pt;--inkwell-reference-size:10.909091pt;--inkwell-heading-1-size:14.346202pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:10.909091pt;--inkwell-heading-4-size:10.909091pt;--inkwell-heading-5-size:10.909091pt;--inkwell-heading-6-size:10.909091pt;--inkwell-body-font:\"Latin Modern Roman\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Latin Modern Roman\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.738813;",
-    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{10pt}{12pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -7164,6 +7488,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.5,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -7190,6 +7516,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -7319,6 +7647,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -7420,6 +7754,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.5,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -7430,7 +7766,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:10.909091pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:9.96264pt;--inkwell-caption-size:10.909091pt;--inkwell-reference-size:10.909091pt;--inkwell-heading-1-size:14.346202pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:10.909091pt;--inkwell-heading-4-size:10.909091pt;--inkwell-heading-5-size:10.909091pt;--inkwell-heading-6-size:10.909091pt;--inkwell-body-font:\"Latin Modern Roman\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Latin Modern Roman\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.738813;",
-    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:#f5f5fa;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:#f5f5fa;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{10pt}{12pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -7443,6 +7779,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.5,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -7469,6 +7807,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -7598,6 +7938,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -7699,6 +8045,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.5,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 8,
       "paddingVerticalPt": 5,
       "alignment": [],
@@ -7709,7 +8057,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:10.909091pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:9.96264pt;--inkwell-caption-size:10.909091pt;--inkwell-reference-size:10.909091pt;--inkwell-heading-1-size:14.346202pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:10.909091pt;--inkwell-heading-4-size:10.909091pt;--inkwell-heading-5-size:10.909091pt;--inkwell-heading-6-size:10.909091pt;--inkwell-body-font:\"Latin Modern Roman\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Latin Modern Roman\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.738813;",
-    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-padding-horizontal:7.970112pt;--inkwell-table-padding-vertical:4.98132pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:7.970112pt;--inkwell-table-padding-vertical:4.98132pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{10pt}{12pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -7722,6 +8070,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.5,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 8,
         "paddingVerticalPt": 5,
         "alignment": [],
@@ -7748,6 +8098,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -7877,6 +8229,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -7978,6 +8336,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.5,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 8,
       "paddingVerticalPt": 5,
       "alignment": [],
@@ -7988,7 +8348,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:10.909091pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:9.96264pt;--inkwell-caption-size:10.909091pt;--inkwell-reference-size:10.909091pt;--inkwell-heading-1-size:14.346202pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:10.909091pt;--inkwell-heading-4-size:10.909091pt;--inkwell-heading-5-size:10.909091pt;--inkwell-heading-6-size:10.909091pt;--inkwell-body-font:\"Latin Modern Roman\",serif;--inkwell-sans-font:\"Latin Modern Sans\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Latin Modern Roman\",serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.738813;",
-    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-padding-horizontal:7.970112pt;--inkwell-table-padding-vertical:4.98132pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:#f5f5fa;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:7.970112pt;--inkwell-table-padding-vertical:4.98132pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:#f5f5fa;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{10pt}{12pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -8001,6 +8361,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.5,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 8,
         "paddingVerticalPt": 5,
         "alignment": [],
@@ -8027,6 +8389,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -8174,6 +8538,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -8275,6 +8645,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.8,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -8285,7 +8657,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:9.96264pt;--inkwell-code-size:7.970112pt;--inkwell-table-size:9.96264pt;--inkwell-caption-size:8.966376pt;--inkwell-reference-size:6.973848pt;--inkwell-heading-1-size:17.215442pt;--inkwell-heading-2-size:14.346202pt;--inkwell-heading-3-size:11.955168pt;--inkwell-heading-4-size:11.955168pt;--inkwell-heading-5-size:11.955168pt;--inkwell-heading-6-size:11.955168pt;--inkwell-body-font:\"Times New Roman\",sans-serif;--inkwell-sans-font:\"Arial\",sans-serif;--inkwell-mono-font:\"Courier New\",monospace;--inkwell-heading-font:\"Arial\",sans-serif;--inkwell-heading-weight:400;--inkwell-heading-color:#336699;--inkwell-line-spacing:1.4892;",
-    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "\\setmainfont[Scale=1]{Times New Roman}\n\\setsansfont[Scale=1]{Arial}\n\\setmonofont[Scale=1]{Courier New}\n% Inkwell heading typography\n\\newfontfamily\\inkwellheadingfont{Arial}[Scale=1]\n\\definecolor{inkwellheadingcolor}{HTML}{336699}\n\\setkomafont{section}{\\normalfont\\inkwellheadingfont\\fontsize{17.28pt}{20.736pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}\n\\setkomafont{subsection}{\\normalfont\\inkwellheadingfont\\fontsize{14.4pt}{17.28pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}\n\\setkomafont{subsubsection}{\\normalfont\\inkwellheadingfont\\fontsize{12pt}{14.4pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}\n\\setkomafont{paragraph}{\\normalfont\\inkwellheadingfont\\fontsize{12pt}{14.4pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}\n\\setkomafont{subparagraph}{\\normalfont\\inkwellheadingfont\\fontsize{12pt}{14.4pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}\n\\makeatletter\n\\renewcommand*\\sectionlinesformat[4]{\\noindent\\singlespacing\\usekomafont{#1}\\@hangfrom{\\hskip #2#3}{#4}}\n\\makeatother\n% Inkwell highlighted and plain code sizing\n\\usepackage{fvextra}\n\\newcommand{\\inkwellcodesize}{\\fontsize{8pt}{9.6pt}\\selectfont}\n\\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\\\\{\\},breaklines,breakanywhere,fontsize=\\inkwellcodesize}\n\\DefineVerbatimEnvironment{verbatim}{Verbatim}{breaklines,breakanywhere,fontsize=\\inkwellcodesize}\n% Inkwell figure and body-table caption sizing\n\\DeclareCaptionFont{inkwellcaption}{\\fontsize{9pt}{10.8pt}\\selectfont}\n\\captionsetup[figure]{font=inkwellcaption}\n\\captionsetup[table]{font=inkwellcaption}\n% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{10pt}{12pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -8298,6 +8670,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.8,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -8320,6 +8694,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -8467,6 +8843,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -8568,6 +8950,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.8,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -8578,7 +8962,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:10.909091pt;--inkwell-code-size:7.970112pt;--inkwell-table-size:9.96264pt;--inkwell-caption-size:8.966376pt;--inkwell-reference-size:6.973848pt;--inkwell-heading-1-size:17.215442pt;--inkwell-heading-2-size:14.346202pt;--inkwell-heading-3-size:13.090909pt;--inkwell-heading-4-size:13.090909pt;--inkwell-heading-5-size:13.090909pt;--inkwell-heading-6-size:13.090909pt;--inkwell-body-font:\"Times New Roman\",sans-serif;--inkwell-sans-font:\"Arial\",sans-serif;--inkwell-mono-font:\"Courier New\",monospace;--inkwell-heading-font:\"Arial\",sans-serif;--inkwell-heading-weight:400;--inkwell-heading-color:#336699;--inkwell-line-spacing:1.541333;",
-    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "\\setmainfont[Scale=1]{Times New Roman}\n\\setsansfont[Scale=1]{Arial}\n\\setmonofont[Scale=1]{Courier New}\n% Inkwell heading typography\n\\newfontfamily\\inkwellheadingfont{Arial}[Scale=1]\n\\definecolor{inkwellheadingcolor}{HTML}{336699}\n\\setkomafont{section}{\\normalfont\\inkwellheadingfont\\fontsize{17.28pt}{20.736pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}\n\\setkomafont{subsection}{\\normalfont\\inkwellheadingfont\\fontsize{14.4pt}{17.28pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}\n\\setkomafont{subsubsection}{\\normalfont\\inkwellheadingfont\\fontsize{13.14pt}{15.768pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}\n\\setkomafont{paragraph}{\\normalfont\\inkwellheadingfont\\fontsize{13.14pt}{15.768pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}\n\\setkomafont{subparagraph}{\\normalfont\\inkwellheadingfont\\fontsize{13.14pt}{15.768pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}\n\\makeatletter\n\\renewcommand*\\sectionlinesformat[4]{\\noindent\\singlespacing\\usekomafont{#1}\\@hangfrom{\\hskip #2#3}{#4}}\n\\makeatother\n% Inkwell highlighted and plain code sizing\n\\usepackage{fvextra}\n\\newcommand{\\inkwellcodesize}{\\fontsize{8pt}{9.6pt}\\selectfont}\n\\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\\\\{\\},breaklines,breakanywhere,fontsize=\\inkwellcodesize}\n\\DefineVerbatimEnvironment{verbatim}{Verbatim}{breaklines,breakanywhere,fontsize=\\inkwellcodesize}\n% Inkwell figure and body-table caption sizing\n\\DeclareCaptionFont{inkwellcaption}{\\fontsize{9pt}{10.8pt}\\selectfont}\n\\captionsetup[figure]{font=inkwellcaption}\n\\captionsetup[table]{font=inkwellcaption}\n% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{10pt}{12pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -8591,6 +8975,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.8,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -8613,6 +8999,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -8760,6 +9148,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -8861,6 +9255,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.8,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -8871,7 +9267,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:11.955168pt;--inkwell-code-size:7.970112pt;--inkwell-table-size:9.96264pt;--inkwell-caption-size:8.966376pt;--inkwell-reference-size:6.973848pt;--inkwell-heading-1-size:20.658531pt;--inkwell-heading-2-size:17.215442pt;--inkwell-heading-3-size:14.346202pt;--inkwell-heading-4-size:14.346202pt;--inkwell-heading-5-size:14.346202pt;--inkwell-heading-6-size:14.346202pt;--inkwell-body-font:\"Times New Roman\",sans-serif;--inkwell-sans-font:\"Arial\",sans-serif;--inkwell-mono-font:\"Courier New\",monospace;--inkwell-heading-font:\"Arial\",sans-serif;--inkwell-heading-weight:400;--inkwell-heading-color:#336699;--inkwell-line-spacing:1.499542;",
-    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:9.96264pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "\\setmainfont[Scale=1]{Times New Roman}\n\\setsansfont[Scale=1]{Arial}\n\\setmonofont[Scale=1]{Courier New}\n% Inkwell heading typography\n\\newfontfamily\\inkwellheadingfont{Arial}[Scale=1]\n\\definecolor{inkwellheadingcolor}{HTML}{336699}\n\\setkomafont{section}{\\normalfont\\inkwellheadingfont\\fontsize{20.736pt}{24.8832pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}\n\\setkomafont{subsection}{\\normalfont\\inkwellheadingfont\\fontsize{17.28pt}{20.736pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}\n\\setkomafont{subsubsection}{\\normalfont\\inkwellheadingfont\\fontsize{14.4pt}{17.28pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}\n\\setkomafont{paragraph}{\\normalfont\\inkwellheadingfont\\fontsize{14.4pt}{17.28pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}\n\\setkomafont{subparagraph}{\\normalfont\\inkwellheadingfont\\fontsize{14.4pt}{17.28pt}\\selectfont\\mdseries\\color{inkwellheadingcolor}}\n\\makeatletter\n\\renewcommand*\\sectionlinesformat[4]{\\noindent\\singlespacing\\usekomafont{#1}\\@hangfrom{\\hskip #2#3}{#4}}\n\\makeatother\n% Inkwell highlighted and plain code sizing\n\\usepackage{fvextra}\n\\newcommand{\\inkwellcodesize}{\\fontsize{8pt}{9.6pt}\\selectfont}\n\\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\\\\{\\},breaklines,breakanywhere,fontsize=\\inkwellcodesize}\n\\DefineVerbatimEnvironment{verbatim}{Verbatim}{breaklines,breakanywhere,fontsize=\\inkwellcodesize}\n% Inkwell figure and body-table caption sizing\n\\DeclareCaptionFont{inkwellcaption}{\\fontsize{9pt}{10.8pt}\\selectfont}\n\\captionsetup[figure]{font=inkwellcaption}\n\\captionsetup[table]{font=inkwellcaption}\n% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{10pt}{12pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -8884,6 +9280,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.8,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -8906,6 +9304,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -9037,6 +9437,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -9138,6 +9544,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#336699",
       "ruleThicknessPt": 0.8,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -9148,7 +9556,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:11.955168pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:8.966376pt;--inkwell-caption-size:11.955168pt;--inkwell-reference-size:11.955168pt;--inkwell-heading-1-size:11.955168pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:11.955168pt;--inkwell-heading-4-size:11.955168pt;--inkwell-heading-5-size:11.955168pt;--inkwell-heading-6-size:11.955168pt;--inkwell-body-font:\"Inter\",sans-serif;--inkwell-sans-font:\"Inter\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Inter\",sans-serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.499542;",
-    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{9pt}{10.8pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -9161,6 +9569,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#336699",
         "ruleThicknessPt": 0.8,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -9188,6 +9598,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -9319,6 +9731,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -9420,6 +9838,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#336699",
       "ruleThicknessPt": 0.8,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -9430,7 +9850,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:11.955168pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:8.966376pt;--inkwell-caption-size:11.955168pt;--inkwell-reference-size:11.955168pt;--inkwell-heading-1-size:11.955168pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:11.955168pt;--inkwell-heading-4-size:11.955168pt;--inkwell-heading-5-size:11.955168pt;--inkwell-heading-6-size:11.955168pt;--inkwell-body-font:\"Inter\",sans-serif;--inkwell-sans-font:\"Inter\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Inter\",sans-serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.499542;",
-    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{9pt}{10.8pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -9443,6 +9863,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#336699",
         "ruleThicknessPt": 0.8,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -9470,6 +9892,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -9601,6 +10025,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -9702,6 +10132,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#336699",
       "ruleThicknessPt": 0.5,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -9712,7 +10144,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:11.955168pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:8.966376pt;--inkwell-caption-size:11.955168pt;--inkwell-reference-size:11.955168pt;--inkwell-heading-1-size:11.955168pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:11.955168pt;--inkwell-heading-4-size:11.955168pt;--inkwell-heading-5-size:11.955168pt;--inkwell-heading-6-size:11.955168pt;--inkwell-body-font:\"Inter\",sans-serif;--inkwell-sans-font:\"Inter\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Inter\",sans-serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.499542;",
-    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{9pt}{10.8pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -9725,6 +10157,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#336699",
         "ruleThicknessPt": 0.5,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -9752,6 +10186,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -9883,6 +10319,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -9984,6 +10426,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#336699",
       "ruleThicknessPt": 0.5,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -9994,7 +10438,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:11.955168pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:8.966376pt;--inkwell-caption-size:11.955168pt;--inkwell-reference-size:11.955168pt;--inkwell-heading-1-size:11.955168pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:11.955168pt;--inkwell-heading-4-size:11.955168pt;--inkwell-heading-5-size:11.955168pt;--inkwell-heading-6-size:11.955168pt;--inkwell-body-font:\"Inter\",sans-serif;--inkwell-sans-font:\"Inter\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Inter\",sans-serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.499542;",
-    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{9pt}{10.8pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -10007,6 +10451,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#336699",
         "ruleThicknessPt": 0.5,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -10034,6 +10480,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -10165,6 +10613,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -10266,6 +10720,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#336699",
       "ruleThicknessPt": 0,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -10276,7 +10732,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:11.955168pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:8.966376pt;--inkwell-caption-size:11.955168pt;--inkwell-reference-size:11.955168pt;--inkwell-heading-1-size:11.955168pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:11.955168pt;--inkwell-heading-4-size:11.955168pt;--inkwell-heading-5-size:11.955168pt;--inkwell-heading-6-size:11.955168pt;--inkwell-body-font:\"Inter\",sans-serif;--inkwell-sans-font:\"Inter\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Inter\",sans-serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.499542;",
-    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{9pt}{10.8pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -10289,6 +10745,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#336699",
         "ruleThicknessPt": 0,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -10316,6 +10774,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -10447,6 +10907,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -10548,6 +11014,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#336699",
       "ruleThicknessPt": 0,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -10558,7 +11026,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:11.955168pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:8.966376pt;--inkwell-caption-size:11.955168pt;--inkwell-reference-size:11.955168pt;--inkwell-heading-1-size:11.955168pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:11.955168pt;--inkwell-heading-4-size:11.955168pt;--inkwell-heading-5-size:11.955168pt;--inkwell-heading-6-size:11.955168pt;--inkwell-body-font:\"Inter\",sans-serif;--inkwell-sans-font:\"Inter\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Inter\",sans-serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.499542;",
-    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{9pt}{10.8pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -10571,6 +11039,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#336699",
         "ruleThicknessPt": 0,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -10598,6 +11068,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -10729,6 +11201,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -10830,6 +11308,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#336699",
       "ruleThicknessPt": 0.8,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -10840,7 +11320,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:11.955168pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:8.966376pt;--inkwell-caption-size:11.955168pt;--inkwell-reference-size:11.955168pt;--inkwell-heading-1-size:11.955168pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:11.955168pt;--inkwell-heading-4-size:11.955168pt;--inkwell-heading-5-size:11.955168pt;--inkwell-heading-6-size:11.955168pt;--inkwell-body-font:\"Inter\",sans-serif;--inkwell-sans-font:\"Inter\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Inter\",sans-serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.499542;",
-    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:#f5f5fa;--inkwell-table-rule-color:#336699;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:#f5f5fa;--inkwell-table-rule-color:#336699;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{9pt}{10.8pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -10853,6 +11333,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#336699",
         "ruleThicknessPt": 0.8,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -10880,6 +11362,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -11011,6 +11495,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -11112,6 +11602,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#336699",
       "ruleThicknessPt": 0.8,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -11122,7 +11614,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:11.955168pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:8.966376pt;--inkwell-caption-size:11.955168pt;--inkwell-reference-size:11.955168pt;--inkwell-heading-1-size:11.955168pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:11.955168pt;--inkwell-heading-4-size:11.955168pt;--inkwell-heading-5-size:11.955168pt;--inkwell-heading-6-size:11.955168pt;--inkwell-body-font:\"Inter\",sans-serif;--inkwell-sans-font:\"Inter\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Inter\",sans-serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.499542;",
-    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:#f5f5fa;--inkwell-table-rule-color:#336699;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.797011pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:#f5f5fa;--inkwell-table-rule-color:#336699;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{9pt}{10.8pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -11135,6 +11627,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#336699",
         "ruleThicknessPt": 0.8,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -11162,6 +11656,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -11293,6 +11789,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -11394,6 +11896,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#336699",
       "ruleThicknessPt": 0.5,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 3,
       "paddingVerticalPt": 1.5,
       "alignment": [],
@@ -11404,7 +11908,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:11.955168pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:8.966376pt;--inkwell-caption-size:11.955168pt;--inkwell-reference-size:11.955168pt;--inkwell-heading-1-size:11.955168pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:11.955168pt;--inkwell-heading-4-size:11.955168pt;--inkwell-heading-5-size:11.955168pt;--inkwell-heading-6-size:11.955168pt;--inkwell-body-font:\"Inter\",sans-serif;--inkwell-sans-font:\"Inter\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Inter\",sans-serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.499542;",
-    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-padding-horizontal:2.988792pt;--inkwell-table-padding-vertical:1.494396pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:2.988792pt;--inkwell-table-padding-vertical:1.494396pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{9pt}{10.8pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -11417,6 +11921,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#336699",
         "ruleThicknessPt": 0.5,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 3,
         "paddingVerticalPt": 1.5,
         "alignment": [],
@@ -11444,6 +11950,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -11575,6 +12083,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -11676,6 +12190,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#336699",
       "ruleThicknessPt": 0.5,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 3,
       "paddingVerticalPt": 1.5,
       "alignment": [],
@@ -11686,7 +12202,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:11.955168pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:8.966376pt;--inkwell-caption-size:11.955168pt;--inkwell-reference-size:11.955168pt;--inkwell-heading-1-size:11.955168pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:11.955168pt;--inkwell-heading-4-size:11.955168pt;--inkwell-heading-5-size:11.955168pt;--inkwell-heading-6-size:11.955168pt;--inkwell-body-font:\"Inter\",sans-serif;--inkwell-sans-font:\"Inter\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Inter\",sans-serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.499542;",
-    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-padding-horizontal:2.988792pt;--inkwell-table-padding-vertical:1.494396pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:8.966376pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:2.988792pt;--inkwell-table-padding-vertical:1.494396pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:#ddeeff;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:#336699;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{9pt}{10.8pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -11699,6 +12215,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#336699",
         "ruleThicknessPt": 0.5,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 3,
         "paddingVerticalPt": 1.5,
         "alignment": [],
@@ -11726,6 +12244,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -11855,6 +12375,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -11956,6 +12482,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.5,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 3,
       "paddingVerticalPt": 1.5,
       "alignment": [],
@@ -11966,7 +12494,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:11.955168pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:10.909091pt;--inkwell-caption-size:11.955168pt;--inkwell-reference-size:11.955168pt;--inkwell-heading-1-size:11.955168pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:11.955168pt;--inkwell-heading-4-size:11.955168pt;--inkwell-heading-5-size:11.955168pt;--inkwell-heading-6-size:11.955168pt;--inkwell-body-font:\"Inter\",sans-serif;--inkwell-sans-font:\"Inter\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Inter\",sans-serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.499542;",
-    "tableCss": "--inkwell-table-font-size:10.909091pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-padding-horizontal:2.988792pt;--inkwell-table-padding-vertical:1.494396pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:10.909091pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:2.988792pt;--inkwell-table-padding-vertical:1.494396pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{10.95pt}{13.14pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -11979,6 +12507,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.5,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 3,
         "paddingVerticalPt": 1.5,
         "alignment": [],
@@ -12005,6 +12535,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -12134,6 +12666,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -12235,6 +12773,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.5,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 3,
       "paddingVerticalPt": 1.5,
       "alignment": [],
@@ -12245,7 +12785,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:11.955168pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:10.909091pt;--inkwell-caption-size:11.955168pt;--inkwell-reference-size:11.955168pt;--inkwell-heading-1-size:11.955168pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:11.955168pt;--inkwell-heading-4-size:11.955168pt;--inkwell-heading-5-size:11.955168pt;--inkwell-heading-6-size:11.955168pt;--inkwell-body-font:\"Inter\",sans-serif;--inkwell-sans-font:\"Inter\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Inter\",sans-serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.499542;",
-    "tableCss": "--inkwell-table-font-size:10.909091pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-padding-horizontal:2.988792pt;--inkwell-table-padding-vertical:1.494396pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:#f5f5fa;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:10.909091pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:2.988792pt;--inkwell-table-padding-vertical:1.494396pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:#f5f5fa;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{10.95pt}{13.14pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -12258,6 +12798,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.5,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 3,
         "paddingVerticalPt": 1.5,
         "alignment": [],
@@ -12284,6 +12826,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -12413,6 +12957,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -12514,6 +13064,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.5,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -12524,7 +13076,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:11.955168pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:10.909091pt;--inkwell-caption-size:11.955168pt;--inkwell-reference-size:11.955168pt;--inkwell-heading-1-size:11.955168pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:11.955168pt;--inkwell-heading-4-size:11.955168pt;--inkwell-heading-5-size:11.955168pt;--inkwell-heading-6-size:11.955168pt;--inkwell-body-font:\"Inter\",sans-serif;--inkwell-sans-font:\"Inter\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Inter\",sans-serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.499542;",
-    "tableCss": "--inkwell-table-font-size:10.909091pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:10.909091pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{10.95pt}{13.14pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -12537,6 +13089,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.5,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -12563,6 +13117,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -12692,6 +13248,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -12793,6 +13355,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.5,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 6,
       "paddingVerticalPt": 3,
       "alignment": [],
@@ -12803,7 +13367,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:11.955168pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:10.909091pt;--inkwell-caption-size:11.955168pt;--inkwell-reference-size:11.955168pt;--inkwell-heading-1-size:11.955168pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:11.955168pt;--inkwell-heading-4-size:11.955168pt;--inkwell-heading-5-size:11.955168pt;--inkwell-heading-6-size:11.955168pt;--inkwell-body-font:\"Inter\",sans-serif;--inkwell-sans-font:\"Inter\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Inter\",sans-serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.499542;",
-    "tableCss": "--inkwell-table-font-size:10.909091pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:#f5f5fa;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:10.909091pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:5.977584pt;--inkwell-table-padding-vertical:2.988792pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:#f5f5fa;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{10.95pt}{13.14pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -12816,6 +13380,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.5,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 6,
         "paddingVerticalPt": 3,
         "alignment": [],
@@ -12842,6 +13408,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -12971,6 +13539,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -13072,6 +13646,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.5,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 8,
       "paddingVerticalPt": 5,
       "alignment": [],
@@ -13082,7 +13658,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:11.955168pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:10.909091pt;--inkwell-caption-size:11.955168pt;--inkwell-reference-size:11.955168pt;--inkwell-heading-1-size:11.955168pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:11.955168pt;--inkwell-heading-4-size:11.955168pt;--inkwell-heading-5-size:11.955168pt;--inkwell-heading-6-size:11.955168pt;--inkwell-body-font:\"Inter\",sans-serif;--inkwell-sans-font:\"Inter\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Inter\",sans-serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.499542;",
-    "tableCss": "--inkwell-table-font-size:10.909091pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-padding-horizontal:7.970112pt;--inkwell-table-padding-vertical:4.98132pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:10.909091pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:7.970112pt;--inkwell-table-padding-vertical:4.98132pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:transparent;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{10.95pt}{13.14pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -13095,6 +13671,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.5,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 8,
         "paddingVerticalPt": 5,
         "alignment": [],
@@ -13121,6 +13699,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,
@@ -13250,6 +13830,12 @@
       "tables.ruleThickness": {
         "support": "supported"
       },
+      "tables.rowRules": {
+        "support": "supported"
+      },
+      "tables.rowRuleColor": {
+        "support": "supported"
+      },
       "tables.paddingHorizontal": {
         "support": "supported"
       },
@@ -13351,6 +13937,8 @@
       "stripeColor": "#f5f5fa",
       "ruleColor": "#000000",
       "ruleThicknessPt": 0.5,
+      "rowRules": false,
+      "rowRuleColor": "#d9d9d9",
       "paddingHorizontalPt": 8,
       "paddingVerticalPt": 5,
       "alignment": [],
@@ -13361,7 +13949,7 @@
       "captionStyle": "normal"
     },
     "typographyCss": "--inkwell-body-size:11.955168pt;--inkwell-code-size:10.909091pt;--inkwell-table-size:10.909091pt;--inkwell-caption-size:11.955168pt;--inkwell-reference-size:11.955168pt;--inkwell-heading-1-size:11.955168pt;--inkwell-heading-2-size:11.955168pt;--inkwell-heading-3-size:11.955168pt;--inkwell-heading-4-size:11.955168pt;--inkwell-heading-5-size:11.955168pt;--inkwell-heading-6-size:11.955168pt;--inkwell-body-font:\"Inter\",sans-serif;--inkwell-sans-font:\"Inter\",sans-serif;--inkwell-mono-font:\"Latin Modern Mono\",monospace;--inkwell-heading-font:\"Inter\",sans-serif;--inkwell-heading-weight:700;--inkwell-heading-color:inherit;--inkwell-line-spacing:1.499542;",
-    "tableCss": "--inkwell-table-font-size:10.909091pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-padding-horizontal:7.970112pt;--inkwell-table-padding-vertical:4.98132pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:#f5f5fa;--inkwell-table-rule-color:currentColor;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
+    "tableCss": "--inkwell-table-font-size:10.909091pt;--inkwell-table-rule-thickness:0.498132pt;--inkwell-table-row-rule-thickness:0pt;--inkwell-table-padding-horizontal:7.970112pt;--inkwell-table-padding-vertical:4.98132pt;--inkwell-table-header-weight:700;--inkwell-table-header-background:transparent;--inkwell-table-stripe-color:#f5f5fa;--inkwell-table-rule-color:currentColor;--inkwell-table-row-rule-color:transparent;--inkwell-table-caption-style:normal;--inkwell-table-width:100%;",
     "latexMacros": "% Used only by body-typography.lua around Pandoc Table nodes\n\\newcommand{\\inkwellbodytablesize}{\\fontsize{10.95pt}{13.14pt}\\selectfont}",
     "tablePdfOptions": {
       "defaults": {
@@ -13374,6 +13962,8 @@
         "stripeColor": "#f5f5fa",
         "ruleColor": "#000000",
         "ruleThicknessPt": 0.5,
+        "rowRules": false,
+        "rowRuleColor": "#d9d9d9",
         "paddingHorizontalPt": 8,
         "paddingVerticalPt": 5,
         "alignment": [],
@@ -13400,6 +13990,8 @@
         "stripeColor": true,
         "ruleColor": true,
         "ruleThicknessPt": true,
+        "rowRules": true,
+        "rowRuleColor": true,
         "paddingHorizontalPt": true,
         "paddingVerticalPt": true,
         "alignment": true,

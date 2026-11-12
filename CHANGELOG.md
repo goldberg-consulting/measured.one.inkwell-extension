@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Add `row-rules` and `row-rule-color` table settings: light rules between body rows in the PDF and preview, without grid's vertical borders or extra rules beside the header and bottom rules.
+- Give measured.one Report body tables the configurable table adapter, so `inkwell: tables:` presets, font size, padding, colors, and row rules apply.
+- Add `hide-wordmark` to the measured.one Report cover: the title becomes the only wordmark, with the Goldberg Consulting line beneath it.
+
 ## 0.5.3 — October 19, 2026
 
 - Restore current Homebrew installation using the same release VSIX, the shared installer, and version-aware removal. Preserve an existing working TeX installation.

@@ -19,6 +19,8 @@ export const TABLE_ATTRIBUTE_SCHEMA: readonly TableAttributeRule[] = [
   { field: "stripeColor", configKey: "tables.stripeColor", aliases: ["table-stripe-color"], type: "color" },
   { field: "ruleColor", configKey: "tables.ruleColor", aliases: ["table-rule-color"], type: "color" },
   { field: "ruleThicknessPt", configKey: "tables.ruleThickness", aliases: ["table-rule-thickness"], type: "size", minimum: 0, maximum: 10 },
+  { field: "rowRules", configKey: "tables.rowRules", aliases: ["table-row-rules"], type: "boolean" },
+  { field: "rowRuleColor", configKey: "tables.rowRuleColor", aliases: ["table-row-rule-color"], type: "color" },
   { field: "paddingHorizontalPt", configKey: "tables.paddingHorizontal", aliases: ["table-padding-horizontal", "table-cell-padding-horizontal"], type: "size", minimum: 0, maximum: 40 },
   { field: "paddingVerticalPt", configKey: "tables.paddingVertical", aliases: ["table-padding-vertical", "table-cell-padding-vertical"], type: "size", minimum: 0, maximum: 40 },
   { field: "alignment", configKey: "tables.alignment", aliases: ["table-alignment", "table-column-alignment"], type: "alignment" },

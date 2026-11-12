@@ -4,10 +4,19 @@ Inkwell uses one presentation model for Markdown tables and generated CSV/JSON
 tables. A table's attributes override document frontmatter, followed by project
 defaults and the template's supported defaults.
 
-Default and ETH Report support `booktabs`, `grid`, `plain`, `zebra`, and `compact`.
-Booktabs uses horizontal rules, grid adds cell borders, plain removes rules,
-zebra adds alternating row backgrounds, and compact reduces cell padding. An
-explicit stripe or density setting overrides the preset's implied value.
+Default, ETH Report, and measured.one Report support `booktabs`, `grid`, `plain`,
+`zebra`, and `compact`. Booktabs uses horizontal rules, grid adds cell borders,
+plain removes rules, zebra adds alternating row backgrounds, and compact reduces
+cell padding. An explicit stripe or density setting overrides the preset's
+implied value.
+
+`row-rules: true` draws a light horizontal rule between body rows without the
+vertical borders of `grid`. No rule is added below the header or above the
+bottom rule. `row-rule-color` sets its color (default `#d9d9d9`); it uses the
+table's `rule-thickness`. Grid already rules every row, so it ignores this
+setting, and tables with cells spanning rows report an error rather than
+drawing a rule through the merged cell. Use `padding-vertical` for the space
+between rows.
 
 ```yaml
 ---
@@ -22,6 +31,8 @@ inkwell:
     stripe-color: '#f5f5fa'
     rule-color: '#446688'
     rule-thickness: 0.5pt
+    row-rules: true
+    row-rule-color: '#d9d9d9'
     padding-horizontal: 4pt
     padding-vertical: 2pt
     alignment: [left, right]
@@ -56,7 +67,7 @@ settings. A label without a caption does not create a numbered table.
 Per-table keys use the `table-` prefix: `table-preset` (or `.grid`, `.plain`, etc.),
 `table-font-size`, `table-stripe`, `table-density`, `table-header-weight`,
 `table-header-background`, `table-stripe-color`, `table-rule-color`,
-`table-rule-thickness`, `table-padding-horizontal`, `table-padding-vertical`,
+`table-rule-thickness`, `table-row-rules`, `table-row-rule-color`, `table-padding-horizontal`, `table-padding-vertical`,
 `table-alignment`, `table-numeric-alignment`, `table-width`,
 `table-caption-position`, and `table-caption-style`. Canonical attributes win
 when their compatibility aliases are also present. Alignment precedence is a

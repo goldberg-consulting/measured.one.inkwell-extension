@@ -44,7 +44,7 @@ export interface TableConfig {
   stripe: boolean; density: "normal" | "compact" | "comfortable"; captionPosition: "above" | "below";
   fontSize?: SizeValue;
   headerWeight?: "normal" | "bold"; headerBackground?: string; stripeColor?: string; ruleColor?: string;
-  ruleThickness?: SizeValue; paddingHorizontal?: SizeValue; paddingVertical?: SizeValue;
+  ruleThickness?: SizeValue; rowRules?: boolean; rowRuleColor?: string; paddingHorizontal?: SizeValue; paddingVertical?: SizeValue;
   alignment?: TableAlignment[]; numericAlignment?: "inherit" | TableAlignment;
   width?: string; overflow?: "wrap" | "fit"; captionStyle?: "normal" | "italic";
 }
@@ -296,11 +296,12 @@ const FIELDS: readonly Field[] = [
   field("tables.captionPosition", "inkwell.caption-style", ["table-caption-position", "caption-style", "tables.caption-position"], enumeration(["above", "below"]), "above or below", ["caption-style", "table-caption-position"]),
   ...TABLE_ATTRIBUTE_SCHEMA.filter(rule => !["preset", "stripe", "density", "fontSizePt", "captionPosition"].includes(rule.field)).map(rule => {
     const parser = rule.type === "color" ? parseTableColor : rule.type === "weight" ? parseTableWeight
+      : rule.type === "boolean" ? boolean
       : rule.type === "alignment" ? parseTableAlignment : rule.type === "width" ? parseTableWidth
       : rule.type === "size" ? (value: unknown) => parseSize(value) || (/^0(?:pt|px|em|rem|%)?$/.test(String(value)) ? { value: 0, unit: "pt" } : undefined)
       : enumeration(rule.values || []);
     return field(rule.configKey, rule.aliases[0], rule.aliases.flatMap(alias => [alias, `inkwell.${alias}`]), parser,
-      rule.values?.join(", ") || (rule.type === "size" ? "a nonnegative size with units" : `a table ${rule.type}`), [...rule.aliases].reverse());
+      rule.values?.join(", ") || (rule.type === "size" ? "a nonnegative size with units" : rule.type === "boolean" ? "true or false" : `a table ${rule.type}`), [...rule.aliases].reverse());
   }),
   field("references.bibliography", "bibliography", ["references.paths"], strings, "a bibliography path or a list of paths"),
   field("references.csl", "csl", [], string, "a CSL path"),

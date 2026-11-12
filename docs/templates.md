@@ -1,6 +1,6 @@
 # Templates
 
-Inkwell ships with ten Pandoc and LaTeX templates. Each template declares the
+Inkwell ships with eleven Pandoc and LaTeX templates. Each template declares the
 PDF engine it needs, so selecting a template also selects the compatible
 compiler. Set the template in document frontmatter or choose **Inkwell: Select
 LaTeX Template** from the Command Palette.
@@ -29,10 +29,29 @@ precedence order.
 | RMxAA | `rmxaa` | `rmaa-rho` | pdfLaTeX | [source](../examples/demo-rmxaa.md) |
 | KTH Letter | `kth-letter` | `kth-letter` | pdfLaTeX | — |
 | ETH Report | `eth-report` | KOMA-Script `standard` | XeLaTeX | [source](../examples/demo-eth-report.md) |
+| measured.one Report (US Letter) | `measured-report` | `report` | XeLaTeX | [source](../examples/demo-measured-report.md) |
 | Hipster CV | `hipster-cv` | `simplehipstercv` | pdfLaTeX | [source](../examples/demo-hipster-cv.md) |
 
 The [example gallery](examples.md) shows the frontmatter and features for each
 template. Built-in template source lives in [`../templates/`](../templates/).
+
+### measured.one Report cover
+
+The cover prints a small `measured.one` wordmark above the document title. Set
+`hide-wordmark: true` when the title already names the firm; the cover then
+shows the title alone, with the Goldberg Consulting line beneath it.
+
+```yaml
+---
+template: measured-report
+title: "Evidence into action"
+hide-wordmark: true
+---
+```
+
+Body tables use the same configurable adapter as Default and ETH Report, so
+`inkwell: tables:` settings such as `font-size`, `padding-vertical`, and
+`row-rules` apply. See [body tables](tables.md).
 
 ## Custom templates
 

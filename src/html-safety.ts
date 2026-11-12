@@ -103,9 +103,9 @@ export function sanitizeHtmlStyle(style: string): string {
     else if (property === "font-variant") valid = /^(?:normal|small-caps)$/.test(value);
     else if (["font-weight", "--inkwell-table-header-weight"].includes(property)) valid = /^(?:normal|bold|400|700)$/.test(value);
     else if (property === "line-height") valid = /^(?:\d+(?:\.\d+)?|\.\d+)$/.test(value) && Number(value) >= 0.5 && Number(value) <= 4;
-    else if (["color", "background-color", "--inkwell-table-header-background", "--inkwell-table-stripe-color", "--inkwell-table-rule-color"].includes(property)) {
+    else if (["color", "background-color", "--inkwell-table-header-background", "--inkwell-table-stripe-color", "--inkwell-table-rule-color", "--inkwell-table-row-rule-color"].includes(property)) {
       valid = /^(?:#[a-f0-9]{3}|#[a-f0-9]{6}|transparent|currentColor|black|white)$/i.test(value);
-    } else if (["font-size", "--inkwell-table-font-size", "--inkwell-table-rule-thickness", "--inkwell-table-padding-horizontal", "--inkwell-table-padding-vertical"].includes(property)) valid = length(value, 64);
+    } else if (["font-size", "--inkwell-table-font-size", "--inkwell-table-rule-thickness", "--inkwell-table-row-rule-thickness", "--inkwell-table-padding-horizontal", "--inkwell-table-padding-vertical"].includes(property)) valid = length(value, 64);
     else if (["width", "--inkwell-table-width"].includes(property)) valid = value === "auto" || length(value);
     else if (["--inkwell-reference-entry-space", "--inkwell-reference-indent"].includes(property)) valid = length(value, 65536);
     else if (["margin-left", "padding-left"].includes(property)) valid = length(value, 16);

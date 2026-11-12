@@ -5,7 +5,8 @@ import { TABLE_ATTRIBUTE_SCHEMA, TableAlignment, TablePreset } from "./table-val
 export interface TableStyle {
   preset: TablePreset; stripe: boolean; density: "normal" | "compact" | "comfortable";
   fontSizePt: number; headerWeight: "normal" | "bold"; headerBackground: string; stripeColor: string;
-  ruleColor: string; ruleThicknessPt: number; paddingHorizontalPt: number; paddingVerticalPt: number;
+  ruleColor: string; ruleThicknessPt: number; rowRules: boolean; rowRuleColor: string;
+  paddingHorizontalPt: number; paddingVerticalPt: number;
   alignment: TableAlignment[]; numericAlignment: "inherit" | TableAlignment;
   width: string; overflow: "wrap" | "fit"; captionPosition: "above" | "below"; captionStyle: "normal" | "italic";
 }
@@ -47,6 +48,7 @@ export function resolveTableStyle(config: DocumentConfig, attributes: Record<str
     headerWeight: table.headerWeight || "bold", headerBackground: table.headerBackground || preset.headerBackground || "transparent",
     stripeColor: table.stripeColor || "#f5f5fa", ruleColor: table.ruleColor || "#000000",
     ruleThicknessPt: points(table.ruleThickness, preset.ruleThicknessPt || 0, "tables.ruleThickness"),
+    rowRules: table.rowRules ?? false, rowRuleColor: table.rowRuleColor || "#d9d9d9",
     paddingHorizontalPt: points(table.paddingHorizontal, padding[0], "tables.paddingHorizontal"),
     paddingVerticalPt: points(table.paddingVertical, padding[1], "tables.paddingVertical"),
     alignment: table.alignment || [], numericAlignment: table.numericAlignment || "inherit",
@@ -61,10 +63,12 @@ export function buildTableCss(style: TableStyle): string {
   const declarations: string[] = [];
   const size = (key: string, points: number) => declarations.push(`--inkwell-table-${key}:${round(points * TEX_POINT_TO_CSS_POINT)}pt`);
   size("font-size", style.fontSizePt); size("rule-thickness", style.ruleThicknessPt);
+  size("row-rule-thickness", style.rowRules ? style.ruleThicknessPt : 0);
   size("padding-horizontal", style.paddingHorizontalPt); size("padding-vertical", style.paddingVerticalPt);
   declarations.push(`--inkwell-table-header-weight:${style.headerWeight === "bold" ? 700 : 400}`,
     `--inkwell-table-header-background:${style.headerBackground}`, `--inkwell-table-stripe-color:${style.stripe ? style.stripeColor : "transparent"}`,
     `--inkwell-table-rule-color:${style.ruleColor === "#000000" ? "currentColor" : style.ruleColor}`,
+    `--inkwell-table-row-rule-color:${style.rowRules ? style.rowRuleColor : "transparent"}`,
     `--inkwell-table-caption-style:${style.captionStyle}`,
     `--inkwell-table-width:${style.width === "auto" ? "100%" : style.width.endsWith("pt") ? `${round(parseFloat(style.width) * TEX_POINT_TO_CSS_POINT)}pt` : style.width}`);
   return declarations.join(";") + ";";

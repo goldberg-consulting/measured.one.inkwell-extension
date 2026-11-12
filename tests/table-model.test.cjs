@@ -62,3 +62,29 @@ test('width and numeric parsing preserve literal values without coercion', () =>
   for (const value of ['0', '0012', '-12.5', '+.5', '1,000.50', '2e-3', '-2.5%', ' 12 ']) assert.equal(isNumericTableValue(value), true, value);
   for (const value of ['', 'NaN', 'Infinity', '1,00', 'USD 2', '{{total}}', '{python} 1+1', '1,000,00']) assert.equal(isNumericTableValue(value), false, value);
 });
+
+test('row rules resolve from nested document keys and table attributes, and preview them only when enabled', () => {
+  const off = resolveTableStyle(config('title: Rules'));
+  assert.equal(off.style.rowRules, false);
+  assert.match(buildTableCss(off.style), /--inkwell-table-row-rule-thickness:0pt;.*--inkwell-table-row-rule-color:transparent/);
+  const nested = config('inkwell:\n  tables:\n    row-rules: true\n    row-rule-color: "#cccccc"\n    rule-thickness: 0.4pt');
+  const on = resolveTableStyle(nested);
+  assert.deepEqual(on.diagnostics, []);
+  assert.equal(on.style.rowRules, true); assert.equal(on.style.rowRuleColor, '#cccccc');
+  assert.match(buildTableCss(on.style), /--inkwell-table-row-rule-color:#cccccc/);
+  assert.equal(tablePdfOptions(nested).enabled, true);
+  assert.equal(resolveTableStyle(config('title: Rules'), { 'table-row-rules': 'true' }).style.rowRules, true);
+  assert.equal(resolveTableStyle(nested, { 'table-row-rules': 'false' }).style.rowRules, false);
+  assert.equal(resolveTableStyle(config('title: Rules'), { 'table-row-rules': 'sometimes' }).diagnostics.filter(item => item.severity === 'error').length, 1);
+});
+
+test('measured.one Report body tables use the configurable adapter', () => {
+  const report = config('template: measured-report\ninkwell:\n  tables:\n    preset: booktabs\n    font-size: 8pt\n    padding-vertical: 3pt\n    row-rules: true');
+  const { style, diagnostics } = resolveTableStyle(report, { 'table-preset': 'grid' });
+  assert.deepEqual(diagnostics, []);
+  assert.equal(style.preset, 'grid'); assert.equal(style.fontSizePt, 8);
+  assert.equal(style.paddingVerticalPt, 3); assert.equal(style.rowRules, true);
+  const options = tablePdfOptions(report);
+  assert.equal(options.supported.preset, true); assert.equal(options.supported.rowRules, true);
+  assert.equal(options.supported.fontSizePt, true);
+});

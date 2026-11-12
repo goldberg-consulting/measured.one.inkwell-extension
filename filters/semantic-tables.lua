@@ -3,11 +3,12 @@
 local directory = PANDOC_SCRIPT_FILE:match('^(.*[/\\])') or ''
 local common = dofile(directory .. 'table-common.lua')
 local presets={booktabs=true,grid=true,plain=true,zebra=true,compact=true}
-local fallback={preset='booktabs',stripe=false,density='normal',fontSizePt=10,headerWeight='bold',stripeColor='#f5f5fa',ruleColor='#000000',ruleThicknessPt=.4,paddingHorizontalPt=6,paddingVerticalPt=0,alignment='source',numericAlignment='inherit',width='auto',overflow='wrap',captionPosition='above',captionStyle='normal'}
+local fallback={preset='booktabs',stripe=false,density='normal',fontSizePt=10,headerWeight='bold',stripeColor='#f5f5fa',ruleColor='#000000',ruleThicknessPt=.4,rowRules=false,rowRuleColor='#d9d9d9',paddingHorizontalPt=6,paddingVerticalPt=0,alignment='source',numericAlignment='inherit',width='auto',overflow='wrap',captionPosition='above',captionStyle='normal'}
 local attribute_fields={
  ['table-preset']='preset',['table-style']='preset',['table-density']='density',['table-font-size']='fontSizePt',
  ['table-stripe']='stripe',['table-header-weight']='headerWeight',['table-header-background']='headerBackground',
  ['table-stripe-color']='stripeColor',['table-rule-color']='ruleColor',['table-rule-thickness']='ruleThicknessPt',
+ ['table-row-rules']='rowRules',['table-row-rule-color']='rowRuleColor',
  ['table-padding-horizontal']='paddingHorizontalPt',['table-padding-vertical']='paddingVerticalPt',
  ['table-alignment']='alignment',['table-numeric-alignment']='numericAlignment',['table-width']='width',
  ['table-overflow']='overflow',['table-caption-position']='captionPosition',['table-caption-style']='captionStyle',
@@ -50,14 +51,14 @@ local function validate(field,value,options)
  for _,candidate in ipairs(options.attributeSchema or {}) do if candidate.field==field then rule=candidate;break end end
  if rule.type=='size' then return points(value,field,options,rule.minimum or 0,rule.maximum or 200) end
  if field=='preset' then if not presets[value] then common.fail('invalid table preset') end;return value end
- if field=='stripe' then
+ if field=='stripe' or field=='rowRules' then
   if value==true or value=='true' then return true elseif value==false or value=='false' then return false end
-  common.fail('table stripe must be true or false')
+  common.fail((field=='stripe' and 'table stripe' or 'table row rules')..' must be true or false')
  end
  if field=='fontSizePt' then return points(value,'table font',options,1,72) end
  if field=='ruleThicknessPt' then return points(value,'rule thickness',options,0,8) end
  if field=='paddingHorizontalPt' or field=='paddingVerticalPt' then return points(value,'table padding',options,0,72) end
- if field=='headerBackground' or field=='stripeColor' or field=='ruleColor' then local c=color(value,field,options);return c and '#'..c:lower() or nil end
+ if field=='headerBackground' or field=='stripeColor' or field=='ruleColor' or field=='rowRuleColor' then local c=color(value,field,options);return c and '#'..c:lower() or nil end
  if field=='density' then return choice(value,{'compact','normal','comfortable'},field) end
  if field=='headerWeight' then if value==400 or value=='400' then value='normal' elseif value==700 or value=='700' then value='bold' end;return choice(value,{'normal','bold'},field) end
  if field=='captionPosition' then return choice(value,{'above','below'},field) end
@@ -218,12 +219,16 @@ local function render(t,style,options)
  local numeric=numeric_columns(t)
  local grid=not width_only and style.preset=='grid'
  local is_plain=not width_only and style.preset=='plain'
+ local row_rules=not width_only and not grid and style.rowRules==true
+ local body_rows=0
+ for _,body in ipairs(t.bodies) do body_rows=body_rows+#body.body end
  local body_row=0
  local function decorate(rows,header)
   for _,row in ipairs(rows) do
    if not header then body_row=body_row+1 end
    for _,cell in ipairs(row.cells) do
     if grid and (cell.row_span>1 or cell.col_span>1) then common.fail('grid rules for merged cells are not supported; choose booktabs or plain for this table') end
+    if row_rules and not header and cell.row_span>1 then common.fail('row rules for cells spanning rows are not supported; turn off row rules for this table') end
     local background=header and style.headerBackground or (not header and style.stripe and body_row%2==0 and style.stripeColor or nil)
     local prefix=''
     local background_color=background and color(background,'background',options) or nil
@@ -236,7 +241,7 @@ local function render(t,style,options)
      cell.contents:insert(pandoc.RawBlock('latex','\\inkwellCellPaddingEnd{'..padding..'}'))
     end
    end
-   if grid and #row.cells>0 then end_marker(row.cells[#row.cells]) end
+   if (grid or (row_rules and not header and body_row<body_rows)) and #row.cells>0 then end_marker(row.cells[#row.cells]) end
   end
  end
  if not width_only then
@@ -287,6 +292,14 @@ local function render(t,style,options)
   tex=tex:gsub('\\inkwellTableRowMarker{%d+}(%s*\\\\)','%1\\hline')
   if tex:find('\\inkwellTableRowMarker') then common.fail('unsupported writer row boundary; choose booktabs for this table') end
   tex=tex:gsub('\\toprule\\noalign{}','\\hline'):gsub('\\midrule\\noalign{}',''):gsub('\\bottomrule\\noalign{}','')
+ elseif row_rules then
+  -- A rule drawn in \noalign spans the table without colortbl state, so the
+  -- booktabs rules keep the document rule color.
+  local rule='\\noalign{{\\color[HTML]{'..(color(style.rowRuleColor,'row rule',options) or 'D9D9D9')..'}\\hrule height '..math.max(style.ruleThicknessPt,.1)..'pt}}'
+  tex=tex:gsub('\\inkwellTableRowMarker{%d+}(%s*\\end{minipage}%s*\\\\)',function(boundary) return boundary..rule end)
+  tex=tex:gsub('\\inkwellTableRowMarker{%d+}(%s*\\\\)',function(boundary) return boundary..rule end)
+  if tex:find('\\inkwellTableRowMarker') then common.fail('unsupported writer row boundary; turn off row rules for this table') end
+  if is_plain then tex=tex:gsub('\\toprule\\noalign{}',''):gsub('\\midrule\\noalign{}',''):gsub('\\bottomrule\\noalign{}','') end
  elseif is_plain then tex=tex:gsub('\\toprule\\noalign{}',''):gsub('\\midrule\\noalign{}',''):gsub('\\bottomrule\\noalign{}','') end
  if width_only then return pandoc.RawBlock('latex','\\begingroup\n% Inkwell bounded table width; template presentation preserved.\n'..tex..'\n\\endgroup') end
  -- A multiline cell may get a writer-owned trailing strut. Keep it from

@@ -9,7 +9,7 @@ const root = path.resolve(__dirname, '..');
 const pandoc = process.env.INKWELL_PANDOC || 'pandoc';
 const available = cp.spawnSync(pandoc, ['--version'], { encoding: 'utf8' }).status === 0;
 const markdown = '| Heading | Number |\n|:--|--:|\n| **Rich** cell | 1.25 |\n| Last | 2 |\n\n: A caption {#tbl:one}\n';
-const defaults = { preset: 'booktabs', stripe: false, density: 'normal', fontSizePt: 10, headerWeight: 'bold', headerBackground: null, stripeColor: '#f5f5fa', ruleColor: '#000000', ruleThicknessPt: .4, paddingHorizontalPt: 6, paddingVerticalPt: 0, alignment: 'source', numericAlignment: 'source', width: 'auto', overflow: 'wrap', captionPosition: 'above', captionStyle: 'normal' };
+const defaults = { preset: 'booktabs', stripe: false, density: 'normal', fontSizePt: 10, headerWeight: 'bold', headerBackground: null, stripeColor: '#f5f5fa', ruleColor: '#000000', ruleThicknessPt: .4, rowRules: false, rowRuleColor: '#d9d9d9', paddingHorizontalPt: 6, paddingVerticalPt: 0, alignment: 'source', numericAlignment: 'source', width: 'auto', overflow: 'wrap', captionPosition: 'above', captionStyle: 'normal' };
 function convert(source, options = {}) {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'inkwell-table-filter-'));
   try {
@@ -185,4 +185,42 @@ test('alignment order is local attributes, source markers, document defaults, nu
   const local = convert(markdown.replace('{#tbl:one}', '{#tbl:one table-alignment="center center"}'), { model });
   assert.equal(local.status, 0, local.stderr);
   assert.doesNotMatch(local.stdout, /raggedright|raggedleft/);
+});
+
+test('row rules separate body rows only and keep booktabs rules in the document color', { skip: !available }, () => {
+  const source = markdown.replace('| Last | 2 |', '| Middle | 3 |\n| Last | 2 |').replace('{#tbl:one}', '{#tbl:one table-row-rules=true table-row-rule-color="#cccccc" table-rule-color="#102f35"}');
+  const result = convert(source, { model: {} });
+  assert.equal(result.status, 0, result.stderr);
+  const rules = result.stdout.match(/\\\\\\noalign\{\{\\color\[HTML\]\{CCCCCC\}\\hrule height 0\.4pt\}\}/g) || [];
+  assert.equal(rules.length, 2);
+  assert.match(result.stdout, /\\arrayrulecolor\[HTML\]\{102F35\}/);
+  assert.match(result.stdout, /\\midrule\\noalign\{\}/);
+  assert.match(result.stdout, /\\bottomrule\\noalign\{\}/);
+  const body = result.stdout.slice(result.stdout.indexOf('\\endlastfoot'));
+  assert.doesNotMatch(body.slice(body.lastIndexOf('Last')), /hrule/);
+  assert.doesNotMatch(result.stdout, /inkwellTableRowMarker/);
+  const off = convert(source.replace('table-row-rules=true', 'table-row-rules=false'), { model: {} });
+  assert.equal(off.status, 0, off.stderr);
+  assert.doesNotMatch(off.stdout, /\\hrule/);
+});
+
+test('row rules defer to grid, compose with stripes, and reject unsafe values', { skip: !available }, () => {
+  const grid = convert(markdown.replace('{#tbl:one}', '{#tbl:one .grid table-row-rules=true}'), { model: {} });
+  assert.equal(grid.status, 0, grid.stderr);
+  assert.doesNotMatch(grid.stdout, /\\hrule/);
+  assert.match(grid.stdout, /\\hline/);
+  const zebra = convert(markdown.replace('{#tbl:one}', '{#tbl:one table-stripe=true table-row-rules=true}'), { model: {} });
+  assert.equal(zebra.status, 0, zebra.stderr);
+  assert.match(zebra.stdout, /cellcolor/); assert.match(zebra.stdout, /\\hrule/);
+  for (const attrs of ['table-row-rules=maybe', 'table-row-rules=true table-row-rule-color="red}\\\\evil"']) {
+    const bad = convert(markdown.replace('{#tbl:one}', `{#tbl:one ${attrs}}`), { model: {} });
+    assert.notEqual(bad.status, 0, attrs);
+    assert.match(bad.stderr, /row rule|color|invalid/i);
+  }
+});
+
+test('document-level row rules apply to unattributed tables when the adapter is enabled', { skip: !available }, () => {
+  const result = convert(markdown, { model: { defaults: { ...defaults, rowRules: true }, explicit: ['rowRules'] } });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal((result.stdout.match(/\\hrule/g) || []).length, 1);
 });

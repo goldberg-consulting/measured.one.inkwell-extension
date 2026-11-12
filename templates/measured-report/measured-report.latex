@@ -150,6 +150,13 @@ $endfor$
 \begin{titlepage}
 \MeasuredCover
 \color{white}\sffamily
+$if(hide-wordmark)$
+\par\vspace*{1.6in}
+\begin{minipage}{0.93\textwidth}
+{\fontsize{38}{43}\selectfont\bfseries $if(title)$$title$$else$Evidence into action$endif$\par}
+\vspace{0.16in}
+{\small GOLDBERG CONSULTING\enspace /\enspace RESEARCH + ADVISORY\par}
+$else$
 \vspace*{0.15in}
 {\fontsize{25}{30}\selectfont\bfseries measured.one\par}
 \vspace{0.12in}
@@ -157,6 +164,7 @@ $endfor$
 \vspace{0.85in}
 \begin{minipage}{0.93\textwidth}
 {\fontsize{38}{43}\selectfont\bfseries $if(title)$$title$$else$Evidence into action$endif$\par}
+$endif$
 $if(subtitle)$\vspace{0.25in}{\Large $subtitle$\par}$endif$
 \end{minipage}
 \vfill

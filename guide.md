@@ -80,6 +80,7 @@ inkwell:
   tables: booktabs            # booktabs, grid, plain, zebra, compact
   table-font-size: small
   table-stripe: true
+  table-row-rules: true       # light rules between body rows
   hanging-indent: true        # hanging indent for bibliography entries
   columns: 2                  # force two-column layout (default template)
   caption-style: above        # above or below

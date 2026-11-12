@@ -178,6 +178,9 @@ blockquote {
 }
 .inkwell-table thead { border-bottom: var(--inkwell-table-rule-thickness) solid var(--inkwell-table-rule-color); }
 .inkwell-table tbody tr:nth-child(even) { background: var(--inkwell-table-stripe-color); }
+.inkwell-table tbody tr + tr > * {
+    border-top: var(--inkwell-table-row-rule-thickness, 0pt) solid var(--inkwell-table-row-rule-color, transparent);
+}
 .inkwell-document table.inkwell-table.table-preset-grid,
 .inkwell-table.table-preset-grid th, .inkwell-table.table-preset-grid td {
     border: var(--inkwell-table-rule-thickness) solid var(--inkwell-table-rule-color);

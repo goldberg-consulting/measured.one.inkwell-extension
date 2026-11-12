@@ -64,6 +64,8 @@ const typographyAdapterOptions: Readonly<Record<string, TemplateOptionCapability
 const tableAdapterOptions: Readonly<Record<string, TemplateOptionCapability>> = Object.fromEntries(TABLE_ATTRIBUTE_SCHEMA
   .filter(rule => rule.configKey.startsWith("tables."))
   .map(rule => [rule.configKey, supported(rule.field === "overflow" ? ["wrap"] : rule.values)]));
+/** Single-column templates whose body tables use the scoped semantic-table adapter. */
+const bodyTableAdapter = ["default", "eth-report", "measured-report"];
 const lockedFamilies: Record<string, string> = {
   "hipster-cv": "Latin Modern Roman (class-owned)", "kth-letter": "Times (class-owned)",
   ludus: "Source Sans 3; Helvetica Neue or Latin Modern Sans fallback", rho: "STIX Two Text (class-owned)",
@@ -79,12 +81,13 @@ function capabilities(
   const options = {
     ...sharedOptions,
     ...Object.fromEntries(TABLE_ATTRIBUTE_SCHEMA.filter(rule => rule.configKey.startsWith("tables.")).map(rule => [rule.configKey,
-      id === "default" || id === "eth-report" ? tableAdapterOptions[rule.configKey]
+      bodyTableAdapter.includes(id) ? tableAdapterOptions[rule.configKey]
         : ["rho", "rmxaa", "ludus", "hipster-cv"].includes(id) && ["width", "overflow"].includes(rule.field)
           ? supported(rule.field === "overflow" ? ["wrap"] : undefined)
-        : rule.field === "preset" ? locked("booktabs", `${name} preserves its native body-table rules. Choose Default or ETH Report for other presets.`)
-        : locked(rule.field === "captionPosition" ? "above" : undefined, `${name} owns this table option. Choose Default or ETH Report for configurable body-table styles.`)])),
+        : rule.field === "preset" ? locked("booktabs", `${name} preserves its native body-table rules. Choose Default, ETH Report, or measured.one Report for other presets.`)
+        : locked(rule.field === "captionPosition" ? "above" : undefined, `${name} owns this table option. Choose Default, ETH Report, or measured.one Report for configurable body-table styles.`)])),
     ...(id === "default" || id === "eth-report" ? typographyAdapterOptions : {}),
+    ...(id === "measured-report" ? { "typography.tableSize": supported() } : {}),
     "typography.bodyFont": bodyFonts ? supported() : { ...locked(undefined, reason), valueLabel: lockedFamilies[id] || "Class-owned font" },
     "typography.sansFont": bodyFonts ? supported() : { ...locked(undefined, reason), valueLabel: "Class-owned sans-serif font" },
     "typography.monoFont": bodyFonts ? supported() : { ...locked(undefined, reason), valueLabel: "Class-owned monospace font" },
